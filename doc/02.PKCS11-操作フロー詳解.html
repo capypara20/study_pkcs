@@ -1,0 +1,1939 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PKCS#11 操作フロー詳解 — 乱数 / 署名 / 鍵生成</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/common.css">
+<link rel="stylesheet" href="assets/02.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="dot"></span>PKCS#11 操作フロー詳解</div>
+  <div style="display: flex; gap: 1rem; align-items: center;">
+    <div class="progress"><span class="cur" id="curNum">01</span><span> / <span id="totalNum">21</span></span></div>
+    <button class="toc-btn" id="tocBtn" type="button" aria-label="目次を開く" aria-haspopup="dialog">INDEX</button>
+  </div>
+</header>
+
+<div class="toc-modal" id="tocModal" role="dialog" aria-modal="true" aria-label="目次">
+  <div class="toc-content">
+    <h3>目次 — INDEX</h3>
+    <ul class="toc-list" id="tocList"></ul>
+  </div>
+</div>
+
+<main class="deck" id="deck">
+
+<!-- ====== SLIDE 01: TITLE ====== -->
+<section class="slide title-slide" data-title="タイトル">
+  <span class="slide-num">01 / 22</span>
+  <div class="slide-inner">
+    <div class="title-mark">Operation Flows · 準備 → 実行 → 結果</div>
+    <h1 class="title">
+      PKCS#11<br>
+      <span class="accent">操作フロー</span>詳解
+    </h1>
+    <div class="title-line"></div>
+    <p class="subtitle">
+      乱数生成・署名・鍵生成<br>
+      ライブラリとHSMの内側で何が起きているか
+    </p>
+    <div class="title-meta">
+      <strong>対象</strong> :  PKCS#11入門ドキュメントを読了した開発者<br>
+      <strong>到達点</strong> : 性能測定の計測点を判断できる状態<br>
+      <strong>進め方</strong> : 3操作 × 5フェーズ（概要→準備→実行→結果→性能評価）
+    </div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 02: TOC ====== -->
+<section class="slide" data-title="目次">
+  <span class="slide-num">02 / 22</span>
+  <div class="slide-inner">
+    <span class="slide-tag">CONTENTS</span>
+    <h2>このドキュメントの構成</h2>
+    <p class="lead">3つの操作を <strong>概要 → 準備 → 実行 → 結果 → 性能評価</strong> の5フェーズで掘り下げる。各章で <span class="measure-marker">★ 測定点</span> を明示する。</p>
+
+    <div class="cols-2">
+      <div>
+        <div class="kv">
+          <div class="kv-row"><div class="k">CHAPTER 1</div><div class="v" style="color:#5e88a6;font-weight:700">乱数生成</div></div>
+          <div class="kv-row"><div class="k">03</div><div class="v">概要：最もシンプルな単発操作</div></div>
+          <div class="kv-row"><div class="k">04</div><div class="v">準備フェーズ</div></div>
+          <div class="kv-row"><div class="k">05</div><div class="v">実行フェーズ + シーケンス図</div></div>
+          <div class="kv-row"><div class="k">06</div><div class="v">結果フェーズ + コード例</div></div>
+          <div class="kv-row"><div class="k">07</div><div class="v">★ 性能評価ポイント</div></div>
+        </div>
+
+        <div class="kv">
+          <div class="kv-row"><div class="k">CHAPTER 2</div><div class="v" style="color:var(--vault);font-weight:700">署名</div></div>
+          <div class="kv-row"><div class="k">08</div><div class="v">概要：3段ロケットの実例</div></div>
+          <div class="kv-row"><div class="k">09</div><div class="v">準備フェーズ（C_SignInit）</div></div>
+          <div class="kv-row"><div class="k">10</div><div class="v">実行フェーズ + シーケンス図</div></div>
+          <div class="kv-row"><div class="k">11</div><div class="v">マルチパート vs ワンショット</div></div>
+          <div class="kv-row"><div class="k">12</div><div class="v">結果フェーズ + コード例</div></div>
+          <div class="kv-row"><div class="k">13</div><div class="v">★ 性能評価ポイント</div></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="kv">
+          <div class="kv-row"><div class="k">CHAPTER 3</div><div class="v" style="color:var(--red);font-weight:700">鍵生成</div></div>
+          <div class="kv-row"><div class="k">14</div><div class="v">概要：属性テンプレートの世界</div></div>
+          <div class="kv-row"><div class="k">15</div><div class="v">準備フェーズ（テンプレート構築）</div></div>
+          <div class="kv-row"><div class="k">16</div><div class="v">実行フェーズ + シーケンス図</div></div>
+          <div class="kv-row"><div class="k">17</div><div class="v">RSA / EC / AES の特性差</div></div>
+          <div class="kv-row"><div class="k">18</div><div class="v">結果フェーズ + コード例</div></div>
+          <div class="kv-row"><div class="k">19</div><div class="v">★ 性能評価ポイント</div></div>
+        </div>
+
+        <div class="kv">
+          <div class="kv-row"><div class="k">CLOSING</div><div class="v">総合まとめ</div></div>
+          <div class="kv-row"><div class="k">20</div><div class="v">3操作の性能特性比較</div></div>
+          <div class="kv-row"><div class="k">21</div><div class="v">ベンチマーク設計の総合指針</div></div>
+          <div class="kv-row"><div class="k">22</div><div class="v">References（一次資料）</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 03: Random Overview ====== -->
+<section class="slide" data-title="乱数生成 概要">
+  <span class="slide-num">03 / 22</span>
+  <div class="slide-inner">
+    <span class="slide-tag ch1">CHAPTER 1 · 乱数生成 · 概要</span>
+    <h2><span class="num">03</span>乱数生成 — 最もシンプルな単発操作</h2>
+    <p class="lead">PKCS#11で<strong>もっともシンプルな操作</strong>。Init/Finalなしの単発関数1本。バッファサイズだけ指定して、HSM内部の真性乱数生成器（TRNG）から取り出す。</p>
+
+    <div class="cols-2">
+      <div>
+        <h3><span class="marker">▸</span>関数シグネチャ</h3>
+        <div class="code-block c">
+<span class="code-lang">C / PKCS#11</span><pre><span class="ty">CK_RV</span> <span class="fn-name">C_GenerateRandom</span>(
+  <span class="ty">CK_SESSION_HANDLE</span> hSession,
+  <span class="ty">CK_BYTE_PTR</span>        pRandomData,
+  <span class="ty">CK_ULONG</span>           ulRandomLen
+);</pre>
+        </div>
+        <p style="font-size:0.88rem">引数は3つだけ。<strong>セッション・出力バッファ・サイズ</strong>。鍵もメカニズムも不要。</p>
+      </div>
+      <div>
+        <h3><span class="marker">▸</span>使われる用途</h3>
+        <ul>
+          <li><strong>Nonce生成</strong> — 一度きりの番号</li>
+          <li><strong>IV / Salt</strong> — 暗号化の初期化ベクトル</li>
+          <li><strong>セッション鍵</strong> — 一時的なAES鍵</li>
+          <li><strong>チャレンジ値</strong> — 認証プロトコル</li>
+          <li><strong>UUID</strong> — 一意識別子</li>
+        </ul>
+        <p style="font-size:0.88rem; color:var(--ink-muted)">いずれも「真にランダムな値」が必要な場面。CPUの<code>rand()</code>では弱い。</p>
+      </div>
+    </div>
+
+    <div class="card bordered-left">
+      <div class="card-title">HSM内部のTRNG（True Random Number Generator）</div>
+      <p>HSMの中には<strong>物理的なエントロピー源</strong>（熱雑音、リング発振器、量子ノイズ等）を使った真性乱数生成器がある。これがHSMを使う理由のひとつで、ソフトウェアの疑似乱数（PRNG）とは別物。</p>
+      <p style="font-size:0.88rem; color:var(--ink-muted)">FIPS 140-3対応HSMでは、TRNGの品質要件が <strong>SP 800-90A/B/C</strong> に基づき厳格に規定されている。</p>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2 §5.18</a><a href="#slide-21">[14] NIST SP 800-90A</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 04: Random - Preparation ====== -->
+<section class="slide" data-title="乱数生成 準備">
+  <span class="slide-num">04 / 22</span>
+  <div class="slide-inner">
+    <span class="slide-tag ch1">CHAPTER 1 · 乱数生成 · 準備</span>
+    <h2><span class="num">04</span>準備フェーズ</h2>
+    <p class="lead">乱数生成の準備は<strong>セッションさえ開いていれば十分</strong>。ログインさえ原則不要（仕様上）。ただし<strong>受け取りバッファをアプリ側で確保</strong>しておく必要がある。</p>
+
+    <div class="phase-box phase-prep">
+      <div class="phase-label">▸ PREPARATION</div>
+      <h4>必要な前提条件</h4>
+      <table class="tbl" style="margin-top:0.5rem">
+        <tr><th style="width:200px">条件</th><th>必須？</th><th>備考</th></tr>
+        <tr><td>セッション</td><td>必須</td><td><code>C_OpenSession</code> 済み</td></tr>
+        <tr><td>ログイン</td><td>原則不要</td><td>仕様上はPublic状態でOK。ただしベンダーによっては必須</td></tr>
+        <tr><td>鍵ハンドル</td><td>不要</td><td>乱数に鍵は関係ない</td></tr>
+        <tr><td>メカニズム</td><td>不要</td><td>選択肢なし</td></tr>
+        <tr><td>出力バッファ</td><td>必須</td><td>アプリ側で <code>ulRandomLen</code> 分を事前確保</td></tr>
+      </table>
+    </div>
+
+    <div class="diagram">
+      <svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+        <!-- State transition: prep -->
+        <rect x="40" y="60" width="160" height="80" fill="#fdfaf2" stroke="#5e88a6" stroke-width="1.5"/>
+        <text x="120" y="85" text-anchor="middle" font-size="11" fill="#5e88a6" font-weight="700" font-family="JetBrains Mono">SESSION OPEN</text>
+        <text x="120" y="105" text-anchor="middle" font-size="10" fill="#3c4865">セッション開設済</text>
+        <text x="120" y="122" text-anchor="middle" font-size="10" fill="#3c4865">状態：Public/User</text>
+
+        <path d="M 205 100 L 250 100" stroke="#18233a" stroke-width="1.5" marker-end="url(#arr-prep)"/>
+        <text x="227" y="92" text-anchor="middle" font-size="9" fill="#6d7591">バッファ確保</text>
+
+        <rect x="255" y="60" width="200" height="80" fill="#fdfaf2" stroke="#b88a3c" stroke-width="1.5"/>
+        <text x="355" y="85" text-anchor="middle" font-size="11" fill="#b88a3c" font-weight="700" font-family="JetBrains Mono">BUFFER READY</text>
+        <text x="355" y="105" text-anchor="middle" font-size="10" fill="#3c4865">CK_BYTE buf[32];</text>
+        <text x="355" y="122" text-anchor="middle" font-size="10" fill="#3c4865">サイズ：32 bytes</text>
+
+        <path d="M 460 100 L 505 100" stroke="#18233a" stroke-width="1.5" marker-end="url(#arr-prep)"/>
+        <text x="482" y="92" text-anchor="middle" font-size="9" fill="#6d7591">関数呼出</text>
+
+        <rect x="510" y="60" width="170" height="80" fill="#faf6ec" stroke="#a83a2b" stroke-width="2"/>
+        <text x="595" y="85" text-anchor="middle" font-size="11" fill="#a83a2b" font-weight="700" font-family="JetBrains Mono">EXECUTE</text>
+        <text x="595" y="105" text-anchor="middle" font-size="10" fill="#18233a" font-family="JetBrains Mono">C_GenerateRandom</text>
+        <text x="595" y="122" text-anchor="middle" font-size="10" fill="#3c4865">→ 次フェーズへ</text>
+
+        <text x="360" y="180" text-anchor="middle" font-size="10" fill="#6d7591" font-style="italic">「セッション開設 → バッファ確保 → 関数呼出」だけのシンプル構造</text>
+
+        <defs>
+          <marker id="arr-prep" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <polygon points="0,0 8,3 0,6" fill="#18233a"/>
+          </marker>
+        </defs>
+      </svg>
+    </div>
+
+    <div class="card warn">
+      <div class="card-title">バッファサイズの実務</div>
+      <ul style="margin: 0.5rem 0">
+        <li><code>16 bytes</code> = AES-128の鍵やCBC IVに十分</li>
+        <li><code>32 bytes</code> = AES-256やSHA-256のソルト相当、最も一般的</li>
+        <li><code>大きすぎるサイズ</code> はベンダーによって上限あり（数KB〜MB）</li>
+      </ul>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2 §5.18.2</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 05: Random - Execution + Sequence ====== -->
+<section class="slide" data-title="乱数生成 実行">
+  <span class="slide-num">05 / 22</span>
+  <div class="slide-inner">
+    <span class="slide-tag ch1">CHAPTER 1 · 乱数生成 · 実行</span>
+    <h2><span class="num">05</span>実行フェーズ — シーケンス図で内部を覗く</h2>
+    <p class="lead">アプリが <code>C_GenerateRandom</code> を呼んだ瞬間、3つのレイヤー（App / Library / HSM）でこんなやりとりが起きてる。</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 460" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+        <!-- Lane headers -->
+        <rect x="40" y="20" width="180" height="36" fill="#fdfaf2" stroke="#18233a" stroke-width="1.5"/>
+        <text x="130" y="44" text-anchor="middle" font-size="13" fill="#18233a" font-weight="700">アプリ</text>
+
+        <rect x="290" y="20" width="180" height="36" fill="#faf6ec" stroke="#b88a3c" stroke-width="1.5"/>
+        <text x="380" y="44" text-anchor="middle" font-size="13" fill="#8b6a2a" font-weight="700">PKCS#11ライブラリ</text>
+
+        <rect x="540" y="20" width="180" height="36" fill="#faf6ec" stroke="#8b6a2a" stroke-width="2"/>
+        <text x="630" y="44" text-anchor="middle" font-size="13" fill="#8b6a2a" font-weight="700">HSM (TRNG)</text>
+
+        <!-- Lifelines -->
+        <line x1="130" y1="56" x2="130" y2="430" stroke="#18233a" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="380" y1="56" x2="380" y2="430" stroke="#b88a3c" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="630" y1="56" x2="630" y2="430" stroke="#8b6a2a" stroke-width="1" stroke-dasharray="3,3"/>
+
+        <!-- Step 1: Call -->
+        <path d="M 135 90 L 375 90" stroke="#18233a" stroke-width="2" marker-end="url(#arr-seq)"/>
+        <rect x="155" y="72" width="200" height="16" fill="#faf6ec" stroke="none"/>
+        <text x="255" y="84" text-anchor="middle" font-size="10" fill="#18233a" font-weight="600" font-family="JetBrains Mono">C_GenerateRandom(s, buf, 32)</text>
+
+        <!-- Library activation -->
+        <rect x="375" y="90" width="10" height="200" fill="#b88a3c" opacity="0.3"/>
+
+        <!-- Step 2: Validate -->
+        <rect x="270" y="105" width="220" height="36" fill="#fdfaf2" stroke="#b88a3c" stroke-width="1" stroke-dasharray="2,2"/>
+        <text x="380" y="120" text-anchor="middle" font-size="10" fill="#8b6a2a" font-weight="700">① 引数検証</text>
+        <text x="380" y="134" text-anchor="middle" font-size="9" fill="#6d7591">セッション有効?  バッファnon-NULL?</text>
+
+        <!-- Step 3: Marshal & send -->
+        <path d="M 385 165 L 625 165" stroke="#18233a" stroke-width="2" marker-end="url(#arr-seq)"/>
+        <text x="505" y="158" text-anchor="middle" font-size="10" fill="#18233a" font-weight="600" font-family="JetBrains Mono">REQ: get_random(32)</text>
+        <text x="505" y="173" text-anchor="middle" font-size="8" fill="#a83a2b" font-style="italic">[TLS暗号化]</text>
+
+        <!-- HSM activation -->
+        <rect x="625" y="165" width="10" height="80" fill="#8b6a2a" opacity="0.3"/>
+
+        <!-- Step 4: HSM operation -->
+        <rect x="510" y="180" width="220" height="50" fill="#faf6ec" stroke="#8b6a2a" stroke-width="1" stroke-dasharray="2,2"/>
+        <text x="620" y="195" text-anchor="middle" font-size="10" fill="#8b6a2a" font-weight="700">② TRNG 読み出し</text>
+        <text x="620" y="210" text-anchor="middle" font-size="9" fill="#6d7591">物理エントロピー源</text>
+        <text x="620" y="223" text-anchor="middle" font-size="9" fill="#6d7591">→ DRBG（決定論的乱数）</text>
+
+        <!-- Step 5: Response -->
+        <path d="M 625 250 L 385 250" stroke="#18233a" stroke-width="2" marker-end="url(#arr-seq)"/>
+        <text x="505" y="243" text-anchor="middle" font-size="10" fill="#18233a" font-weight="600" font-family="JetBrains Mono">RESP: 32 bytes random</text>
+
+        <!-- Step 6: Lib write back -->
+        <rect x="270" y="265" width="220" height="36" fill="#fdfaf2" stroke="#b88a3c" stroke-width="1" stroke-dasharray="2,2"/>
+        <text x="380" y="280" text-anchor="middle" font-size="10" fill="#8b6a2a" font-weight="700">③ アプリのバッファに書込</text>
+        <text x="380" y="294" text-anchor="middle" font-size="9" fill="#6d7591">pRandomData[0..32] にコピー</text>
+
+        <!-- Step 7: Return -->
+        <path d="M 375 325 L 135 325" stroke="#18233a" stroke-width="2" marker-end="url(#arr-seq)"/>
+        <text x="255" y="318" text-anchor="middle" font-size="10" fill="#18233a" font-weight="600" font-family="JetBrains Mono">return CKR_OK (= 0)</text>
+
+        <!-- bottom annotations -->
+        <text x="130" y="360" text-anchor="middle" font-size="10" fill="#6d7591">buf[0..32]が</text>
+        <text x="130" y="375" text-anchor="middle" font-size="10" fill="#6d7591">乱数で埋まる</text>
+
+        <text x="630" y="360" text-anchor="middle" font-size="10" fill="#6d7591">演算は最速</text>
+        <text x="630" y="375" text-anchor="middle" font-size="10" fill="#6d7591">(暗号計算なし)</text>
+
+        <!-- Time axis -->
+        <text x="20" y="100" font-size="9" fill="#6d7591" letter-spacing="2" transform="rotate(-90 20 100)">TIME →</text>
+
+        <defs>
+          <marker id="arr-seq" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto">
+            <polygon points="0,0 9,3.5 0,7" fill="#18233a"/>
+          </marker>
+        </defs>
+      </svg>
+    </div>
+    <div class="diagram-caption">シーケンス図：縦軸が時間、横線がメッセージ、太縦線がアクティブ区間</div>
+
+    <div class="cols-2">
+      <div class="card bordered-left">
+        <div class="card-title">ライブラリの仕事</div>
+        <p style="font-size:0.92rem">引数検証 → リクエスト梱包（TLS） → HSMへ送信 → 応答受信 → アプリバッファに書込み → 戻り値返却</p>
+      </div>
+      <div class="card bordered-left">
+        <div class="card-title">HSMの仕事</div>
+        <p style="font-size:0.92rem">TRNGから物理エントロピー取得 → DRBG（NIST SP 800-90A準拠）で平滑化 → 指定バイト数を返却</p>
+      </div>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2 §5.18.2</a><a href="#slide-21">[14] NIST SP 800-90A/B/C</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 06: Random - Result + Code ====== -->
+<section class="slide" data-title="乱数生成 結果 + コード">
+  <span class="slide-num">06 / 22</span>
+  <div class="slide-inner">
+    <span class="slide-tag ch1">CHAPTER 1 · 乱数生成 · 結果</span>
+    <h2><span class="num">06</span>結果フェーズ + コード例</h2>
+    <p class="lead">戻り値は <code>CKR_OK</code>（成功）または各種エラーコード。<strong>バッファは引数で渡したポインタに直接書き込まれる</strong>。新たにメモリは確保されない（アプリの責任）。</p>
+
+    <div class="phase-box phase-result">
+      <div class="phase-label">▸ RESULT</div>
+      <h4>戻り値と状態変化</h4>
+      <table class="tbl" style="margin-top:0.5rem">
+        <tr><th style="width:280px">戻り値</th><th>意味</th></tr>
+        <tr><td><code>CKR_OK</code> (0x00)</td><td>成功。<code>pRandomData</code>に乱数が格納されている</td></tr>
+        <tr><td><code>CKR_SESSION_HANDLE_INVALID</code></td><td>セッションが無効。要再オープン</td></tr>
+        <tr><td><code>CKR_ARGUMENTS_BAD</code></td><td>バッファがNULL等の引数不正</td></tr>
+        <tr><td><code>CKR_RANDOM_NO_RNG</code></td><td>そのTokenがRNG非対応（極めて稀）</td></tr>
+        <tr><td><code>CKR_DEVICE_ERROR</code></td><td>HSM側障害。リトライ検討</td></tr>
+      </table>
+    </div>
+
+    <div class="cols-2">
+      <div>
+        <h3><span class="marker">▸</span>C 言語実装</h3>
+        <div class="code-block c">
+<span class="code-lang">C</span><pre><span class="com">// 32バイトの乱数を取得</span>
+<span class="ty">CK_BYTE</span> buf[<span class="num">32</span>];
+<span class="ty">CK_RV</span> rv = pFuncs-><span class="fn-name">C_GenerateRandom</span>(
+    hSession,
+    buf,
+    <span class="kw">sizeof</span>(buf)
+);
+<span class="kw">if</span> (rv != <span class="num">CKR_OK</span>) {
+    <span class="fn-name">fprintf</span>(stderr, <span class="str">"random failed: 0x%lx\n"</span>, rv);
+    <span class="kw">return</span> -<span class="num">1</span>;
+}
+<span class="com">// buf[0..32] が乱数で埋まっている</span></pre>
+        </div>
+      </div>
+      <div>
+        <h3><span class="marker">▸</span>Rust 実装（cryptoki クレート）</h3>
+        <div class="code-block rust">
+<span class="code-lang">Rust</span><pre><span class="kw">use</span> cryptoki::session::Session;
+
+<span class="com">// 32バイトの乱数を取得</span>
+<span class="kw">let</span> <span class="kw">mut</span> buf = [<span class="num">0u8</span>; <span class="num">32</span>];
+session.<span class="fn-name">generate_random_slice</span>(<span class="kw">&amp;mut</span> buf)?;
+
+<span class="com">// buf[..] に乱数が入る</span>
+<span class="fn-name">println!</span>(<span class="str">"{:02x?}"</span>, buf);</pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="card bordered-left">
+      <div class="card-title">セッション状態への影響</div>
+      <p><strong>乱数生成はセッション状態を変更しない</strong>。<code>C_SignInit</code>のような「次の操作を待ってる状態」を作らないので、何度連続で呼んでも問題ない。これも乱数が「軽い」と言われる理由のひとつ。</p>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2 §5.18</a><a href="#slide-21">[13] cryptoki crate</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 07: Random - Performance ====== -->
+<section class="slide" data-title="乱数生成 性能評価">
+  <span class="slide-num">07 / 22</span>
+  <div class="slide-inner">
+    <span class="slide-tag ch1">CHAPTER 1 · 乱数生成 · ★ 性能評価</span>
+    <h2><span class="num">07</span>性能評価ポイント</h2>
+    <p class="lead">乱数生成は<strong>暗号演算を伴わない</strong>ため、純粋に「<strong>ライブラリのオーバーヘッド + ネットワーク往復 + HSM内のTRNG読み出し</strong>」の測定になる。</p>
+
+    <div class="card measure">
+      <div class="card-title">★ どこを測るか</div>
+      <p>計測対象は <code>C_GenerateRandom</code> の呼び出し前後の時刻差。<strong>Init/Finalがないので測定設計が最もシンプル</strong>。</p>
+      <div class="code-block c" style="margin-top: 1rem;">
+<span class="code-lang">疑似コード</span><pre><span class="com">// ★ 計測区間</span>
+t0 = <span class="fn-name">get_time_ns</span>();
+rv = pFuncs-><span class="fn-name">C_GenerateRandom</span>(hSession, buf, len);
+t1 = <span class="fn-name">get_time_ns</span>();
+
+latency_ns = t1 - t0;</pre>
+      </div>
+    </div>
+
+    <div class="cols-2">
+      <div>
+        <h3><span class="marker">▸</span>測定すべき変数</h3>
+        <ul>
+          <li><strong>バッファサイズ別</strong>：16B / 32B / 256B / 1KB / 16KB</li>
+          <li><strong>並列度</strong>：シングル → マルチスレッド</li>
+          <li><strong>連続呼び出し</strong>：定常状態のスループット</li>
+          <li><strong>セッション数</strong>：1セッション vs 複数並列</li>
+        </ul>
+      </div>
+      <div>
+        <h3><span class="marker">▸</span>取るべきメトリクス</h3>
+        <ul>
+          <li><strong>レイテンシ</strong>（平均、p50、p99）</li>
+          <li><strong>スループット</strong>（ops/sec、MB/sec）</li>
+          <li><strong>スケール係数</strong>（スレッド数とTPSの比）</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card warn">
+      <div class="card-title">注意：HSM側のRNG上限</div>
+      <ul style="margin: 0.4rem 0;">
+        <li>HSMの<strong>TRNGスループット</strong>には物理的な上限がある（数MB/sec〜）</li>
+        <li>大量に乱数を取り続けると<strong>エントロピー枯渇</strong>を起こすベンダーもある</li>
+        <li>ネットワーク型HSMでは<strong>TLS往復のレイテンシ</strong>が支配的になる（バッファサイズが小さい場合）</li>
+      </ul>
+    </div>
+
+    <div class="card bordered-left">
+      <div class="card-title">期待される結果の目安（ネットワーク型HSM）</div>
+      <table class="tbl">
+        <tr><th>項目</th><th>典型値（参考）</th><th>備考</th></tr>
+        <tr><td>レイテンシ（32B）</td><td>0.5〜2 ms</td><td>RTT支配</td></tr>
+        <tr><td>レイテンシ（16KB）</td><td>2〜10 ms</td><td>転送量増加</td></tr>
+        <tr><td>スループット（単一）</td><td>500〜2000 ops/sec</td><td>シングルスレッド</td></tr>
+        <tr><td>スループット（並列）</td><td>セッション数倍</td><td>HSM上限まで</td></tr>
+      </table>
+      <p style="font-size:0.85rem; color:var(--ink-muted); margin-top: 0.5rem;">※ あくまで一般的な目安。実機・ネットワーク環境で大きく変動する</p>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2 §5.18</a><a href="#slide-21">[7] AWS CloudHSM PKCS#11 library</a><a href="#slide-21">[14] NIST SP 800-90B (Entropy)</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 08: Sign Overview ====== -->
+<section class="slide" data-title="署名 概要">
+  <span class="slide-num">08 / 22</span>
+  <div class="slide-inner">
+    <span class="slide-tag ch2">CHAPTER 2 · 署名 · 概要</span>
+    <h2><span class="num">08</span>署名 — 3段ロケットの実例</h2>
+    <p class="lead">PKCS#11で<strong>もっとも使われる操作</strong>。<code>C_SignInit</code> で準備、<code>C_Sign</code> で実行。秘密鍵はHSM内にあるまま、署名だけが返ってくる。性能評価のメインターゲット。</p>
+
+    <div class="cols-2">
+      <div>
+        <h3><span class="marker">▸</span>関数シグネチャ（ワンショット版）</h3>
+        <div class="code-block c">
+<span class="code-lang">C / PKCS#11</span><pre><span class="com">// 準備</span>
+<span class="ty">CK_RV</span> <span class="fn-name">C_SignInit</span>(
+  <span class="ty">CK_SESSION_HANDLE</span> hSession,
+  <span class="ty">CK_MECHANISM_PTR</span>  pMechanism,
+  <span class="ty">CK_OBJECT_HANDLE</span>  hKey
+);
+
+<span class="com">// 実行</span>
+<span class="ty">CK_RV</span> <span class="fn-name">C_Sign</span>(
+  <span class="ty">CK_SESSION_HANDLE</span> hSession,
+  <span class="ty">CK_BYTE_PTR</span>       pData,
+  <span class="ty">CK_ULONG</span>          ulDataLen,
+  <span class="ty">CK_BYTE_PTR</span>       pSignature,
+  <span class="ty">CK_ULONG_PTR</span>      pulSignatureLen
+);</pre>
+        </div>
+      </div>
+      <div>
+        <h3><span class="marker">▸</span>引数の意味</h3>
+        <ul>
+          <li><code>hSession</code> — 利用するセッション</li>
+          <li><code>pMechanism</code> — どの方式で署名するか（RSA-PSS等）</li>
+          <li><code>hKey</code> — どの<strong>秘密鍵</strong>で署名するか</li>
+          <li><code>pData/ulDataLen</code> — 署名対象のデータ</li>
+          <li><code>pSignature</code> — 署名結果を書き込むバッファ</li>
+          <li><code>pulSignatureLen</code> — <strong>入出力兼用</strong>：バッファサイズ／実際の署名長</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+        <!-- Phase 1 -->
+        <rect x="30" y="50" width="200" height="100" fill="#fdfaf2" stroke="#5e88a6" stroke-width="2"/>
+        <text x="130" y="75" text-anchor="middle" font-size="11" fill="#5e88a6" font-weight="700" font-family="JetBrains Mono">PHASE 1 · 準備</text>
+        <text x="130" y="100" text-anchor="middle" font-size="14" fill="#18233a" font-weight="700" font-family="JetBrains Mono">C_SignInit</text>
+        <text x="130" y="120" text-anchor="middle" font-size="10" fill="#3c4865">鍵 + メカニズム指定</text>
+        <text x="130" y="135" text-anchor="middle" font-size="10" fill="#3c4865">セッションを"署名待ち"に</text>
+
+        <path d="M 235 100 L 285 100" stroke="#18233a" stroke-width="2" marker-end="url(#arr-ph)"/>
+
+        <!-- Phase 2 -->
+        <rect x="290" y="50" width="200" height="100" fill="#faf6ec" stroke="#b88a3c" stroke-width="2.5"/>
+        <text x="390" y="75" text-anchor="middle" font-size="11" fill="#8b6a2a" font-weight="700" font-family="JetBrains Mono">PHASE 2 ★ · 実行</text>
+        <text x="390" y="100" text-anchor="middle" font-size="14" fill="#18233a" font-weight="700" font-family="JetBrains Mono">C_Sign</text>
+        <text x="390" y="120" text-anchor="middle" font-size="10" fill="#3c4865">データ渡して</text>
+        <text x="390" y="135" text-anchor="middle" font-size="10" fill="#3c4865">署名結果を取得</text>
+
+        <path d="M 495 100 L 545 100" stroke="#18233a" stroke-width="2" marker-end="url(#arr-ph)"/>
+
+        <!-- Phase 3 -->
+        <rect x="550" y="50" width="200" height="100" fill="#fdfaf2" stroke="#6b8e5e" stroke-width="2"/>
+        <text x="650" y="75" text-anchor="middle" font-size="11" fill="#6b8e5e" font-weight="700" font-family="JetBrains Mono">PHASE 3 · 結果</text>
+        <text x="650" y="100" text-anchor="middle" font-size="14" fill="#18233a" font-weight="700" font-family="JetBrains Mono">CKR_OK + signature</text>
+        <text x="650" y="120" text-anchor="middle" font-size="10" fill="#3c4865">バッファに署名格納</text>
+        <text x="650" y="135" text-anchor="middle" font-size="10" fill="#3c4865">セッション状態リセット</text>
+
+        <defs>
+          <marker id="arr-ph" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto">
+            <polygon points="0,0 9,3.5 0,7" fill="#18233a"/>
+          </marker>
+        </defs>
+      </svg>
+    </div>
+
+    <div class="card bordered-left">
+      <div class="card-title">注文書のたとえ</div>
+      <p>"鍵 = #47"・"方式 = RSA-PSS"・"対象データ = ファイル内容" の3点セットを毎回 <code>C_SignInit</code> + <code>C_Sign</code> で渡す。秘密鍵は<strong>HSM内部で一時的にロードされ、署名演算後すぐに消える</strong>（鍵ハンドルだけが永続）。</p>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2 §5.13 Signing functions</a><a href="#slide-21">[3] PKCS#11 Usage Guide v3.2</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 09: Sign - Preparation (SignInit) ====== -->
+<section class="slide" data-title="署名 準備">
+  <span class="slide-num">09 / 22</span>
+  <div class="slide-inner">
+    <span class="slide-tag ch2">CHAPTER 2 · 署名 · 準備</span>
+    <h2><span class="num">09</span>準備フェーズ — C_SignInit</h2>
+    <p class="lead"><code>C_SignInit</code>は<strong>「これからどの鍵で・どの方式で署名するか」をセッションに記憶させる</strong>関数。実際の暗号演算はまだ起きてない。</p>
+
+    <div class="phase-box phase-prep">
+      <div class="phase-label">▸ PREPARATION</div>
+      <h4>必要な前提条件</h4>
+      <table class="tbl" style="margin-top:0.5rem">
+        <tr><th style="width:220px">条件</th><th>必須？</th><th>備考</th></tr>
+        <tr><td>セッション</td><td>必須</td><td><code>C_OpenSession</code> 済み</td></tr>
+        <tr><td>ログイン</td><td>必須（Private鍵の場合）</td><td><code>C_Login(CKU_USER)</code> 完了済み</td></tr>
+        <tr><td>鍵ハンドル</td><td>必須</td><td><code>CKA_SIGN=true</code> の秘密鍵を <code>C_FindObjects</code> 等で取得済</td></tr>
+        <tr><td>メカニズム指定</td><td>必須</td><td>鍵の種類と整合するメカニズム</td></tr>
+        <tr><td>セッション状態</td><td>「アクティブ操作なし」状態</td><td>他の<code>xxxInit</code>が走ってない</td></tr>
+      </table>
+    </div>
+
+    <h3><span class="marker">▸</span>メカニズム構造（CK_MECHANISM）の中身</h3>
+    <div class="diagram">
+      <svg viewBox="0 0 760 240" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+        <!-- Struct box -->
+        <rect x="40" y="30" width="320" height="180" fill="#fdfaf2" stroke="#18233a" stroke-width="1.5"/>
+        <text x="200" y="55" text-anchor="middle" font-size="13" fill="#18233a" font-weight="700" font-family="JetBrains Mono">CK_MECHANISM</text>
+        <line x1="55" y1="65" x2="345" y2="65" stroke="#d6cdb7"/>
+
+        <text x="60" y="90" font-size="11" fill="#6d7591" font-family="JetBrains Mono">mechanism</text>
+        <text x="340" y="90" text-anchor="end" font-size="11" fill="#18233a" font-weight="600" font-family="JetBrains Mono">CKM_RSA_PKCS_PSS</text>
+        <line x1="55" y1="100" x2="345" y2="100" stroke="#e6dcc4"/>
+
+        <text x="60" y="125" font-size="11" fill="#6d7591" font-family="JetBrains Mono">pParameter</text>
+        <text x="340" y="125" text-anchor="end" font-size="11" fill="#18233a" font-weight="600" font-family="JetBrains Mono">→ PSS params</text>
+        <line x1="55" y1="135" x2="345" y2="135" stroke="#e6dcc4"/>
+
+        <text x="60" y="160" font-size="11" fill="#6d7591" font-family="JetBrains Mono">ulParameterLen</text>
+        <text x="340" y="160" text-anchor="end" font-size="11" fill="#18233a" font-weight="600" font-family="JetBrains Mono">sizeof(params)</text>
+
+        <text x="200" y="195" text-anchor="middle" font-size="10" fill="#6d7591" font-style="italic">3フィールドだけのシンプル構造体</text>
+
+        <!-- Arrow -->
+        <path d="M 360 120 L 400 120" stroke="#18233a" stroke-width="1.5" stroke-dasharray="3,3" marker-end="url(#arr-mech)"/>
+
+        <!-- Params -->
+        <rect x="405" y="30" width="320" height="180" fill="#faf6ec" stroke="#b88a3c" stroke-width="1.5"/>
+        <text x="565" y="55" text-anchor="middle" font-size="13" fill="#8b6a2a" font-weight="700" font-family="JetBrains Mono">CK_RSA_PKCS_PSS_PARAMS</text>
+        <line x1="420" y1="65" x2="710" y2="65" stroke="#d6cdb7"/>
+
+        <text x="425" y="90" font-size="11" fill="#6d7591" font-family="JetBrains Mono">hashAlg</text>
+        <text x="705" y="90" text-anchor="end" font-size="11" fill="#18233a" font-weight="600" font-family="JetBrains Mono">CKM_SHA256</text>
+        <line x1="420" y1="100" x2="710" y2="100" stroke="#e6dcc4"/>
+
+        <text x="425" y="125" font-size="11" fill="#6d7591" font-family="JetBrains Mono">mgf</text>
+        <text x="705" y="125" text-anchor="end" font-size="11" fill="#18233a" font-weight="600" font-family="JetBrains Mono">CKG_MGF1_SHA256</text>
+        <line x1="420" y1="135" x2="710" y2="135" stroke="#e6dcc4"/>
+
+        <text x="425" y="160" font-size="11" fill="#6d7591" font-family="JetBrains Mono">sLen</text>
+        <text x="705" y="160" text-anchor="end" font-size="11" fill="#18233a" font-weight="600" font-family="JetBrains Mono">32 (salt長)</text>
+
+        <text x="565" y="195" text-anchor="middle" font-size="10" fill="#6d7591" font-style="italic">PSSのときだけ追加で渡すパラメータ</text>
+
+        <defs>
+          <marker id="arr-mech" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <polygon points="0,0 8,3 0,6" fill="#18233a"/>
+          </marker>
+        </defs>
+      </svg>
+    </div>
+
+    <div class="cols-2">
+      <div class="card bordered-left">
+        <div class="card-title">SignInitで何が起きてるか</div>
+        <ul style="font-size:0.92rem; margin: 0.5rem 0">
+          <li>ライブラリ：引数検証、鍵の<code>CKA_SIGN</code>属性チェック、メカニズムが鍵タイプと整合するか確認</li>
+          <li>ライブラリ：セッション状態を「署名待ち：鍵#47、PSS方式」に変更</li>
+          <li>ベンダーによっては：HSM側にもInit通知を送る（事前準備）</li>
+        </ul>
+      </div>
+      <div class="card warn">
+        <div class="card-title">よくあるエラー</div>
+        <ul style="font-size:0.92rem; margin: 0.5rem 0">
+          <li><code>CKR_KEY_FUNCTION_NOT_PERMITTED</code> — 鍵に<code>CKA_SIGN=false</code></li>
+          <li><code>CKR_MECHANISM_INVALID</code> — HSMが対応してないメカニズム</li>
+          <li><code>CKR_KEY_TYPE_INCONSISTENT</code> — RSAメカニズムにEC鍵を渡した等</li>
+          <li><code>CKR_OPERATION_ACTIVE</code> — 別の<code>xxxInit</code>がまだ走ってる</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2 §5.13.1, §6 Mechanism specifications</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 10: Sign - Execution + Sequence ====== -->
+<section class="slide" data-title="署名 実行">
+  <span class="slide-num">10 / 22</span>
+  <div class="slide-inner">
+    <span class="slide-tag ch2">CHAPTER 2 · 署名 · 実行</span>
+    <h2><span class="num">10</span>実行フェーズ — シーケンス図</h2>
+    <p class="lead"><code>C_SignInit</code> + <code>C_Sign</code> の完全な流れ。<strong>HSM内部で秘密鍵を一時ロード → ハッシュ計算 → 秘密鍵演算 → 署名返却</strong>。乱数生成と違い、実際の暗号計算が走るので時間がかかる。</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 620" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+        <!-- Lane headers -->
+        <rect x="40" y="20" width="180" height="36" fill="#fdfaf2" stroke="#18233a" stroke-width="1.5"/>
+        <text x="130" y="44" text-anchor="middle" font-size="13" fill="#18233a" font-weight="700">アプリ</text>
+
+        <rect x="290" y="20" width="180" height="36" fill="#faf6ec" stroke="#b88a3c" stroke-width="1.5"/>
+        <text x="380" y="44" text-anchor="middle" font-size="13" fill="#8b6a2a" font-weight="700">PKCS#11ライブラリ</text>
+
+        <rect x="540" y="20" width="180" height="36" fill="#faf6ec" stroke="#8b6a2a" stroke-width="2"/>
+        <text x="630" y="44" text-anchor="middle" font-size="13" fill="#8b6a2a" font-weight="700">HSM (秘密鍵演算)</text>
+
+        <!-- Lifelines -->
+        <line x1="130" y1="56" x2="130" y2="590" stroke="#18233a" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="380" y1="56" x2="380" y2="590" stroke="#b88a3c" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="630" y1="56" x2="630" y2="590" stroke="#8b6a2a" stroke-width="1" stroke-dasharray="3,3"/>
+
+        <!-- C_SignInit -->
+        <path d="M 135 90 L 375 90" stroke="#18233a" stroke-width="2" marker-end="url(#arr-sign)"/>
+        <text x="255" y="82" text-anchor="middle" font-size="10" fill="#18233a" font-weight="600" font-family="JetBrains Mono">C_SignInit(key, RSA_PSS)</text>
+
+        <rect x="375" y="90" width="10" height="55" fill="#b88a3c" opacity="0.3"/>
+
+        <rect x="270" y="100" width="220" height="30" fill="#fdfaf2" stroke="#b88a3c" stroke-width="1" stroke-dasharray="2,2"/>
+        <text x="380" y="115" text-anchor="middle" font-size="9" fill="#8b6a2a">① 検証 + セッション状態を"署名待ち"に</text>
+
+        <path d="M 375 145 L 135 145" stroke="#18233a" stroke-width="2" marker-end="url(#arr-sign)"/>
+        <text x="255" y="138" text-anchor="middle" font-size="10" fill="#18233a" font-weight="600" font-family="JetBrains Mono">return CKR_OK</text>
+
+        <!-- Gap -->
+        <text x="380" y="175" text-anchor="middle" font-size="9" fill="#6d7591" font-style="italic">— ここでアプリは別の処理可（状態は保持） —</text>
+
+        <!-- C_Sign call -->
+        <path d="M 135 210 L 375 210" stroke="#18233a" stroke-width="2" marker-end="url(#arr-sign)"/>
+        <text x="255" y="202" text-anchor="middle" font-size="10" fill="#18233a" font-weight="600" font-family="JetBrains Mono">C_Sign(data, len, sig, &amp;sigLen)</text>
+
+        <rect x="375" y="210" width="10" height="280" fill="#b88a3c" opacity="0.3"/>
+
+        <rect x="270" y="220" width="220" height="30" fill="#fdfaf2" stroke="#b88a3c" stroke-width="1" stroke-dasharray="2,2"/>
+        <text x="380" y="234" text-anchor="middle" font-size="9" fill="#8b6a2a">② バッファサイズ確認 / データ梱包</text>
+
+        <!-- Lib → HSM: sign request -->
+        <path d="M 385 270 L 625 270" stroke="#18233a" stroke-width="2" marker-end="url(#arr-sign)"/>
+        <text x="505" y="263" text-anchor="middle" font-size="10" fill="#18233a" font-weight="600" font-family="JetBrains Mono">REQ: sign(key_id, mech, data)</text>
+        <text x="505" y="278" text-anchor="middle" font-size="8" fill="#a83a2b" font-style="italic">[TLS暗号化]</text>
+
+        <rect x="625" y="270" width="10" height="170" fill="#8b6a2a" opacity="0.3"/>
+
+        <!-- HSM work -->
+        <rect x="510" y="285" width="220" height="148" fill="#faf6ec" stroke="#8b6a2a" stroke-width="1" stroke-dasharray="2,2"/>
+        <text x="620" y="302" text-anchor="middle" font-size="10" fill="#8b6a2a" font-weight="700">③ HSM内部処理</text>
+        <text x="620" y="320" text-anchor="middle" font-size="9" fill="#3c4865">a. 鍵ハンドル → 実鍵ロード</text>
+        <text x="620" y="335" text-anchor="middle" font-size="9" fill="#3c4865">b. データのSHA-256ハッシュ計算</text>
+        <text x="620" y="350" text-anchor="middle" font-size="9" fill="#3c4865">c. PSSパディング適用</text>
+        <text x="620" y="365" text-anchor="middle" font-size="9" fill="#3c4865">d. RSA秘密鍵演算（重い）</text>
+        <text x="620" y="380" text-anchor="middle" font-size="9" fill="#3c4865">e. アクセスログ記録</text>
+        <text x="620" y="402" text-anchor="middle" font-size="10" fill="#a83a2b" font-weight="700" font-style="italic">所要：RSA-2048で 5〜30ms</text>
+        <text x="620" y="418" text-anchor="middle" font-size="9" fill="#6d7591">(HSMの処理能力に依存)</text>
+
+        <!-- HSM → Lib: response -->
+        <path d="M 625 458 L 385 458" stroke="#18233a" stroke-width="2" marker-end="url(#arr-sign)"/>
+        <text x="505" y="451" text-anchor="middle" font-size="10" fill="#18233a" font-weight="600" font-family="JetBrains Mono">RESP: signature (256 bytes)</text>
+
+        <rect x="270" y="475" width="220" height="30" fill="#fdfaf2" stroke="#b88a3c" stroke-width="1" stroke-dasharray="2,2"/>
+        <text x="380" y="490" text-anchor="middle" font-size="9" fill="#8b6a2a">④ 署名をアプリバッファに書込 / 状態リセット</text>
+
+        <!-- Lib → App -->
+        <path d="M 375 525 L 135 525" stroke="#18233a" stroke-width="2" marker-end="url(#arr-sign)"/>
+        <text x="255" y="518" text-anchor="middle" font-size="10" fill="#18233a" font-weight="600" font-family="JetBrains Mono">return CKR_OK + sigLen=256</text>
+
+        <text x="130" y="560" text-anchor="middle" font-size="10" fill="#6d7591">署名取得完了</text>
+        <text x="380" y="560" text-anchor="middle" font-size="10" fill="#6d7591">状態：アクティブ操作なし</text>
+        <text x="630" y="560" text-anchor="middle" font-size="10" fill="#6d7591">鍵：解放済</text>
+
+        <text x="20" y="320" font-size="9" fill="#6d7591" letter-spacing="2" transform="rotate(-90 20 320)">TIME →</text>
+
+        <defs>
+          <marker id="arr-sign" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto">
+            <polygon points="0,0 9,3.5 0,7" fill="#18233a"/>
+          </marker>
+        </defs>
+      </svg>
+    </div>
+    <div class="diagram-caption">SignInit (準備) + Sign (実行) の完全シーケンス。HSM内部のステップに注目</div>
+
+    <div class="card bordered-left">
+      <div class="card-title">HSM内部の③が時間を食う理由</div>
+      <p>RSA秘密鍵演算（CRT使用でも）は<strong>大きな数のべき乗剰余計算</strong>。RSA-2048で約1300ビットの掛け算を数百回。これがHSMの専用クリプトプロセッサで実行される。ECDSAだとずっと軽く、AES-CMACなら超軽い。</p>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2 §5.13</a><a href="#slide-21">[3] PKCS#11 Usage Guide v3.2</a><a href="#slide-21">[15] NIST FIPS 186-5 Digital Signature Standard</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 11: Sign - Multipart vs Oneshot ====== -->
+<section class="slide" data-title="マルチパート vs ワンショット">
+  <span class="slide-num">11 / 22</span>
+  <div class="slide-inner">
+    <span class="slide-tag ch2">CHAPTER 2 · 署名 · 補論</span>
+    <h2><span class="num">11</span>マルチパート vs ワンショット</h2>
+    <p class="lead">PKCS#11は<strong>2種類の署名スタイル</strong>を提供する。「データ全部一気に渡す」のか「少しずつ渡す」のか。性能評価ではどちらかに統一する必要がある。</p>
+
+    <div class="cols-2">
+      <div class="card bordered-left">
+        <div class="card-title">A. ワンショット（推奨：性能評価で使う）</div>
+        <div class="code-block c" style="margin-top:0.5rem">
+<span class="code-lang">パターンA</span><pre><span class="fn-name">C_SignInit</span>(hSession, &amp;mech, hKey);
+<span class="fn-name">C_Sign</span>(hSession, data, dataLen,
+       sig, &amp;sigLen);
+<span class="com">// 1回で完結</span></pre>
+        </div>
+        <ul style="font-size:0.9rem; margin:0.5rem 0">
+          <li>データ全体をメモリに保持</li>
+          <li>HSMへの往復が <strong>1回</strong></li>
+          <li>性能測定に向く（変数が少ない）</li>
+          <li>典型サイズ：〜数MB</li>
+        </ul>
+      </div>
+      <div class="card bordered-left">
+        <div class="card-title">B. マルチパート</div>
+        <div class="code-block c" style="margin-top:0.5rem">
+<span class="code-lang">パターンB</span><pre><span class="fn-name">C_SignInit</span>(hSession, &amp;mech, hKey);
+<span class="fn-name">C_SignUpdate</span>(hSession, chunk1, len1);
+<span class="fn-name">C_SignUpdate</span>(hSession, chunk2, len2);
+<span class="fn-name">C_SignUpdate</span>(hSession, chunk3, len3);
+<span class="fn-name">C_SignFinal</span>(hSession, sig, &amp;sigLen);</pre>
+        </div>
+        <ul style="font-size:0.9rem; margin:0.5rem 0">
+          <li>ストリーミング処理</li>
+          <li>HSMへの往復が <strong>Update回数+2回</strong></li>
+          <li>大きなデータ（GB級）で必須</li>
+          <li>性能評価では避ける（ノイズが多い）</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3><span class="marker">▸</span>マルチパートのシーケンス</h3>
+    <div class="diagram">
+      <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+        <rect x="40" y="20" width="180" height="30" fill="#fdfaf2" stroke="#18233a" stroke-width="1.5"/>
+        <text x="130" y="40" text-anchor="middle" font-size="12" fill="#18233a" font-weight="700">アプリ</text>
+
+        <rect x="290" y="20" width="180" height="30" fill="#faf6ec" stroke="#b88a3c" stroke-width="1.5"/>
+        <text x="380" y="40" text-anchor="middle" font-size="12" fill="#8b6a2a" font-weight="700">ライブラリ</text>
+
+        <rect x="540" y="20" width="180" height="30" fill="#faf6ec" stroke="#8b6a2a" stroke-width="2"/>
+        <text x="630" y="40" text-anchor="middle" font-size="12" fill="#8b6a2a" font-weight="700">HSM</text>
+
+        <line x1="130" y1="50" x2="130" y2="300" stroke="#18233a" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="380" y1="50" x2="380" y2="300" stroke="#b88a3c" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="630" y1="50" x2="630" y2="300" stroke="#8b6a2a" stroke-width="1" stroke-dasharray="3,3"/>
+
+        <path d="M 135 75 L 375 75" stroke="#18233a" stroke-width="1.5" marker-end="url(#arr-mp)"/>
+        <text x="255" y="68" text-anchor="middle" font-size="10" fill="#18233a" font-family="JetBrains Mono">C_SignInit</text>
+
+        <path d="M 135 105 L 375 105" stroke="#18233a" stroke-width="1.5" marker-end="url(#arr-mp)"/>
+        <text x="255" y="98" text-anchor="middle" font-size="10" fill="#18233a" font-family="JetBrains Mono">C_SignUpdate(chunk1)</text>
+        <path d="M 385 110 L 625 110" stroke="#18233a" stroke-width="1.5" marker-end="url(#arr-mp)"/>
+        <text x="505" y="103" text-anchor="middle" font-size="9" fill="#a83a2b" font-style="italic">[HSMでハッシュ累積]</text>
+
+        <path d="M 135 145 L 375 145" stroke="#18233a" stroke-width="1.5" marker-end="url(#arr-mp)"/>
+        <text x="255" y="138" text-anchor="middle" font-size="10" fill="#18233a" font-family="JetBrains Mono">C_SignUpdate(chunk2)</text>
+        <path d="M 385 150 L 625 150" stroke="#18233a" stroke-width="1.5" marker-end="url(#arr-mp)"/>
+
+        <path d="M 135 185 L 375 185" stroke="#18233a" stroke-width="1.5" marker-end="url(#arr-mp)"/>
+        <text x="255" y="178" text-anchor="middle" font-size="10" fill="#18233a" font-family="JetBrains Mono">C_SignUpdate(chunkN)</text>
+        <path d="M 385 190 L 625 190" stroke="#18233a" stroke-width="1.5" marker-end="url(#arr-mp)"/>
+
+        <path d="M 135 225 L 375 225" stroke="#18233a" stroke-width="2" marker-end="url(#arr-mp)"/>
+        <text x="255" y="218" text-anchor="middle" font-size="10" fill="#18233a" font-weight="700" font-family="JetBrains Mono">C_SignFinal</text>
+        <path d="M 385 230 L 625 230" stroke="#18233a" stroke-width="2" marker-end="url(#arr-mp)"/>
+        <text x="505" y="223" text-anchor="middle" font-size="9" fill="#a83a2b" font-style="italic">[ここで初めて秘密鍵演算]</text>
+
+        <path d="M 625 265 L 385 265" stroke="#18233a" stroke-width="2" marker-end="url(#arr-mp)"/>
+        <text x="505" y="258" text-anchor="middle" font-size="9" fill="#18233a" font-weight="600" font-family="JetBrains Mono">signature</text>
+        <path d="M 375 280 L 135 280" stroke="#18233a" stroke-width="2" marker-end="url(#arr-mp)"/>
+        <text x="255" y="273" text-anchor="middle" font-size="9" fill="#18233a" font-weight="600" font-family="JetBrains Mono">CKR_OK + sig</text>
+
+        <defs>
+          <marker id="arr-mp" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <polygon points="0,0 8,3 0,6" fill="#18233a"/>
+          </marker>
+        </defs>
+      </svg>
+    </div>
+
+    <div class="card warn">
+      <div class="card-title">性能評価で見落としがちなポイント</div>
+      <p>マルチパートは<strong>Updateごとにネットワーク往復が発生</strong>するため、ネットワーク型HSMでは想像以上に遅い。1MBのデータを 1KBチャンクで送ると 1024往復。<strong>ワンショットなら 1往復で済む</strong>。「ストリーミング = 速い」と直感で考えると逆の結果になる。</p>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2 §5.13.2-5.13.4</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 12: Sign - Result + Code ====== -->
+<section class="slide" data-title="署名 結果 + コード">
+  <span class="slide-num">12 / 22</span>
+  <div class="slide-inner">
+    <span class="slide-tag ch2">CHAPTER 2 · 署名 · 結果</span>
+    <h2><span class="num">12</span>結果フェーズ + コード例</h2>
+    <p class="lead">署名はバッファに書き込まれる。<strong>2-call convention</strong>（バッファサイズ問い合わせ→実署名）を理解しておくと、ベンダー間の挙動差に対応しやすい。</p>
+
+    <div class="phase-box phase-result">
+      <div class="phase-label">▸ RESULT</div>
+      <h4>2-call convention（バッファサイズ事前確認）</h4>
+      <p style="font-size:0.93rem"><code>pSignature = NULL</code>で呼ぶと、<code>pulSignatureLen</code>に<strong>必要なバッファサイズ</strong>が返る。これでアプリは適切なサイズのバッファを確保してから2回目の呼び出しをする。</p>
+      <div class="code-block c" style="margin-top: 0.8rem;">
+<span class="code-lang">C</span><pre><span class="com">// 1回目：サイズだけ取得</span>
+<span class="ty">CK_ULONG</span> sigLen = <span class="num">0</span>;
+pFuncs-><span class="fn-name">C_Sign</span>(hSession, data, dataLen, <span class="kw">NULL</span>, &amp;sigLen);
+<span class="com">// → sigLen に必要なバッファサイズが入る (RSA-2048なら 256)</span>
+
+<span class="com">// 2回目：実際に署名</span>
+<span class="ty">CK_BYTE</span> *sig = <span class="fn-name">malloc</span>(sigLen);
+pFuncs-><span class="fn-name">C_Sign</span>(hSession, data, dataLen, sig, &amp;sigLen);
+<span class="com">// → sig[0..sigLen] に署名データ</span></pre>
+      </div>
+    </div>
+
+    <div class="cols-2">
+      <div>
+        <h3><span class="marker">▸</span>C 完全実装</h3>
+        <div class="code-block c">
+<span class="code-lang">C</span><pre><span class="com">// 署名（RSA-PSS）</span>
+<span class="ty">CK_RSA_PKCS_PSS_PARAMS</span> pss = {
+    .hashAlg   = <span class="num">CKM_SHA256</span>,
+    .mgf       = <span class="num">CKG_MGF1_SHA256</span>,
+    .sLen      = <span class="num">32</span>
+};
+<span class="ty">CK_MECHANISM</span> mech = {
+    .mechanism      = <span class="num">CKM_RSA_PKCS_PSS</span>,
+    .pParameter     = &amp;pss,
+    .ulParameterLen = <span class="kw">sizeof</span>(pss)
+};
+
+pFuncs-><span class="fn-name">C_SignInit</span>(hSession, &amp;mech, hPrivKey);
+
+<span class="ty">CK_ULONG</span> sigLen;
+pFuncs-><span class="fn-name">C_Sign</span>(hSession, data, dataLen,
+              <span class="kw">NULL</span>, &amp;sigLen);
+
+<span class="ty">CK_BYTE</span> *sig = <span class="fn-name">malloc</span>(sigLen);
+<span class="ty">CK_RV</span> rv = pFuncs-><span class="fn-name">C_Sign</span>(
+    hSession, data, dataLen, sig, &amp;sigLen);</pre>
+        </div>
+      </div>
+      <div>
+        <h3><span class="marker">▸</span>Rust 実装</h3>
+        <div class="code-block rust">
+<span class="code-lang">Rust</span><pre><span class="kw">use</span> cryptoki::mechanism::{
+    Mechanism, rsa::{PkcsMgfType, PkcsPssParams}
+};
+
+<span class="kw">let</span> pss_params = <span class="fn-name">PkcsPssParams</span> {
+    hash_alg: Mechanism::Sha256,
+    mgf:      PkcsMgfType::MGF1_SHA256,
+    s_len:    <span class="num">32</span>.<span class="fn-name">into</span>(),
+};
+<span class="kw">let</span> mech = Mechanism::<span class="fn-name">RsaPkcsPss</span>(pss_params);
+
+<span class="kw">let</span> signature = session.<span class="fn-name">sign</span>(
+    &amp;mech,
+    priv_key_handle,
+    data
+)?;
+<span class="com">// signature: Vec&lt;u8&gt; (256 bytes for RSA-2048)</span></pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="card bordered-left">
+      <div class="card-title">セッション状態のリセット</div>
+      <p><code>C_Sign</code>が成功（または失敗）すると、<strong>セッション状態は「アクティブ操作なし」に戻る</strong>。同じ鍵で再度署名するには、もう一度 <code>C_SignInit</code> から始める必要がある。これが性能評価で「Initを毎回呼ぶか」議論のポイント。</p>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2 §5.13.2</a><a href="#slide-21">[9] AWS CloudHSM PKCS#11 examples</a><a href="#slide-21">[13] cryptoki crate</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 13: Sign - Performance ====== -->
+<section class="slide" data-title="署名 性能評価">
+  <span class="slide-num">13 / 22</span>
+  <div class="slide-inner">
+    <span class="slide-tag ch2">CHAPTER 2 · 署名 · ★ 性能評価</span>
+    <h2><span class="num">13</span>性能評価ポイント</h2>
+    <p class="lead">署名は<strong>性能評価のメインターゲット</strong>。実運用で最も呼ばれる操作で、HSMのスペックの差が一番出る。「鍵長」「メカニズム」「並列度」の3軸で測る。</p>
+
+    <div class="card measure">
+      <div class="card-title">★ どこを測るか — 2つの設計</div>
+      <div class="cols-2" style="margin-top: 0.8rem;">
+        <div class="code-block c">
+<span class="code-lang">Init込み (現実的)</span><pre><span class="com">// 毎回 SignInit + Sign を測る</span>
+t0 = <span class="fn-name">now</span>();
+<span class="fn-name">C_SignInit</span>(s, &amp;mech, hKey);
+<span class="fn-name">C_Sign</span>(s, data, len, sig, &amp;sLen);
+t1 = <span class="fn-name">now</span>();
+<span class="com">// → 実運用に近い</span></pre>
+        </div>
+        <div class="code-block c">
+<span class="code-lang">Sign単体 (純粋計測)</span><pre><span class="com">// SignInitを事前に1回だけ呼んで</span>
+<span class="com">// Sign のみを繰り返し測る</span>
+<span class="fn-name">C_SignInit</span>(...);  <span class="com">// 一度だけ</span>
+<span class="kw">for</span> i <span class="kw">in</span> <span class="num">0</span>..N {
+   t0 = <span class="fn-name">now</span>();
+   <span class="fn-name">C_Sign</span>(...);
+   t1 = <span class="fn-name">now</span>();
+}</pre>
+        </div>
+      </div>
+      <p style="font-size:0.9rem; margin-top:0.5rem;"><strong>※ 注：Sign後にセッション状態がリセットされるので、純粋計測パターンは通常成立しない</strong>。ベンダー実装によっては成立する場合もあるが、原則「Init込み」で測る。</p>
+    </div>
+
+    <div class="cols-2">
+      <div>
+        <h3><span class="marker">▸</span>測定すべき変数（マトリクス）</h3>
+        <ul>
+          <li><strong>アルゴリズム</strong>：RSA / ECDSA / EdDSA / HMAC</li>
+          <li><strong>鍵長</strong>：
+            <br>RSA-2048 / 3072 / 4096<br>EC P-256 / P-384 / P-521</li>
+          <li><strong>メカニズム</strong>：RSA-PKCS / RSA-PSS / SHA256-RSA-PKCS</li>
+          <li><strong>データサイズ</strong>：32B / 1KB / 16KB / 1MB</li>
+          <li><strong>並列度</strong>：1 / 4 / 16 / 64 スレッド</li>
+        </ul>
+      </div>
+      <div>
+        <h3><span class="marker">▸</span>取るべきメトリクス</h3>
+        <ul>
+          <li><strong>レイテンシ分布</strong>：mean / p50 / p95 / p99 / max</li>
+          <li><strong>スループット</strong>：ops/sec（全スレッド合計）</li>
+          <li><strong>スレッド数によるスケール曲線</strong></li>
+          <li><strong>エラー率</strong>（過負荷時の失敗）</li>
+          <li><strong>HSM側CPU使用率</strong>（取れれば）</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card bordered-left">
+      <div class="card-title">期待される結果の目安</div>
+      <table class="tbl">
+        <tr><th>アルゴリズム</th><th>典型レイテンシ</th><th>典型TPS（単一）</th><th>備考</th></tr>
+        <tr><td>RSA-2048 PSS</td><td>5〜30 ms</td><td>30〜200 ops/s</td><td>最も一般的</td></tr>
+        <tr><td>RSA-4096 PSS</td><td>50〜300 ms</td><td>3〜20 ops/s</td><td>RSAは鍵長で激重</td></tr>
+        <tr><td>ECDSA P-256</td><td>2〜15 ms</td><td>70〜500 ops/s</td><td>RSAより軽い</td></tr>
+        <tr><td>HMAC-SHA256</td><td>0.5〜3 ms</td><td>300〜2000 ops/s</td><td>共通鍵で超軽い</td></tr>
+      </table>
+      <p style="font-size:0.85rem; color:var(--ink-muted); margin-top: 0.5rem;">※ ネットワーク型HSMの目安。HSMの世代、ネットワーク状態、データサイズで上下する</p>
+    </div>
+
+    <div class="card warn">
+      <div class="card-title">設計上の落とし穴</div>
+      <ul style="margin: 0.4rem 0;">
+        <li><strong>初回測定</strong>：TLSセッション確立、鍵キャッシュ展開で異常値が出る → ウォームアップ必須</li>
+        <li><strong>セッション枯渇</strong>：マルチスレッドでセッションを使い回さないとHSM側上限に達する</li>
+        <li><strong>同一データ署名</strong>：同じデータで連続署名するとPSSの場合は毎回違う署名になる（saltがランダム）→ ベンチには影響しないが検証時に注意</li>
+      </ul>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2 §5.13</a><a href="#slide-21">[7] AWS CloudHSM Mechanisms</a><a href="#slide-21">[15] NIST FIPS 186-5</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 14: KeyGen Overview ====== -->
+<section class="slide" data-title="鍵生成 概要">
+  <span class="slide-num">14 / 22</span>
+  <div class="slide-inner">
+    <span class="slide-tag ch3">CHAPTER 3 · 鍵生成 · 概要</span>
+    <h2><span class="num">14</span>鍵生成 — 属性テンプレートの世界</h2>
+    <p class="lead">PKCS#11で<strong>もっとも重い単発操作</strong>。Init/Finalなしの1関数で完結するが、<strong>属性テンプレート</strong>という概念が登場する。HSM内部で乱数生成→素数探索→検証→オブジェクト登録という重い処理が走る。</p>
+
+    <div class="cols-2">
+      <div>
+        <h3><span class="marker">▸</span>2つの関数</h3>
+        <div class="code-block c">
+<span class="code-lang">C · 対称鍵 (AES等)</span><pre><span class="ty">CK_RV</span> <span class="fn-name">C_GenerateKey</span>(
+  <span class="ty">CK_SESSION_HANDLE</span> hSession,
+  <span class="ty">CK_MECHANISM_PTR</span>  pMechanism,
+  <span class="ty">CK_ATTRIBUTE_PTR</span>  pTemplate,
+  <span class="ty">CK_ULONG</span>           ulCount,
+  <span class="ty">CK_OBJECT_HANDLE_PTR</span> phKey
+);</pre>
+        </div>
+        <div class="code-block c">
+<span class="code-lang">C · 公開/秘密鍵ペア (RSA, EC)</span><pre><span class="ty">CK_RV</span> <span class="fn-name">C_GenerateKeyPair</span>(
+  <span class="ty">CK_SESSION_HANDLE</span> hSession,
+  <span class="ty">CK_MECHANISM_PTR</span>  pMechanism,
+  <span class="ty">CK_ATTRIBUTE_PTR</span>  pPubTemplate,
+  <span class="ty">CK_ULONG</span>           ulPubCount,
+  <span class="ty">CK_ATTRIBUTE_PTR</span>  pPrivTemplate,
+  <span class="ty">CK_ULONG</span>           ulPrivCount,
+  <span class="ty">CK_OBJECT_HANDLE_PTR</span> phPubKey,
+  <span class="ty">CK_OBJECT_HANDLE_PTR</span> phPrivKey
+);</pre>
+        </div>
+      </div>
+      <div>
+        <h3><span class="marker">▸</span>2つの世界の違い</h3>
+        <table class="tbl">
+          <tr><th>項目</th><th>対称 (Key)</th><th>非対称 (KeyPair)</th></tr>
+          <tr><td>関数</td><td>C_GenerateKey</td><td>C_GenerateKeyPair</td></tr>
+          <tr><td>テンプレート</td><td>1つ</td><td>2つ（公開・秘密）</td></tr>
+          <tr><td>返るハンドル</td><td>1つ</td><td>2つ</td></tr>
+          <tr><td>速度</td><td>速い (μs〜ms)</td><td>遅い (ms〜sec)</td></tr>
+          <tr><td>例</td><td>AES, HMAC鍵</td><td>RSA, EC</td></tr>
+        </table>
+        <p style="font-size:0.88rem; color:var(--ink-muted); margin-top:0.5rem">対称鍵は本質的に「乱数取得+属性付け」なので軽い。非対称鍵は数学的に有効な鍵を探す必要があるため重い。</p>
+      </div>
+    </div>
+
+    <div class="card bordered-left">
+      <div class="card-title">なぜ「属性テンプレート」が必要か</div>
+      <p>鍵を作るには、その鍵がどう使えるか（署名用？暗号化用？）、いつまで存在するか（永続？揮発？）、外に出せるか（持ち出し禁止？）等を<strong>生成時に決めて</strong>HSMに伝える必要がある。これらの設定が「属性テンプレート」という名前の<strong>配列</strong>として渡される。</p>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2 §5.15 Key management</a><a href="#slide-21">[8] AWS CloudHSM Key attributes</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 15: KeyGen - Preparation (Template) ====== -->
+<section class="slide" data-title="鍵生成 準備">
+  <span class="slide-num">15 / 22</span>
+  <div class="slide-inner">
+    <span class="slide-tag ch3">CHAPTER 3 · 鍵生成 · 準備</span>
+    <h2><span class="num">15</span>準備フェーズ — テンプレート構築</h2>
+    <p class="lead">鍵生成の準備の本体は<strong>属性テンプレートの構築</strong>。<code>CK_ATTRIBUTE</code>構造体の配列を作る作業で、ここでセキュリティ設計が決まる。</p>
+
+    <div class="phase-box phase-prep">
+      <div class="phase-label">▸ PREPARATION</div>
+      <h4>属性テンプレートの構造</h4>
+      <p style="font-size:0.93rem">テンプレートは<code>CK_ATTRIBUTE</code>構造体の配列。各要素は <strong>(属性タイプ, ポインタ, サイズ)</strong> の3つ組。</p>
+    </div>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 360" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+        <!-- Public key template -->
+        <rect x="30" y="20" width="340" height="320" fill="#fdfaf2" stroke="#5e88a6" stroke-width="1.5"/>
+        <text x="200" y="45" text-anchor="middle" font-size="13" fill="#5e88a6" font-weight="700" font-family="JetBrains Mono">PUBLIC KEY TEMPLATE</text>
+        <line x1="45" y1="55" x2="355" y2="55" stroke="#d6cdb7"/>
+
+        <text x="200" y="75" text-anchor="middle" font-size="10" fill="#6d7591">CK_ATTRIBUTE pPubTemplate[]</text>
+
+        <g font-size="10" font-family="JetBrains Mono">
+          <rect x="50" y="90" width="300" height="24" fill="#faf6ec" stroke="#d6cdb7"/>
+          <text x="60" y="105" fill="#6d7591">type:</text>
+          <text x="345" y="105" text-anchor="end" fill="#18233a" font-weight="600">CKA_TOKEN</text>
+          <rect x="50" y="114" width="300" height="24" fill="#fdfaf2" stroke="#d6cdb7"/>
+          <text x="60" y="130" fill="#6d7591">value:</text>
+          <text x="345" y="130" text-anchor="end" fill="#a83a2b" font-weight="700">true (永続)</text>
+
+          <rect x="50" y="145" width="300" height="24" fill="#faf6ec" stroke="#d6cdb7"/>
+          <text x="60" y="160" fill="#6d7591">type:</text>
+          <text x="345" y="160" text-anchor="end" fill="#18233a" font-weight="600">CKA_MODULUS_BITS</text>
+          <rect x="50" y="169" width="300" height="24" fill="#fdfaf2" stroke="#d6cdb7"/>
+          <text x="60" y="185" fill="#6d7591">value:</text>
+          <text x="345" y="185" text-anchor="end" fill="#a83a2b" font-weight="700">2048</text>
+
+          <rect x="50" y="200" width="300" height="24" fill="#faf6ec" stroke="#d6cdb7"/>
+          <text x="60" y="215" fill="#6d7591">type:</text>
+          <text x="345" y="215" text-anchor="end" fill="#18233a" font-weight="600">CKA_PUBLIC_EXPONENT</text>
+          <rect x="50" y="224" width="300" height="24" fill="#fdfaf2" stroke="#d6cdb7"/>
+          <text x="60" y="240" fill="#6d7591">value:</text>
+          <text x="345" y="240" text-anchor="end" fill="#a83a2b" font-weight="700">0x010001 (65537)</text>
+
+          <rect x="50" y="255" width="300" height="24" fill="#faf6ec" stroke="#d6cdb7"/>
+          <text x="60" y="270" fill="#6d7591">type:</text>
+          <text x="345" y="270" text-anchor="end" fill="#18233a" font-weight="600">CKA_VERIFY</text>
+          <rect x="50" y="279" width="300" height="24" fill="#fdfaf2" stroke="#d6cdb7"/>
+          <text x="60" y="295" fill="#6d7591">value:</text>
+          <text x="345" y="295" text-anchor="end" fill="#a83a2b" font-weight="700">true</text>
+        </g>
+        <text x="200" y="325" text-anchor="middle" font-size="10" fill="#6d7591" font-style="italic">"公開できる/検証に使える"</text>
+
+        <!-- Private key template -->
+        <rect x="390" y="20" width="340" height="320" fill="#fdfaf2" stroke="#a83a2b" stroke-width="1.5"/>
+        <text x="560" y="45" text-anchor="middle" font-size="13" fill="#a83a2b" font-weight="700" font-family="JetBrains Mono">PRIVATE KEY TEMPLATE</text>
+        <line x1="405" y1="55" x2="715" y2="55" stroke="#d6cdb7"/>
+
+        <text x="560" y="75" text-anchor="middle" font-size="10" fill="#6d7591">CK_ATTRIBUTE pPrivTemplate[]</text>
+
+        <g font-size="10" font-family="JetBrains Mono">
+          <rect x="410" y="90" width="300" height="24" fill="#faf6ec" stroke="#d6cdb7"/>
+          <text x="420" y="105" fill="#6d7591">type:</text>
+          <text x="705" y="105" text-anchor="end" fill="#18233a" font-weight="600">CKA_TOKEN</text>
+          <rect x="410" y="114" width="300" height="24" fill="#fdfaf2" stroke="#d6cdb7"/>
+          <text x="420" y="130" fill="#6d7591">value:</text>
+          <text x="705" y="130" text-anchor="end" fill="#a83a2b" font-weight="700">true (永続)</text>
+
+          <rect x="410" y="145" width="300" height="24" fill="#faf6ec" stroke="#d6cdb7"/>
+          <text x="420" y="160" fill="#6d7591">type:</text>
+          <text x="705" y="160" text-anchor="end" fill="#18233a" font-weight="600">CKA_SIGN</text>
+          <rect x="410" y="169" width="300" height="24" fill="#fdfaf2" stroke="#d6cdb7"/>
+          <text x="420" y="185" fill="#6d7591">value:</text>
+          <text x="705" y="185" text-anchor="end" fill="#a83a2b" font-weight="700">true</text>
+
+          <rect x="410" y="200" width="300" height="24" fill="#faf6ec" stroke="#d6cdb7"/>
+          <text x="420" y="215" fill="#6d7591">type:</text>
+          <text x="705" y="215" text-anchor="end" fill="#18233a" font-weight="600">CKA_SENSITIVE</text>
+          <rect x="410" y="224" width="300" height="24" fill="#fdfaf2" stroke="#d6cdb7"/>
+          <text x="420" y="240" fill="#6d7591">value:</text>
+          <text x="705" y="240" text-anchor="end" fill="#a83a2b" font-weight="700">true ★</text>
+
+          <rect x="410" y="255" width="300" height="24" fill="#faf6ec" stroke="#d6cdb7"/>
+          <text x="420" y="270" fill="#6d7591">type:</text>
+          <text x="705" y="270" text-anchor="end" fill="#18233a" font-weight="600">CKA_EXTRACTABLE</text>
+          <rect x="410" y="279" width="300" height="24" fill="#fdfaf2" stroke="#d6cdb7"/>
+          <text x="420" y="295" fill="#6d7591">value:</text>
+          <text x="705" y="295" text-anchor="end" fill="#a83a2b" font-weight="700">false ★</text>
+        </g>
+        <text x="560" y="325" text-anchor="middle" font-size="10" fill="#6d7591" font-style="italic">"署名できる/外に出さない/秘密値"</text>
+      </svg>
+    </div>
+    <div class="diagram-caption">RSA鍵ペア生成のテンプレート例。★が付いた属性がセキュリティの要</div>
+
+    <div class="cols-2">
+      <div class="card bordered-left">
+        <div class="card-title">セキュリティの要となる3属性</div>
+        <ul style="font-size:0.9rem">
+          <li><strong>CKA_SENSITIVE = true</strong>：秘密値を <code>C_GetAttributeValue</code> で取り出せなくする</li>
+          <li><strong>CKA_EXTRACTABLE = false</strong>：ラップしても外に出せない</li>
+          <li><strong>CKA_PRIVATE = true</strong>：ログイン状態のユーザーにしか見えない</li>
+        </ul>
+        <p style="font-size:0.85rem; color:var(--ink-muted); margin-top:0.5rem;">この3つの組み合わせで「秘密鍵が絶対にHSMから出ない」状態を作る</p>
+      </div>
+      <div class="card warn">
+        <div class="card-title">ベンダーごとの差</div>
+        <ul style="font-size:0.9rem">
+          <li>属性のデフォルト値はベンダーによって違う</li>
+          <li>必須属性も微妙に違う（CKA_IDなど）</li>
+          <li>一部の属性は組み合わせ禁止（例：<code>SENSITIVE=true</code>と<code>EXTRACTABLE=true</code>を同時指定すると拒否されるベンダーあり）</li>
+          <li>ベンダーマニュアル必読</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2 §10 Object types, §5.15</a><a href="#slide-21">[8] AWS CloudHSM Key attributes</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 16: KeyGen - Execution + Sequence ====== -->
+<section class="slide" data-title="鍵生成 実行">
+  <span class="slide-num">16 / 22</span>
+  <div class="slide-inner">
+    <span class="slide-tag ch3">CHAPTER 3 · 鍵生成 · 実行</span>
+    <h2><span class="num">16</span>実行フェーズ — シーケンス図</h2>
+    <p class="lead"><code>C_GenerateKeyPair</code>を呼んだ瞬間、HSM内部では<strong>素数生成・原始性判定・鍵ペア構築・属性付け・永続化</strong>という長い処理が走る。RSAで数百ms〜数秒、ECで数ms〜数十ms。</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 660" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+        <rect x="40" y="20" width="180" height="36" fill="#fdfaf2" stroke="#18233a" stroke-width="1.5"/>
+        <text x="130" y="44" text-anchor="middle" font-size="13" fill="#18233a" font-weight="700">アプリ</text>
+
+        <rect x="290" y="20" width="180" height="36" fill="#faf6ec" stroke="#b88a3c" stroke-width="1.5"/>
+        <text x="380" y="44" text-anchor="middle" font-size="13" fill="#8b6a2a" font-weight="700">PKCS#11ライブラリ</text>
+
+        <rect x="540" y="20" width="180" height="36" fill="#faf6ec" stroke="#8b6a2a" stroke-width="2"/>
+        <text x="630" y="44" text-anchor="middle" font-size="13" fill="#8b6a2a" font-weight="700">HSM (鍵生成エンジン)</text>
+
+        <line x1="130" y1="56" x2="130" y2="630" stroke="#18233a" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="380" y1="56" x2="380" y2="630" stroke="#b88a3c" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="630" y1="56" x2="630" y2="630" stroke="#8b6a2a" stroke-width="1" stroke-dasharray="3,3"/>
+
+        <!-- App → Lib -->
+        <path d="M 135 90 L 375 90" stroke="#18233a" stroke-width="2" marker-end="url(#arr-kg)"/>
+        <text x="255" y="80" text-anchor="middle" font-size="10" fill="#18233a" font-weight="600" font-family="JetBrains Mono">C_GenerateKeyPair(</text>
+        <text x="255" y="95" text-anchor="middle" font-size="9" fill="#18233a" font-family="JetBrains Mono">mech, pubT, privT, ...)</text>
+
+        <rect x="375" y="100" width="10" height="430" fill="#b88a3c" opacity="0.3"/>
+
+        <!-- Lib validation -->
+        <rect x="270" y="115" width="220" height="40" fill="#fdfaf2" stroke="#b88a3c" stroke-width="1" stroke-dasharray="2,2"/>
+        <text x="380" y="132" text-anchor="middle" font-size="10" fill="#8b6a2a" font-weight="700">① テンプレート検証</text>
+        <text x="380" y="147" text-anchor="middle" font-size="9" fill="#6d7591">属性整合性、必須項目、組み合わせ</text>
+
+        <!-- Lib → HSM -->
+        <path d="M 385 180 L 625 180" stroke="#18233a" stroke-width="2" marker-end="url(#arr-kg)"/>
+        <text x="505" y="172" text-anchor="middle" font-size="10" fill="#18233a" font-weight="600" font-family="JetBrains Mono">REQ: gen_key_pair(spec)</text>
+
+        <rect x="625" y="180" width="10" height="270" fill="#8b6a2a" opacity="0.3"/>
+
+        <!-- HSM steps -->
+        <rect x="495" y="195" width="240" height="240" fill="#faf6ec" stroke="#8b6a2a" stroke-width="1" stroke-dasharray="2,2"/>
+        <text x="615" y="213" text-anchor="middle" font-size="11" fill="#8b6a2a" font-weight="700">② HSM内部処理</text>
+
+        <text x="510" y="232" font-size="9" fill="#a83a2b" font-weight="600">a. TRNGでエントロピー取得</text>
+        <text x="510" y="247" font-size="9" fill="#3c4865">   ↓</text>
+        <text x="510" y="262" font-size="9" fill="#a83a2b" font-weight="600">b. 候補素数 p, q を生成</text>
+        <text x="510" y="277" font-size="9" fill="#3c4865">   (1024-bit ランダム × 2)</text>
+        <text x="510" y="292" font-size="9" fill="#3c4865">   ↓</text>
+        <text x="510" y="307" font-size="9" fill="#a83a2b" font-weight="600">c. Miller-Rabin 素数判定</text>
+        <text x="510" y="322" font-size="9" fill="#3c4865">   (失敗なら b. に戻る)</text>
+        <text x="510" y="337" font-size="9" fill="#3c4865">   ↓</text>
+        <text x="510" y="352" font-size="9" fill="#a83a2b" font-weight="600">d. n = p·q, φ(n), d 計算</text>
+        <text x="510" y="367" font-size="9" fill="#3c4865">   ↓</text>
+        <text x="510" y="382" font-size="9" fill="#a83a2b" font-weight="600">e. 公開鍵オブジェクト作成</text>
+        <text x="510" y="397" font-size="9" fill="#a83a2b" font-weight="600">f. 秘密鍵オブジェクト作成</text>
+        <text x="510" y="412" font-size="9" fill="#3c4865">   ↓</text>
+        <text x="510" y="427" font-size="9" fill="#a83a2b" font-weight="600">g. 属性適用 + 永続化</text>
+
+        <!-- HSM → Lib -->
+        <path d="M 625 470 L 385 470" stroke="#18233a" stroke-width="2" marker-end="url(#arr-kg)"/>
+        <text x="505" y="463" text-anchor="middle" font-size="10" fill="#18233a" font-weight="600" font-family="JetBrains Mono">RESP: pubHandle, privHandle</text>
+
+        <rect x="270" y="490" width="220" height="40" fill="#fdfaf2" stroke="#b88a3c" stroke-width="1" stroke-dasharray="2,2"/>
+        <text x="380" y="507" text-anchor="middle" font-size="10" fill="#8b6a2a" font-weight="700">③ ハンドル変換・登録</text>
+        <text x="380" y="522" text-anchor="middle" font-size="9" fill="#6d7591">ライブラリ帳簿に2つのハンドル記録</text>
+
+        <!-- Lib → App -->
+        <path d="M 375 565 L 135 565" stroke="#18233a" stroke-width="2" marker-end="url(#arr-kg)"/>
+        <text x="255" y="555" text-anchor="middle" font-size="10" fill="#18233a" font-weight="600" font-family="JetBrains Mono">return CKR_OK</text>
+        <text x="255" y="572" text-anchor="middle" font-size="9" fill="#18233a" font-family="JetBrains Mono">*phPubKey=42, *phPrivKey=43</text>
+
+        <text x="130" y="610" text-anchor="middle" font-size="10" fill="#6d7591">2つのハンドル取得</text>
+        <text x="630" y="610" text-anchor="middle" font-size="10" fill="#a83a2b" font-weight="700">★ ここが長い</text>
+
+        <text x="20" y="320" font-size="9" fill="#6d7591" letter-spacing="2" transform="rotate(-90 20 320)">TIME →</text>
+
+        <defs>
+          <marker id="arr-kg" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto">
+            <polygon points="0,0 9,3.5 0,7" fill="#18233a"/>
+          </marker>
+        </defs>
+      </svg>
+    </div>
+    <div class="diagram-caption">RSA鍵生成のシーケンス。HSM内のステップbとcが繰り返されるため時間が予測しにくい</div>
+
+    <div class="card warn">
+      <div class="card-title">なぜ鍵生成は「ばらつき」が大きいか</div>
+      <p>RSAの素数生成は<strong>確率的アルゴリズム</strong>。Miller-Rabin判定で「合成数」と分かったら次の候補を試す。運悪く何度も外せば数十秒かかることもある。<strong>レイテンシのmaxはmeanの数十倍になる</strong>のが典型。</p>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2 §5.15.4</a><a href="#slide-21">[16] NIST FIPS 186-5 §A.1 RSA key generation</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 17: Algorithm comparison ====== -->
+<section class="slide" data-title="アルゴリズム特性差">
+  <span class="slide-num">17 / 22</span>
+  <div class="slide-inner">
+    <span class="slide-tag ch3">CHAPTER 3 · 鍵生成 · アルゴリズム別特性</span>
+    <h2><span class="num">17</span>RSA / EC / AES — 全然違う3兄弟</h2>
+    <p class="lead">同じ「鍵生成」でも、アルゴリズムによって処理内容と所要時間が桁違いに変わる。性能評価ではこれらを<strong>別カテゴリで測る</strong>のが鉄則。</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+        <!-- AES -->
+        <rect x="30" y="40" width="220" height="240" fill="#fdfaf2" stroke="#6b8e5e" stroke-width="2"/>
+        <text x="140" y="65" text-anchor="middle" font-size="13" fill="#6b8e5e" font-weight="700" font-family="JetBrains Mono">AES (対称)</text>
+        <line x1="50" y1="75" x2="230" y2="75" stroke="#d6cdb7"/>
+
+        <text x="140" y="95" text-anchor="middle" font-size="11" fill="#18233a" font-weight="600">処理：</text>
+        <text x="140" y="112" text-anchor="middle" font-size="10" fill="#3c4865">TRNGから 16/24/32B取得</text>
+        <text x="140" y="127" text-anchor="middle" font-size="10" fill="#3c4865">↓</text>
+        <text x="140" y="142" text-anchor="middle" font-size="10" fill="#3c4865">属性付けて保存</text>
+
+        <line x1="50" y1="160" x2="230" y2="160" stroke="#d6cdb7" stroke-dasharray="2,2"/>
+
+        <text x="140" y="180" text-anchor="middle" font-size="11" fill="#18233a" font-weight="600">所要時間：</text>
+        <text x="140" y="210" text-anchor="middle" font-size="22" fill="#6b8e5e" font-weight="700" font-family="Shippori Mincho">&lt; 1 ms</text>
+
+        <text x="140" y="240" text-anchor="middle" font-size="10" fill="#6d7591">関数：</text>
+        <text x="140" y="258" text-anchor="middle" font-size="10" fill="#18233a" font-family="JetBrains Mono">C_GenerateKey</text>
+
+        <!-- EC -->
+        <rect x="270" y="40" width="220" height="240" fill="#fdfaf2" stroke="#b88a3c" stroke-width="2"/>
+        <text x="380" y="65" text-anchor="middle" font-size="13" fill="#b88a3c" font-weight="700" font-family="JetBrains Mono">EC (楕円曲線)</text>
+        <line x1="290" y1="75" x2="470" y2="75" stroke="#d6cdb7"/>
+
+        <text x="380" y="95" text-anchor="middle" font-size="11" fill="#18233a" font-weight="600">処理：</text>
+        <text x="380" y="112" text-anchor="middle" font-size="10" fill="#3c4865">d をランダム選択 (∈[1,n-1])</text>
+        <text x="380" y="127" text-anchor="middle" font-size="10" fill="#3c4865">↓</text>
+        <text x="380" y="142" text-anchor="middle" font-size="10" fill="#3c4865">Q = d·G (スカラー倍)</text>
+
+        <line x1="290" y1="160" x2="470" y2="160" stroke="#d6cdb7" stroke-dasharray="2,2"/>
+
+        <text x="380" y="180" text-anchor="middle" font-size="11" fill="#18233a" font-weight="600">所要時間：</text>
+        <text x="380" y="210" text-anchor="middle" font-size="22" fill="#b88a3c" font-weight="700" font-family="Shippori Mincho">5〜50 ms</text>
+
+        <text x="380" y="240" text-anchor="middle" font-size="10" fill="#6d7591">関数：</text>
+        <text x="380" y="258" text-anchor="middle" font-size="10" fill="#18233a" font-family="JetBrains Mono">C_GenerateKeyPair</text>
+
+        <!-- RSA -->
+        <rect x="510" y="40" width="220" height="240" fill="#fdfaf2" stroke="#a83a2b" stroke-width="2"/>
+        <text x="620" y="65" text-anchor="middle" font-size="13" fill="#a83a2b" font-weight="700" font-family="JetBrains Mono">RSA</text>
+        <line x1="530" y1="75" x2="710" y2="75" stroke="#d6cdb7"/>
+
+        <text x="620" y="95" text-anchor="middle" font-size="11" fill="#18233a" font-weight="600">処理：</text>
+        <text x="620" y="112" text-anchor="middle" font-size="10" fill="#3c4865">大きな素数 p, q を探索</text>
+        <text x="620" y="127" text-anchor="middle" font-size="10" fill="#3c4865">↓ (確率的)</text>
+        <text x="620" y="142" text-anchor="middle" font-size="10" fill="#3c4865">n, e, d 計算</text>
+
+        <line x1="530" y1="160" x2="710" y2="160" stroke="#d6cdb7" stroke-dasharray="2,2"/>
+
+        <text x="620" y="180" text-anchor="middle" font-size="11" fill="#18233a" font-weight="600">所要時間：</text>
+        <text x="620" y="210" text-anchor="middle" font-size="22" fill="#a83a2b" font-weight="700" font-family="Shippori Mincho">100ms 〜 数秒</text>
+
+        <text x="620" y="240" text-anchor="middle" font-size="10" fill="#6d7591">関数：</text>
+        <text x="620" y="258" text-anchor="middle" font-size="10" fill="#18233a" font-family="JetBrains Mono">C_GenerateKeyPair</text>
+      </svg>
+    </div>
+
+    <h3><span class="marker">▸</span>鍵長別の所要時間（典型値・ネットワーク型HSM）</h3>
+    <table class="tbl">
+      <tr><th>アルゴリズム / 鍵長</th><th>mean</th><th>p99</th><th>max</th><th>備考</th></tr>
+      <tr><td>AES-256</td><td>~1 ms</td><td>~3 ms</td><td>~10 ms</td><td>RTT支配</td></tr>
+      <tr><td>EC P-256</td><td>5〜10 ms</td><td>~20 ms</td><td>~40 ms</td><td>安定</td></tr>
+      <tr><td>EC P-384</td><td>10〜30 ms</td><td>~50 ms</td><td>~100 ms</td><td>安定</td></tr>
+      <tr><td>RSA-2048</td><td>200〜500 ms</td><td>~2 sec</td><td><strong style="color:var(--red)">数秒</strong></td><td>ばらつき大</td></tr>
+      <tr><td>RSA-3072</td><td>800ms〜2 sec</td><td>~10 sec</td><td><strong style="color:var(--red)">数十秒</strong></td><td>確率次第</td></tr>
+      <tr><td>RSA-4096</td><td>2〜5 sec</td><td>~30 sec</td><td><strong style="color:var(--red)">分単位</strong></td><td>運要素強い</td></tr>
+    </table>
+
+    <div class="card warn">
+      <div class="card-title">なぜRSA鍵生成は遅いか</div>
+      <p>RSA鍵生成 = <strong>素数探索</strong>。たとえば2048ビットRSAなら1024ビットの素数を2つ探す。1024ビットの乱数1個が素数である確率は約 1/700。<strong>平均700回の素数判定試行が必要</strong>。Miller-Rabin判定自体も乱数を使う確率的処理で時間がかかる。</p>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[16] NIST FIPS 186-5 §A.1.5 (RSA key gen)</a><a href="#slide-21">[1] PKCS#11 Spec v3.2 §6 (Mechanisms)</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 18: KeyGen - Result + Code ====== -->
+<section class="slide" data-title="鍵生成 結果 + コード">
+  <span class="slide-num">18 / 22</span>
+  <div class="slide-inner">
+    <span class="slide-tag ch3">CHAPTER 3 · 鍵生成 · 結果</span>
+    <h2><span class="num">18</span>結果フェーズ + コード例</h2>
+    <p class="lead">成功すると<strong>2つのハンドル（公開鍵・秘密鍵）</strong>が返ってくる。<code>CKA_TOKEN=true</code>なら永続化され、次のセッションでも<code>C_FindObjects</code>で見つかる。</p>
+
+    <div class="phase-box phase-result">
+      <div class="phase-label">▸ RESULT</div>
+      <h4>戻り値とオブジェクトの永続化</h4>
+      <table class="tbl" style="margin-top:0.5rem">
+        <tr><th>戻り値</th><th>意味</th></tr>
+        <tr><td><code>CKR_OK</code></td><td>成功。phPubKey, phPrivKey に新ハンドル</td></tr>
+        <tr><td><code>CKR_TEMPLATE_INCONSISTENT</code></td><td>属性の組み合わせが矛盾</td></tr>
+        <tr><td><code>CKR_TEMPLATE_INCOMPLETE</code></td><td>必須属性が足りない</td></tr>
+        <tr><td><code>CKR_ATTRIBUTE_VALUE_INVALID</code></td><td>属性値が不正（鍵長など）</td></tr>
+        <tr><td><code>CKR_HOST_MEMORY</code> / <code>CKR_DEVICE_MEMORY</code></td><td>HSM内のオブジェクト枠が満杯</td></tr>
+        <tr><td><code>CKR_FUNCTION_FAILED</code></td><td>素数生成失敗等の内部エラー（極稀）</td></tr>
+      </table>
+    </div>
+
+    <h3><span class="marker">▸</span>RSA-2048鍵ペア生成の完全コード</h3>
+    <div class="cols-2">
+      <div>
+        <div class="code-block c">
+<span class="code-lang">C</span><pre><span class="ty">CK_MECHANISM</span> mech = {
+    <span class="num">CKM_RSA_PKCS_KEY_PAIR_GEN</span>,
+    <span class="kw">NULL</span>, <span class="num">0</span>
+};
+
+<span class="ty">CK_ULONG</span>  modBits = <span class="num">2048</span>;
+<span class="ty">CK_BYTE</span>   pubExp[] = {<span class="num">0x01,0x00,0x01</span>};
+<span class="ty">CK_BBOOL</span>  yes = <span class="num">CK_TRUE</span>;
+<span class="ty">CK_BBOOL</span>  no  = <span class="num">CK_FALSE</span>;
+
+<span class="ty">CK_ATTRIBUTE</span> pubT[] = {
+  {<span class="num">CKA_TOKEN</span>,        &amp;yes, <span class="kw">sizeof</span>(yes)},
+  {<span class="num">CKA_MODULUS_BITS</span>, &amp;modBits, <span class="kw">sizeof</span>(modBits)},
+  {<span class="num">CKA_PUBLIC_EXPONENT</span>, pubExp, <span class="kw">sizeof</span>(pubExp)},
+  {<span class="num">CKA_VERIFY</span>,       &amp;yes, <span class="kw">sizeof</span>(yes)},
+};
+
+<span class="ty">CK_ATTRIBUTE</span> privT[] = {
+  {<span class="num">CKA_TOKEN</span>,       &amp;yes, <span class="kw">sizeof</span>(yes)},
+  {<span class="num">CKA_PRIVATE</span>,     &amp;yes, <span class="kw">sizeof</span>(yes)},
+  {<span class="num">CKA_SIGN</span>,        &amp;yes, <span class="kw">sizeof</span>(yes)},
+  {<span class="num">CKA_SENSITIVE</span>,   &amp;yes, <span class="kw">sizeof</span>(yes)},
+  {<span class="num">CKA_EXTRACTABLE</span>, &amp;no,  <span class="kw">sizeof</span>(no)},
+};
+
+<span class="ty">CK_OBJECT_HANDLE</span> hPub, hPriv;
+<span class="ty">CK_RV</span> rv = pFuncs-><span class="fn-name">C_GenerateKeyPair</span>(
+    hSession, &amp;mech,
+    pubT,  <span class="num">4</span>,
+    privT, <span class="num">5</span>,
+    &amp;hPub, &amp;hPriv);</pre>
+        </div>
+      </div>
+      <div>
+        <div class="code-block rust">
+<span class="code-lang">Rust</span><pre><span class="kw">use</span> cryptoki::{
+    mechanism::Mechanism,
+    object::{Attribute, KeyType},
+};
+
+<span class="kw">let</span> pub_template = <span class="fn-name">vec!</span>[
+    Attribute::<span class="fn-name">Token</span>(<span class="kw">true</span>),
+    Attribute::<span class="fn-name">ModulusBits</span>(<span class="num">2048</span>.<span class="fn-name">into</span>()),
+    Attribute::<span class="fn-name">PublicExponent</span>(<span class="fn-name">vec!</span>[<span class="num">0x01, 0x00, 0x01</span>]),
+    Attribute::<span class="fn-name">Verify</span>(<span class="kw">true</span>),
+];
+
+<span class="kw">let</span> priv_template = <span class="fn-name">vec!</span>[
+    Attribute::<span class="fn-name">Token</span>(<span class="kw">true</span>),
+    Attribute::<span class="fn-name">Private</span>(<span class="kw">true</span>),
+    Attribute::<span class="fn-name">Sign</span>(<span class="kw">true</span>),
+    Attribute::<span class="fn-name">Sensitive</span>(<span class="kw">true</span>),
+    Attribute::<span class="fn-name">Extractable</span>(<span class="kw">false</span>),
+];
+
+<span class="kw">let</span> (pub_key, priv_key) = session.<span class="fn-name">generate_key_pair</span>(
+    &amp;Mechanism::RsaPkcsKeyPairGen,
+    &amp;pub_template,
+    &amp;priv_template,
+)?;
+<span class="com">// pub_key, priv_key: ObjectHandle</span></pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="card bordered-left">
+      <div class="card-title">生成された鍵のライフサイクル</div>
+      <ul style="margin: 0.4rem 0;">
+        <li><strong>Token Object</strong>（<code>CKA_TOKEN=true</code>）→ HSMの永続記憶領域に書き込まれる。次回ログイン時も<code>C_FindObjects</code>で発見可能</li>
+        <li><strong>Session Object</strong>（<code>CKA_TOKEN=false</code>）→ セッション終了で消える</li>
+        <li>削除するには <code>C_DestroyObject</code> を明示的に呼ぶ</li>
+      </ul>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2 §5.15.4</a><a href="#slide-21">[9] AWS CloudHSM Examples</a><a href="#slide-21">[13] cryptoki crate</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 19: KeyGen - Performance ====== -->
+<section class="slide" data-title="鍵生成 性能評価">
+  <span class="slide-num">19 / 22</span>
+  <div class="slide-inner">
+    <span class="slide-tag ch3">CHAPTER 3 · 鍵生成 · ★ 性能評価</span>
+    <h2><span class="num">19</span>性能評価ポイント</h2>
+    <p class="lead">鍵生成の性能評価は<strong>署名とは完全に別ベンチで実施</strong>するのが鉄則。レイテンシのばらつきが激しく、署名と同じスケールで測ると統計が壊れる。</p>
+
+    <div class="card measure">
+      <div class="card-title">★ どこを測るか</div>
+      <p>計測対象は <code>C_GenerateKeyPair</code> (or <code>C_GenerateKey</code>) の全体。Init/Finalなしの単発関数なので、計測点はシンプル。</p>
+      <div class="code-block c" style="margin-top: 1rem;">
+<span class="code-lang">疑似コード</span><pre><span class="com">// ★ 計測区間（テンプレート構築は事前に済ませる）</span>
+t0 = <span class="fn-name">get_time_ns</span>();
+rv = pFuncs-><span class="fn-name">C_GenerateKeyPair</span>(
+    hSession, &amp;mech,
+    pubT,  pubCount,
+    privT, privCount,
+    &amp;hPub, &amp;hPriv);
+t1 = <span class="fn-name">get_time_ns</span>();
+
+latency_ns = t1 - t0;
+<span class="com">// 生成した鍵は使い回さない場合 C_DestroyObject で削除</span></pre>
+      </div>
+    </div>
+
+    <div class="cols-2">
+      <div>
+        <h3><span class="marker">▸</span>測定すべき変数</h3>
+        <ul>
+          <li><strong>アルゴリズム × 鍵長</strong><br>
+            RSA: 2048/3072/4096<br>
+            EC: P-256/P-384/P-521<br>
+            AES: 128/192/256</li>
+          <li><strong>属性パターン</strong>：Token(永続) vs Session(揮発)</li>
+          <li><strong>並列度</strong>：注意 — HSM側の鍵生成同時実行数に上限あり</li>
+        </ul>
+      </div>
+      <div>
+        <h3><span class="marker">▸</span>取るべきメトリクス（署名と違う！）</h3>
+        <ul>
+          <li><strong>レイテンシ分布</strong>：<strong style="color:var(--red)">max を必ず記録</strong></li>
+          <li><strong>p99 / p99.9</strong>：テールが長い</li>
+          <li><strong>標準偏差</strong>：ばらつきの大きさ</li>
+          <li><strong>スループットより1リクエストの最悪値</strong>を重視</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card warn">
+      <div class="card-title">設計上の重要な注意</div>
+      <ul style="margin: 0.4rem 0;">
+        <li><strong>署名と同じ枠で測るな</strong>：1回の鍵生成 = 数百〜数千回の署名相当。平均が壊れる</li>
+        <li><strong>HSM側の鍵格納上限</strong>：ベンチで作りすぎると枠を食う → 使い終わったら <code>C_DestroyObject</code> で削除</li>
+        <li><strong>並列度の罠</strong>：鍵生成は<strong>HSM側で並列実行されないことが多い</strong>（リソース集中型処理）。スレッドを増やしてもスループットが上がらない</li>
+        <li><strong>サンプル数を稼ぐ</strong>：RSAは20-30回でmean計算するとmaxを取り逃がす。<strong>1000回以上</strong>のサンプリングが必要</li>
+      </ul>
+    </div>
+
+    <div class="card bordered-left">
+      <div class="card-title">推奨ベンチ設計（RSA鍵生成）</div>
+      <div class="code-block c" style="margin-top:0.6rem">
+<span class="code-lang">疑似コード</span><pre><span class="com">// 1. 準備（測定外）</span>
+<span class="fn-name">setup_session_and_login</span>();
+
+<span class="com">// 2. ウォームアップ（5〜10回）</span>
+<span class="kw">for</span> i <span class="kw">in</span> <span class="num">0</span>..<span class="num">10</span> { <span class="fn-name">gen_and_destroy</span>(); }
+
+<span class="com">// 3. 計測 (1000サンプル / 数時間かかる)</span>
+<span class="kw">for</span> i <span class="kw">in</span> <span class="num">0</span>..<span class="num">1000</span> {
+    t0 = <span class="fn-name">now</span>();
+    <span class="fn-name">C_GenerateKeyPair</span>(...);
+    t1 = <span class="fn-name">now</span>();
+    latencies[i] = t1 - t0;
+    <span class="fn-name">C_DestroyObject</span>(hPub);
+    <span class="fn-name">C_DestroyObject</span>(hPriv);
+}
+
+<span class="com">// 4. 集計：max, p99.9 を必ず確認</span></pre>
+      </div>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2 §5.15</a><a href="#slide-21">[7] AWS CloudHSM PKCS#11 library</a><a href="#slide-21">[16] NIST FIPS 186-5</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 20: 3-way comparison ====== -->
+<section class="slide" data-title="3操作の性能特性比較">
+  <span class="slide-num">20 / 22</span>
+  <div class="slide-inner">
+    <span class="slide-tag">CLOSING · 総合まとめ</span>
+    <h2><span class="num">20</span>3操作の性能特性 — 横断比較</h2>
+    <p class="lead">乱数・署名・鍵生成は<strong>「単発の重さ」と「呼び出し頻度」が桁違い</strong>。ベンチ設計を間違えると、片方の特性しか見えなくなる。</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 360" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+        <!-- Axes -->
+        <line x1="80" y1="320" x2="720" y2="320" stroke="#18233a" stroke-width="1.5"/>
+        <line x1="80" y1="40" x2="80" y2="320" stroke="#18233a" stroke-width="1.5"/>
+
+        <!-- Axis labels -->
+        <text x="400" y="350" text-anchor="middle" font-size="11" fill="#18233a" font-weight="600">1回あたりの所要時間 (log scale)</text>
+        <text x="30" y="180" font-size="11" fill="#18233a" font-weight="600" transform="rotate(-90 30 180)">呼び出し頻度</text>
+
+        <!-- x-axis ticks -->
+        <text x="160" y="335" text-anchor="middle" font-size="9" fill="#6d7591" font-family="JetBrains Mono">μs</text>
+        <text x="280" y="335" text-anchor="middle" font-size="9" fill="#6d7591" font-family="JetBrains Mono">1 ms</text>
+        <text x="400" y="335" text-anchor="middle" font-size="9" fill="#6d7591" font-family="JetBrains Mono">10 ms</text>
+        <text x="520" y="335" text-anchor="middle" font-size="9" fill="#6d7591" font-family="JetBrains Mono">100 ms</text>
+        <text x="640" y="335" text-anchor="middle" font-size="9" fill="#6d7591" font-family="JetBrains Mono">1 s+</text>
+
+        <!-- y-axis ticks -->
+        <text x="70" y="295" text-anchor="end" font-size="9" fill="#6d7591">低</text>
+        <text x="70" y="180" text-anchor="end" font-size="9" fill="#6d7591">中</text>
+        <text x="70" y="80" text-anchor="end" font-size="9" fill="#6d7591">高</text>
+
+        <!-- Grid lines -->
+        <line x1="80" y1="200" x2="720" y2="200" stroke="#d6cdb7" stroke-width="0.5" stroke-dasharray="2,2"/>
+        <line x1="80" y1="120" x2="720" y2="120" stroke="#d6cdb7" stroke-width="0.5" stroke-dasharray="2,2"/>
+
+        <!-- 乱数生成 region -->
+        <ellipse cx="240" cy="130" rx="80" ry="50" fill="#5e88a6" fill-opacity="0.15" stroke="#5e88a6" stroke-width="2"/>
+        <text x="240" y="125" text-anchor="middle" font-size="13" fill="#5e88a6" font-weight="700" font-family="Shippori Mincho">乱数生成</text>
+        <text x="240" y="143" text-anchor="middle" font-size="10" fill="#5e88a6">軽い・頻繁</text>
+
+        <!-- 署名 region -->
+        <ellipse cx="420" cy="180" rx="100" ry="65" fill="#b88a3c" fill-opacity="0.2" stroke="#b88a3c" stroke-width="2.5"/>
+        <text x="420" y="175" text-anchor="middle" font-size="14" fill="#8b6a2a" font-weight="700" font-family="Shippori Mincho">署名</text>
+        <text x="420" y="195" text-anchor="middle" font-size="10" fill="#8b6a2a">中〜重・頻繁 (本命)</text>
+
+        <!-- 鍵生成 region -->
+        <ellipse cx="620" cy="275" rx="80" ry="35" fill="#a83a2b" fill-opacity="0.15" stroke="#a83a2b" stroke-width="2"/>
+        <text x="620" y="270" text-anchor="middle" font-size="13" fill="#a83a2b" font-weight="700" font-family="Shippori Mincho">鍵生成</text>
+        <text x="620" y="288" text-anchor="middle" font-size="10" fill="#a83a2b">超重・稀</text>
+
+        <!-- Annotation -->
+        <text x="400" y="22" text-anchor="middle" font-size="10" fill="#6d7591" font-style="italic">3操作はスケールが桁違い → 別ベンチで測定</text>
+      </svg>
+    </div>
+
+    <h3><span class="marker">▸</span>性能特性の対比表</h3>
+    <table class="tbl">
+      <tr>
+        <th style="width: 130px">観点</th>
+        <th style="color:#5e88a6">乱数生成</th>
+        <th style="color:var(--vault)">署名</th>
+        <th style="color:var(--red)">鍵生成</th>
+      </tr>
+      <tr>
+        <td>1回の所要時間</td>
+        <td>0.5〜数 ms</td>
+        <td>2〜30 ms (RSA-2048)</td>
+        <td>100ms〜数秒 (RSA-2048)</td>
+      </tr>
+      <tr>
+        <td>ばらつき</td>
+        <td>小</td>
+        <td>中</td>
+        <td><strong style="color:var(--red)">超大（max≫mean）</strong></td>
+      </tr>
+      <tr>
+        <td>呼び出し頻度</td>
+        <td>中〜高</td>
+        <td><strong>非常に高い</strong></td>
+        <td>非常に低い</td>
+      </tr>
+      <tr>
+        <td>主ボトルネック</td>
+        <td>ネットワークRTT</td>
+        <td>HSM内秘密鍵演算</td>
+        <td>HSM内素数探索</td>
+      </tr>
+      <tr>
+        <td>並列スケール</td>
+        <td>セッション数倍までOK</td>
+        <td>HSM上限まで線形</td>
+        <td><strong style="color:var(--red)">ほぼスケールしない</strong></td>
+      </tr>
+      <tr>
+        <td>Init/Final</td>
+        <td>なし（単発）</td>
+        <td><strong>あり（3段）</strong></td>
+        <td>なし（単発）</td>
+      </tr>
+      <tr>
+        <td>計測単位</td>
+        <td>ops/sec</td>
+        <td>ops/sec + p99</td>
+        <td>1回あたりmax</td>
+      </tr>
+      <tr>
+        <td>サンプル数目安</td>
+        <td>10,000+</td>
+        <td>1,000+</td>
+        <td>100〜1,000（時間かかる）</td>
+      </tr>
+    </table>
+
+    <div class="card bordered-left">
+      <div class="card-title">運用設計への含意</div>
+      <ul style="font-size:0.92rem; margin: 0.4rem 0">
+        <li><strong>鍵生成は事前に済ませる</strong>：本番リクエストの中で鍵生成しない（ユーザーを待たせる）</li>
+        <li><strong>署名のキャパが本番の上限</strong>：HSMの選定はTPS-署名を見る</li>
+        <li><strong>乱数は意外と詰まる</strong>：高負荷時はライブラリ側でPRNGを使うことも検討</li>
+      </ul>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2</a><a href="#slide-21">[7] AWS CloudHSM</a><a href="#slide-21">[10] Thales Luna</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 21: Benchmark design overall ====== -->
+<section class="slide" data-title="ベンチマーク設計の総合指針">
+  <span class="slide-num">21 / 22</span>
+  <div class="slide-inner">
+    <span class="slide-tag">CLOSING · 総合まとめ</span>
+    <h2><span class="num">21</span>ベンチマーク設計の総合指針</h2>
+    <p class="lead">3操作を統一的に評価するための<strong>設計テンプレ</strong>。これに沿って組めば、結果の解釈が後で破綻しない。</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+        <!-- Phase boxes -->
+        <rect x="20" y="40" width="140" height="200" fill="#fdfaf2" stroke="#5e88a6" stroke-width="2"/>
+        <text x="90" y="65" text-anchor="middle" font-size="12" fill="#5e88a6" font-weight="700" font-family="JetBrains Mono">SETUP</text>
+        <line x1="35" y1="73" x2="145" y2="73" stroke="#d6cdb7"/>
+        <text x="90" y="95" text-anchor="middle" font-size="10" fill="#3c4865">セッション開設</text>
+        <text x="90" y="113" text-anchor="middle" font-size="10" fill="#3c4865">ログイン</text>
+        <text x="90" y="131" text-anchor="middle" font-size="10" fill="#3c4865">鍵生成 / 取得</text>
+        <text x="90" y="149" text-anchor="middle" font-size="10" fill="#3c4865">バッファ準備</text>
+        <text x="90" y="167" text-anchor="middle" font-size="10" fill="#3c4865">TLSセッション確立</text>
+        <text x="90" y="195" text-anchor="middle" font-size="9" fill="#6d7591" font-style="italic">＝測定外</text>
+        <text x="90" y="215" text-anchor="middle" font-size="9" fill="#6d7591" font-style="italic">準備時間長くてOK</text>
+
+        <path d="M 165 140 L 200 140" stroke="#18233a" stroke-width="1.5" marker-end="url(#arr-wf)"/>
+
+        <rect x="205" y="40" width="140" height="200" fill="#fdfaf2" stroke="#b88a3c" stroke-width="2"/>
+        <text x="275" y="65" text-anchor="middle" font-size="12" fill="#b88a3c" font-weight="700" font-family="JetBrains Mono">WARMUP</text>
+        <line x1="220" y1="73" x2="330" y2="73" stroke="#d6cdb7"/>
+        <text x="275" y="100" text-anchor="middle" font-size="10" fill="#3c4865">対象関数を</text>
+        <text x="275" y="118" text-anchor="middle" font-size="10" fill="#3c4865">10〜100回呼ぶ</text>
+        <text x="275" y="155" text-anchor="middle" font-size="9" fill="#6d7591">JITウォーム</text>
+        <text x="275" y="173" text-anchor="middle" font-size="9" fill="#6d7591">キャッシュ温め</text>
+        <text x="275" y="191" text-anchor="middle" font-size="9" fill="#6d7591">HSM側準備</text>
+        <text x="275" y="215" text-anchor="middle" font-size="9" fill="#a83a2b" font-style="italic">＝結果は捨てる</text>
+
+        <path d="M 350 140 L 385 140" stroke="#18233a" stroke-width="1.5" marker-end="url(#arr-wf)"/>
+
+        <rect x="390" y="40" width="140" height="200" fill="#faf6ec" stroke="#a83a2b" stroke-width="2.5"/>
+        <text x="460" y="65" text-anchor="middle" font-size="12" fill="#a83a2b" font-weight="700" font-family="JetBrains Mono">★ MEASURE</text>
+        <line x1="405" y1="73" x2="515" y2="73" stroke="#d6cdb7"/>
+        <text x="460" y="100" text-anchor="middle" font-size="10" fill="#3c4865" font-weight="600">N回繰り返し測定</text>
+        <text x="460" y="120" text-anchor="middle" font-size="10" fill="#3c4865">乱数: 10,000</text>
+        <text x="460" y="138" text-anchor="middle" font-size="10" fill="#3c4865">署名: 1,000</text>
+        <text x="460" y="156" text-anchor="middle" font-size="10" fill="#3c4865">鍵生成: 100+</text>
+        <text x="460" y="190" text-anchor="middle" font-size="9" fill="#a83a2b" font-weight="600">時刻はns精度</text>
+        <text x="460" y="208" text-anchor="middle" font-size="9" fill="#a83a2b" font-weight="600">各サンプル保存</text>
+
+        <path d="M 535 140 L 570 140" stroke="#18233a" stroke-width="1.5" marker-end="url(#arr-wf)"/>
+
+        <rect x="575" y="40" width="140" height="200" fill="#fdfaf2" stroke="#6b8e5e" stroke-width="2"/>
+        <text x="645" y="65" text-anchor="middle" font-size="12" fill="#6b8e5e" font-weight="700" font-family="JetBrains Mono">ANALYZE</text>
+        <line x1="590" y1="73" x2="700" y2="73" stroke="#d6cdb7"/>
+        <text x="645" y="95" text-anchor="middle" font-size="10" fill="#3c4865">mean / stddev</text>
+        <text x="645" y="113" text-anchor="middle" font-size="10" fill="#3c4865">p50, p95, p99</text>
+        <text x="645" y="131" text-anchor="middle" font-size="10" fill="#3c4865">max を必ず</text>
+        <text x="645" y="149" text-anchor="middle" font-size="10" fill="#3c4865">ヒストグラム</text>
+        <text x="645" y="167" text-anchor="middle" font-size="10" fill="#3c4865">エラー率</text>
+        <text x="645" y="195" text-anchor="middle" font-size="9" fill="#6d7591" font-style="italic">CSV出力 +</text>
+        <text x="645" y="213" text-anchor="middle" font-size="9" fill="#6d7591" font-style="italic">グラフ化</text>
+
+        <defs>
+          <marker id="arr-wf" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto">
+            <polygon points="0,0 9,3.5 0,7" fill="#18233a"/>
+          </marker>
+        </defs>
+      </svg>
+    </div>
+    <div class="diagram-caption">標準的なベンチマーク4フェーズ。3操作ともこの型で統一する</div>
+
+    <div class="cols-2">
+      <div class="card bordered-left">
+        <div class="card-title">必ず記録すべき情報</div>
+        <ul style="font-size:0.9rem; margin:0.4rem 0">
+          <li>HSMのバージョン・FW・型番</li>
+          <li>PKCS#11ライブラリのバージョン</li>
+          <li>ネットワーク経路（同一LAN/別VPC等）</li>
+          <li>ベンチ実行ホストのスペック</li>
+          <li>並列度・セッション数</li>
+          <li>使用メカニズム・鍵長</li>
+          <li>テスト時刻（HSM側の他負荷影響）</li>
+        </ul>
+      </div>
+      <div class="card warn">
+        <div class="card-title">典型的な失敗パターン</div>
+        <ul style="font-size:0.9rem; margin:0.4rem 0">
+          <li><strong>ウォームアップなし</strong> → 初回がp99に化けて全体歪む</li>
+          <li><strong>サンプル少なすぎ</strong> → maxを取り逃がし、テールリスク見落とし</li>
+          <li><strong>3操作を同じ枠で実行</strong> → 鍵生成1回が他をブロック</li>
+          <li><strong>セッション枯渇放置</strong> → 中盤からエラー多発で結果汚染</li>
+          <li><strong>HSM側ログを取り忘れ</strong> → ボトルネックの場所が特定できない</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card measure">
+      <div class="card-title">★ 並列度設計のチェックリスト</div>
+      <ul style="font-size:0.92rem; margin: 0.4rem 0">
+        <li>スレッドごとに<strong>別セッション</strong>を持つ（セッションを共有しない）</li>
+        <li>並列度を<strong>1, 2, 4, 8, 16, 32, 64...</strong>と倍々で増やしてスケール曲線を描く</li>
+        <li><strong>飽和点</strong>を特定する：これ以上スレッドを増やしてもTPSが上がらない点</li>
+        <li>飽和点でのレイテンシ・エラー率を記録（運用上限の参考）</li>
+        <li>鍵生成は<strong>並列度1〜数</strong>で十分（スケールしないので）</li>
+      </ul>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2</a><a href="#slide-21">[3] PKCS#11 Usage Guide v3.2</a><a href="#slide-21">[7] AWS CloudHSM</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 22: References ====== -->
+<section class="slide" data-title="一次資料 / References">
+  <span class="slide-num">22 / 22</span>
+  <div class="slide-inner">
+    <span class="slide-tag">PRIMARY SOURCES — 一次資料</span>
+    <h2><span class="num">22</span>References</h2>
+    <p class="lead">本ドキュメントの記述が依拠する一次資料・公式ドキュメント。<strong>PKCS#11 v3.2 仕様書および NIST関連標準</strong>を中心に整理。</p>
+
+    <div class="ref-section">
+      <div class="ref-section-title">▸ PKCS#11 公式仕様 (OASIS)</div>
+      <ul class="ref-list">
+        <li>
+          <span class="ref-num">[1]</span>
+          <span class="ref-title">PKCS #11 Specification Version 3.2</span>
+          <span class="ref-meta">Edited by Dieter Bong and Greg Scott. OASIS Committee Specification 01. 14 November 2025. — メイン仕様書（データ型・関数・Mechanism全部入り）</span>
+          <a class="ref-url" href="https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.2/pkcs11-spec-v3.2.html" target="_blank" rel="noopener">docs.oasis-open.org/pkcs11/pkcs11-spec/v3.2/pkcs11-spec-v3.2.html</a>
+        </li>
+        <li>
+          <span class="ref-num">[2]</span>
+          <span class="ref-title">PKCS #11 Profiles Version 3.2</span>
+          <span class="ref-meta">Edited by Tim Hudson. — Baseline、Extended、Authentication Token等のプロファイル定義</span>
+          <a class="ref-url" href="https://docs.oasis-open.org/pkcs11/pkcs11-profiles/v3.2/pkcs11-profiles-v3.2.html" target="_blank" rel="noopener">docs.oasis-open.org/pkcs11/pkcs11-profiles/v3.2/pkcs11-profiles-v3.2.html</a>
+        </li>
+        <li>
+          <span class="ref-num">[3]</span>
+          <span class="ref-title">PKCS #11 Usage Guide Version 3.2</span>
+          <span class="ref-meta">Edited by Dieter Bong. — 開発者向け使い方ガイド、フロー例も豊富</span>
+          <a class="ref-url" href="https://docs.oasis-open.org/pkcs11/pkcs11-ug/v3.2/pkcs11-ug-v3.2.html" target="_blank" rel="noopener">docs.oasis-open.org/pkcs11/pkcs11-ug/v3.2/pkcs11-ug-v3.2.html</a>
+        </li>
+        <li>
+          <span class="ref-num">[4]</span>
+          <span class="ref-title">PKCS #11 Specification Version 3.1</span>
+          <span class="ref-meta">OASIS Committee Specification 01. 11 August 2022. — 前バージョン（多くのベンダー実装が3.1ベース）</span>
+          <a class="ref-url" href="https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/pkcs11-spec-v3.1.html" target="_blank" rel="noopener">docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/pkcs11-spec-v3.1.html</a>
+        </li>
+        <li>
+          <span class="ref-num">[5]</span>
+          <span class="ref-title">OASIS PKCS 11 Technical Committee</span>
+          <span class="ref-meta">仕様の策定主体。最新の動向・公開レビュー情報</span>
+          <a class="ref-url" href="https://www.oasis-open.org/committees/pkcs11/" target="_blank" rel="noopener">www.oasis-open.org/committees/pkcs11/</a>
+        </li>
+      </ul>
+    </div>
+
+    <div class="ref-section">
+      <div class="ref-section-title">▸ ソフトウェア実装（学習・PoC用）</div>
+      <ul class="ref-list">
+        <li>
+          <span class="ref-num">[6]</span>
+          <span class="ref-title">SoftHSM2 — OpenDNSSEC Project</span>
+          <span class="ref-meta">PKCS#11互換のソフトウェアHSM。学習・API動作確認に最適。Botan / OpenSSLバックエンド選択可</span>
+          <a class="ref-url" href="https://www.opendnssec.org/softhsm/" target="_blank" rel="noopener">www.opendnssec.org/softhsm/</a><br>
+          <a class="ref-url" href="https://github.com/softhsm/SoftHSMv2" target="_blank" rel="noopener">github.com/softhsm/SoftHSMv2</a>
+        </li>
+      </ul>
+    </div>
+
+    <div class="ref-section">
+      <div class="ref-section-title">▸ ベンダー実装ドキュメント（参考例）</div>
+      <ul class="ref-list">
+        <li>
+          <span class="ref-num">[7]</span>
+          <span class="ref-title">AWS CloudHSM — PKCS #11 library</span>
+          <span class="ref-meta">CloudHSM Client SDK 5の公式リファレンス。対応Mechanism、属性デフォルト値、ベンダー固有拡張</span>
+          <a class="ref-url" href="https://docs.aws.amazon.com/cloudhsm/latest/userguide/pkcs11-library.html" target="_blank" rel="noopener">docs.aws.amazon.com/cloudhsm/latest/userguide/pkcs11-library.html</a>
+        </li>
+        <li>
+          <span class="ref-num">[8]</span>
+          <span class="ref-title">AWS CloudHSM — Key attributes</span>
+          <span class="ref-meta">属性のデフォルト値とベンダー固有の挙動。<code>CKA_EXTRACTABLE</code>等の運用知見</span>
+          <a class="ref-url" href="https://docs.aws.amazon.com/cloudhsm/latest/userguide/pkcs11-attributes.html" target="_blank" rel="noopener">docs.aws.amazon.com/cloudhsm/latest/userguide/pkcs11-attributes.html</a>
+        </li>
+        <li>
+          <span class="ref-num">[9]</span>
+          <span class="ref-title">AWS CloudHSM PKCS#11 サンプルコード集</span>
+          <span class="ref-meta">署名・暗号化・鍵生成・鍵ラップの完全な動作サンプル（C言語）</span>
+          <a class="ref-url" href="https://github.com/aws-samples/aws-cloudhsm-pkcs11-examples" target="_blank" rel="noopener">github.com/aws-samples/aws-cloudhsm-pkcs11-examples</a>
+        </li>
+        <li>
+          <span class="ref-num">[10]</span>
+          <span class="ref-title">Thales Luna HSM — FIPS 140-3</span>
+          <span class="ref-meta">Luna Network / Luna PCIe HSM（FIPS 140-3 Level 3、NIST cert #4684）</span>
+          <a class="ref-url" href="https://cpl.thalesgroup.com/compliance/fips-140-3" target="_blank" rel="noopener">cpl.thalesgroup.com/compliance/fips-140-3</a>
+        </li>
+      </ul>
+    </div>
+
+    <div class="ref-section">
+      <div class="ref-section-title">▸ 認証規格・関連標準 (NIST)</div>
+      <ul class="ref-list">
+        <li>
+          <span class="ref-num">[11]</span>
+          <span class="ref-title">NIST Cryptographic Module Validation Program (CMVP)</span>
+          <span class="ref-meta">FIPS 140-3に基づく暗号モジュール認証プログラム。HSM認証の一次情報源</span>
+          <a class="ref-url" href="https://csrc.nist.gov/projects/cryptographic-module-validation-program" target="_blank" rel="noopener">csrc.nist.gov/projects/cryptographic-module-validation-program</a>
+        </li>
+        <li>
+          <span class="ref-num">[12]</span>
+          <span class="ref-title">FIPS 140-3 Implementation Guidance</span>
+          <span class="ref-meta">FIPS 140-3 / ISO/IEC 19790:2012 の実装ガイダンス（NIST + CCCS）</span>
+          <a class="ref-url" href="https://csrc.nist.gov/projects/cryptographic-module-validation-program/fips-140-3-standards" target="_blank" rel="noopener">csrc.nist.gov/projects/cryptographic-module-validation-program/fips-140-3-standards</a>
+        </li>
+        <li>
+          <span class="ref-num">[14]</span>
+          <span class="ref-title">NIST SP 800-90 A/B/C — Random Bit Generators</span>
+          <span class="ref-meta">乱数生成器の標準。SP 800-90A: DRBG、SP 800-90B: エントロピー源、SP 800-90C: 構築指針</span>
+          <a class="ref-url" href="https://csrc.nist.gov/projects/random-bit-generation" target="_blank" rel="noopener">csrc.nist.gov/projects/random-bit-generation</a>
+        </li>
+        <li>
+          <span class="ref-num">[15]</span>
+          <span class="ref-title">NIST FIPS 186-5 — Digital Signature Standard (DSS)</span>
+          <span class="ref-meta">2023年公開のデジタル署名標準。RSA, ECDSA, EdDSA の規定を含む</span>
+          <a class="ref-url" href="https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-5.pdf" target="_blank" rel="noopener">nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-5.pdf</a>
+        </li>
+        <li>
+          <span class="ref-num">[16]</span>
+          <span class="ref-title">NIST FIPS 186-5 Annex A — Key Generation Procedures</span>
+          <span class="ref-meta">特にA.1.5（RSA鍵生成の素数選定）が鍵生成性能の議論の根拠</span>
+          <a class="ref-url" href="https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-5.pdf" target="_blank" rel="noopener">nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-5.pdf</a>
+        </li>
+      </ul>
+    </div>
+
+    <div class="ref-section">
+      <div class="ref-section-title">▸ プログラミング言語バインディング</div>
+      <ul class="ref-list">
+        <li>
+          <span class="ref-num">[13]</span>
+          <span class="ref-title">cryptoki — Rust binding for PKCS#11</span>
+          <span class="ref-meta">PKCS#11のRustラッパー。ベンダーの<code>.so</code>をFFI経由で呼ぶ高レベルAPI</span>
+          <a class="ref-url" href="https://crates.io/crates/cryptoki" target="_blank" rel="noopener">crates.io/crates/cryptoki</a><br>
+          <a class="ref-url" href="https://docs.rs/cryptoki/" target="_blank" rel="noopener">docs.rs/cryptoki/</a>
+        </li>
+      </ul>
+    </div>
+
+    <div class="card bordered-left" style="margin-top: 2rem;">
+      <div class="card-title">読み進めるときの推奨順（性能評価フォーカス）</div>
+      <p style="font-size: 0.92rem;"><strong>[3] Usage Guide §フロー例</strong> → 各操作の正しい呼び出し順を確認<br><strong>[1] Specification §5</strong> → 関数の戻り値・状態遷移を正確に把握<br><strong>[7]〜[10] ベンダー資料</strong> → 実機の制約・対応Mechanism・属性デフォルトを確認<br><strong>[14]〜[16] NIST資料</strong> → 性能特性の理論背景（特にRSA鍵生成のばらつき）<br><strong>[6] SoftHSM2 で先に試す</strong> → ベンチハーネス自体を検証してから本番HSMへ</p>
+    </div>
+
+    <div style="text-align: center; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--line);">
+      <p style="font-family: 'Shippori Mincho', serif; font-size: 1.1rem; color: var(--ink); font-style: italic;">
+        — 計測の質は、ベンチ設計の質を超えない —
+      </p>
+      <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--ink-muted); letter-spacing: 0.15em; margin-top: 1rem;">
+        END OF DOCUMENT
+      </p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<nav class="nav-bottom" aria-label="スライドナビゲーション">
+  <button id="prevBtn" type="button" aria-label="前のスライドへ">← PREV</button>
+  <button id="nextBtn" type="button" aria-label="次のスライドへ">NEXT →</button>
+</nav>
+
+<script src="assets/deck.js"></script>
+
+</body>
+</html>

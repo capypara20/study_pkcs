@@ -1,0 +1,559 @@
+/* =====================================================================
+ * common.css — 3つのスライドHTMLで共通する土台スタイル
+ *
+ * テーマ変数・リセット・タイポグラフィ・スライド枠・ナビ・目次など、
+ * ページをまたいで共通する部分をまとめる。
+ * ページ固有の色（アクセント）や微調整・固有部品は 01.css / 02.css /
+ * 03.css 側で上書き・追加する。
+ *
+ * 読み込み順は「common.css → 各ページ.css」を前提とする。
+ * ===================================================================== */
+
+/* ---- テーマ変数 ---------------------------------------------------- */
+:root {
+  --bg: #f3eee3;
+  --paper: #faf6ec;
+  --ink: #18233a;
+  --ink-soft: #3c4865;
+  --ink-muted: #6d7591;
+  --gold: #b88a3c;
+  --gold-soft: #d9b56b;
+  --vault: #8b6a2a;
+  --red: #a83a2b;
+  --line: #d6cdb7;
+  --line-strong: #b3a584;
+  --bg-card: #fdfaf2;
+  --code-bg: #1d2435;
+  --code-fg: #e8e3d5;
+  --shadow: 0 1px 0 rgba(24, 35, 58, 0.04), 0 8px 24px -12px rgba(24, 35, 58, 0.18);
+
+  /* ページごとに上書きするアクセント色（既定は金） */
+  --accent: var(--vault);
+}
+
+/* ---- リセット / 基本 ----------------------------------------------- */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: "Zen Kaku Gothic New", "Hiragino Kaku Gothic ProN", sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.7;
+  letter-spacing: 0.01em;
+  overflow-x: hidden;
+}
+
+/* 紙のような淡いテクスチャ（背景の色味は各ページで上書き可） */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(184, 138, 60, 0.04) 0%, transparent 50%),
+    radial-gradient(circle at 80% 70%, rgba(168, 58, 43, 0.03) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.deck { position: relative; z-index: 1; }
+
+/* ---- スライド枠 ---------------------------------------------------- */
+.slide {
+  min-height: 100vh;
+  padding: 5rem 2rem 6rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  border-bottom: 1px solid var(--line);
+}
+
+.slide-inner { max-width: 1080px; width: 100%; margin: 0 auto; }
+
+.slide-num {
+  position: absolute;
+  top: 1.5rem;
+  right: 2rem;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  letter-spacing: 0.15em;
+}
+
+.slide-tag {
+  display: inline-block;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--gold);
+  border: 1px solid var(--gold);
+  padding: 0.3rem 0.8rem;
+  margin-bottom: 1.5rem;
+}
+
+/* ---- 見出し / 本文 ------------------------------------------------- */
+h1.title {
+  font-family: "Shippori Mincho", serif;
+  font-weight: 800;
+  font-size: clamp(2.3rem, 5.5vw, 4rem);
+  line-height: 1.18;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  margin-bottom: 1.5rem;
+}
+h1.title .accent { color: var(--accent); }
+
+.subtitle {
+  font-family: "Shippori Mincho", serif;
+  font-size: clamp(1.05rem, 2vw, 1.4rem);
+  color: var(--ink-soft);
+  font-weight: 500;
+  margin-bottom: 3rem;
+  line-height: 1.5;
+}
+
+h2 {
+  font-family: "Shippori Mincho", serif;
+  font-weight: 700;
+  font-size: clamp(1.7rem, 3.8vw, 2.6rem);
+  line-height: 1.25;
+  letter-spacing: -0.005em;
+  margin-bottom: 1.2rem;
+  color: var(--ink);
+}
+h2 .num {
+  font-family: "JetBrains Mono", monospace;
+  color: var(--gold);
+  font-size: 0.65em;
+  margin-right: 0.8rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+}
+
+h3 {
+  font-family: "Zen Kaku Gothic New", sans-serif;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--ink);
+  margin: 1.5rem 0 0.6rem;
+  letter-spacing: 0.01em;
+}
+h3 .marker { color: var(--gold); margin-right: 0.4rem; }
+
+p { margin-bottom: 0.9rem; color: var(--ink-soft); font-size: 0.98rem; }
+p.lead {
+  font-size: 1.08rem;
+  color: var(--ink);
+  margin-bottom: 1.6rem;
+  font-weight: 500;
+  line-height: 1.7;
+}
+
+strong, b { color: var(--ink); font-weight: 700; }
+em { font-style: normal; color: var(--red); font-weight: 600; }
+
+code, .mono {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.88em;
+  background: rgba(184, 138, 60, 0.1);
+  color: var(--vault);
+  padding: 0.12em 0.4em;
+  border-radius: 2px;
+  font-weight: 500;
+}
+
+/* ---- コードブロック（共通） ---------------------------------------- */
+.code-block {
+  background: var(--code-bg);
+  color: var(--code-fg);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  padding: 1.2rem 1.4rem;
+  border-left: 3px solid var(--gold);
+  margin: 1rem 0;
+  overflow-x: auto;
+  position: relative;
+}
+.code-lang {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.7rem;
+  font-size: 0.65rem;
+  color: var(--gold);
+  letter-spacing: 0.15em;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.code-block pre      { margin: 0; }
+.code-block .kw      { color: #c89bff; }
+.code-block .str     { color: #a8d391; }
+.code-block .com     { color: #7e8aa6; font-style: italic; }
+.code-block .fn-name { color: #f5d97a; }
+.code-block .ty      { color: #7ab8e6; }
+.code-block .num     { color: #f5a363; }
+.code-block .mac     { color: #ff9580; }
+
+ul { list-style: none; margin: 0.8rem 0 1.2rem; }
+ul li {
+  position: relative;
+  padding-left: 1.4rem;
+  margin-bottom: 0.5rem;
+  color: var(--ink-soft);
+  font-size: 0.98rem;
+}
+ul li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.65rem;
+  width: 0.5rem;
+  height: 1px;
+  background: var(--gold);
+}
+
+/* ---- カード -------------------------------------------------------- */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  padding: 1.4rem 1.6rem;
+  margin: 1rem 0;
+  box-shadow: var(--shadow);
+  position: relative;
+}
+.card.bordered-left { border-left: 3px solid var(--gold); }
+.card.warn { border-left: 3px solid var(--red); background: rgba(168, 58, 43, 0.03); }
+.card-title {
+  font-family: "Shippori Mincho", serif;
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--ink);
+  margin-bottom: 0.5rem;
+}
+
+/* ---- 段組み -------------------------------------------------------- */
+.cols-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem; margin: 1.4rem 0; }
+.cols-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.2rem; margin: 1.4rem 0; }
+@media (max-width: 768px) {
+  .cols-2, .cols-3 { grid-template-columns: 1fr; }
+}
+
+/* ---- 表 ------------------------------------------------------------ */
+.tbl { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.92rem; }
+.tbl th, .tbl td {
+  text-align: left;
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.tbl th {
+  font-family: "Shippori Mincho", serif;
+  font-weight: 700;
+  color: var(--ink);
+  background: rgba(184, 138, 60, 0.06);
+  border-bottom: 1px solid var(--line-strong);
+}
+.tbl td { color: var(--ink-soft); }
+.tbl td:first-child { color: var(--ink); font-weight: 500; }
+
+/* ---- 上部バー ------------------------------------------------------ */
+.topbar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  background: rgba(243, 238, 227, 0.92);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+  padding: 0.8rem 1.5rem;
+  z-index: 100;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.brand {
+  font-family: "Shippori Mincho", serif;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--ink);
+  letter-spacing: 0.02em;
+}
+.brand .dot {
+  display: inline-block;
+  width: 6px; height: 6px;
+  background: var(--accent);
+  border-radius: 50%;
+  margin: 0 0.5rem 2px;
+  vertical-align: middle;
+}
+.progress {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  letter-spacing: 0.1em;
+}
+.progress .total { color: var(--ink-muted); }
+.progress .cur { color: var(--accent); font-weight: 700; }
+
+.toc-btn {
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  padding: 0.35rem 0.7rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.toc-btn:hover { background: var(--vault); color: white; border-color: var(--vault); }
+
+/* ---- 目次モーダル -------------------------------------------------- */
+.toc-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(24, 35, 58, 0.5);
+  backdrop-filter: blur(8px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 2rem;
+}
+.toc-modal.show { display: flex; }
+
+.toc-content {
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  max-width: 600px;
+  width: 100%;
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: 2rem 2.5rem;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+}
+.toc-content h3 {
+  font-family: "Shippori Mincho", serif;
+  font-size: 1.4rem;
+  margin: 0 0 1.2rem;
+  color: var(--ink);
+}
+
+.toc-list { list-style: none; }
+.toc-list li { padding: 0; margin: 0; }
+.toc-list li::before { display: none; }
+.toc-list a {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.6rem 0;
+  color: var(--ink-soft);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--line);
+  transition: color 0.15s;
+  font-size: 0.93rem;
+}
+.toc-list a:hover { color: var(--vault); }
+.toc-list a .toc-num {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  margin-right: 1rem;
+  min-width: 2.5rem;
+}
+.toc-list a .toc-title { flex: 1; }
+/* 章見出し（JSが toc-chapter クラスを付与） */
+.toc-list a.toc-chapter { background: rgba(184, 138, 60, 0.06); margin: 0.3rem -0.5rem; padding: 0.6rem 0.5rem; }
+.toc-list a.toc-chapter .toc-title { font-weight: 700; color: var(--ink); }
+
+/* ---- 下部ナビ ------------------------------------------------------ */
+.nav-bottom {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 0.5rem;
+  z-index: 100;
+  background: rgba(250, 246, 236, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--line);
+  padding: 0.4rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+.nav-bottom button {
+  background: transparent;
+  border: none;
+  color: var(--ink);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.nav-bottom button:hover { background: var(--gold); color: white; }
+.nav-bottom button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* ---- 図版 ---------------------------------------------------------- */
+.diagram {
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow-x: auto;
+  box-shadow: var(--shadow);
+}
+.diagram svg { max-width: 100%; height: auto; }
+.diagram-caption {
+  font-family: "Shippori Mincho", serif;
+  font-size: 0.83rem;
+  color: var(--ink-muted);
+  text-align: center;
+  font-style: italic;
+  margin-top: -0.5rem;
+  margin-bottom: 1.2rem;
+}
+
+/* ---- タイトルスライド ---------------------------------------------- */
+.title-slide { background: linear-gradient(180deg, var(--paper) 0%, var(--bg) 100%); }
+.title-mark {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.3em;
+  color: var(--accent);
+  margin-bottom: 2rem;
+  text-transform: uppercase;
+}
+.title-line { width: 60px; height: 1px; background: var(--accent); margin: 2rem 0; }
+.title-meta {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+  margin-top: 3rem;
+  letter-spacing: 0.05em;
+  line-height: 1.8;
+}
+.title-meta strong { color: var(--ink); font-weight: 500; }
+
+/* ---- 出典表記 ------------------------------------------------------ */
+.sources {
+  margin-top: 2rem;
+  padding-top: 0.8rem;
+  border-top: 1px dotted var(--line);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.7rem;
+  color: var(--ink-muted);
+  letter-spacing: 0.1em;
+}
+.sources .src-label { color: var(--ink-muted); margin-right: 0.4em; }
+.sources a {
+  color: var(--vault);
+  text-decoration: none;
+  margin: 0 0.15em;
+  font-weight: 500;
+  transition: color 0.15s;
+}
+.sources a:hover { color: var(--red); text-decoration: underline; }
+
+/* ---- 参考文献スライド ---------------------------------------------- */
+.ref-section { margin-bottom: 1.6rem; }
+.ref-section-title {
+  font-family: "Shippori Mincho", serif;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--ink);
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--gold);
+  letter-spacing: 0.02em;
+}
+.ref-list { list-style: none; margin: 0; padding: 0; }
+.ref-list li {
+  padding: 0.5rem 0 0.5rem 2.5rem;
+  position: relative;
+  border-bottom: 1px dotted var(--line);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+.ref-list li::before { display: none; }
+.ref-list li:last-child { border-bottom: none; }
+.ref-list .ref-num {
+  position: absolute;
+  left: 0;
+  top: 0.5rem;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--vault);
+  letter-spacing: 0.05em;
+}
+.ref-list .ref-title {
+  display: block;
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 0.92rem;
+  margin-bottom: 0.15rem;
+}
+.ref-list .ref-meta {
+  display: block;
+  color: var(--ink-muted);
+  font-size: 0.78rem;
+  margin-bottom: 0.2rem;
+}
+.ref-list .ref-url {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.72rem;
+  color: var(--vault);
+  word-break: break-all;
+  text-decoration: none;
+}
+.ref-list .ref-url:hover { text-decoration: underline; color: var(--red); }
+
+/* ---- 共通の小物 ---------------------------------------------------- */
+.highlight {
+  background: linear-gradient(120deg, transparent 0%, rgba(217, 181, 107, 0.35) 50%, transparent 100%);
+  padding: 0 0.2em;
+}
+
+/* キー: 値 のリスト */
+.kv { border-top: 1px solid var(--line); margin: 1rem 0; }
+.kv-row {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--line);
+  gap: 1rem;
+  font-size: 0.92rem;
+}
+.kv-row .k { font-family: "Shippori Mincho", serif; font-weight: 700; color: var(--ink); }
+.kv-row .v { color: var(--ink-soft); }
+@media (max-width: 640px) {
+  .kv-row { grid-template-columns: 1fr; gap: 0.2rem; }
+}
+
+/* ---- レスポンシブ（共通） ------------------------------------------ */
+@media (max-width: 640px) {
+  .slide { padding: 4rem 1.2rem 5rem; min-height: auto; }
+  .card { padding: 1.1rem; }
+  .diagram { padding: 0.7rem; }
+  .topbar { padding: 0.6rem 1rem; }
+  .brand { font-size: 0.82rem; }
+  .nav-bottom { bottom: 1rem; }
+  .nav-bottom button { padding: 0.4rem 0.7rem; font-size: 0.7rem; }
+  h1.title { font-size: 1.9rem; }
+  h2 { font-size: 1.45rem; }
+  p, ul li { font-size: 0.93rem; }
+  .code-block { padding: 1rem; }
+}
+
+/* ---- 印刷 ---------------------------------------------------------- */
+@media print {
+  .topbar, .nav-bottom { display: none; }
+  .slide { page-break-after: always; min-height: auto; padding: 1rem; }
+}

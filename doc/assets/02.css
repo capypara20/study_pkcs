@@ -1,0 +1,79 @@
+/* =====================================================================
+ * 02.css — 「PKCS#11 操作フロー詳解」固有スタイル
+ * common.css の後に読み込む。
+ * アクセント色は金（--vault）なので変更なし。章タグの色だけ追加。
+ * ===================================================================== */
+
+/* ---- 章タグの色分け ------------------------------------------------ */
+.slide-tag.ch1 { color: #5e88a6; border-color: #5e88a6; }
+.slide-tag.ch2 { color: var(--vault); border-color: var(--vault); }
+.slide-tag.ch3 { color: var(--red); border-color: var(--red); }
+
+/* ---- 計測対象カード ------------------------------------------------ */
+.card.measure { border-left: 3px solid var(--red); background: rgba(168, 58, 43, 0.04); }
+.card.measure::before {
+  content: "★";
+  position: absolute;
+  top: 0.6rem;
+  right: 0.8rem;
+  color: var(--red);
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+/* ---- コードブロック（02固有：common.css を金色ベースで上書き） ---- */
+.code-block                 { font-size: 0.81rem; }
+.code-block.rust            { border-left-color: #d97757; }
+.code-block.c               { border-left-color: #6c8ebf; }
+.code-block.rust .code-lang { color: #d97757; }
+.code-block.c    .code-lang { color: #6c8ebf; }
+.code-block pre             { white-space: pre-wrap; word-break: break-word; }
+
+/* ---- フェーズ表示 -------------------------------------------------- */
+.phase-box {
+  border: 1px solid var(--line);
+  padding: 1.2rem 1.5rem;
+  margin: 1rem 0;
+  background: var(--bg-card);
+  position: relative;
+}
+.phase-box.phase-prep { border-left: 4px solid #5e88a6; }
+.phase-box.phase-exec { border-left: 4px solid var(--gold); }
+.phase-box.phase-result { border-left: 4px solid #6b8e5e; }
+.phase-label {
+  font-family: "Shippori Mincho", serif;
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  margin-bottom: 0.5rem;
+}
+.phase-prep .phase-label { color: #5e88a6; }
+.phase-exec .phase-label { color: var(--gold); }
+.phase-result .phase-label { color: #6b8e5e; }
+.phase-box h4 {
+  font-family: "Shippori Mincho", serif;
+  font-size: 1.15rem;
+  color: var(--ink);
+  margin-bottom: 0.7rem;
+  font-weight: 700;
+}
+
+/* ---- 計測マーカー -------------------------------------------------- */
+.measure-marker {
+  display: inline-block;
+  background: var(--red);
+  color: white;
+  padding: 0.15em 0.5em;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  margin: 0 0.3em;
+  vertical-align: middle;
+}
+
+/* ---- モバイル微調整 ------------------------------------------------ */
+@media (max-width: 640px) {
+  .code-block { font-size: 0.74rem; }
+}

@@ -1,0 +1,1346 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rust × PKCS#11 — .so動的ロードと生FFI実装</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/common.css">
+<link rel="stylesheet" href="assets/03.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="dot"></span>Rust × PKCS#11 生FFI実装</div>
+  <div style="display: flex; gap: 1rem; align-items: center;">
+    <div class="progress"><span class="cur" id="curNum">01</span><span> / <span id="totalNum">19</span></span></div>
+    <button class="toc-btn" id="tocBtn" type="button" aria-label="目次を開く" aria-haspopup="dialog">INDEX</button>
+  </div>
+</header>
+
+<div class="toc-modal" id="tocModal" role="dialog" aria-modal="true" aria-label="目次">
+  <div class="toc-content">
+    <h3>目次 — INDEX</h3>
+    <ul class="toc-list" id="tocList"></ul>
+  </div>
+</div>
+
+<main class="deck" id="deck">
+
+<!-- ====== SLIDE 01: TITLE ====== -->
+<section class="slide title-slide" data-title="タイトル">
+  <span class="slide-num">01 / 20</span>
+  <div class="slide-inner">
+    <div class="title-mark">Dynamic Loading · libloading · Raw FFI</div>
+    <h1 class="title">
+      Rust で <span class="accent">.so</span> を<br>
+      動的ロードして叩く
+    </h1>
+    <div class="title-line"></div>
+    <p class="subtitle">
+      PKCS#11 ライブラリを libloading で読み込み<br>
+      C_GetFunctionList から関数ポインタ束を取り出す
+    </p>
+    <div class="title-meta">
+      <strong>レイヤー</strong> : libloading 生FFI（cryptoki の裏側）<br>
+      <strong>対応</strong> : 第2部の3操作（乱数・署名・鍵生成）をそのまま実装<br>
+      <strong>構成</strong> : 設計案（構造・型・シグネチャ）→ 本編コード
+    </div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 02: TOC ====== -->
+<section class="slide" data-title="目次">
+  <span class="slide-num">02 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag">CONTENTS</span>
+    <h2>このドキュメントの流れ</h2>
+    <p class="lead">まず<strong>設計案</strong>（ファイル構成・モジュール分割・型設計・シグネチャ）を固める。そのうえで<strong>本編コード</strong>を1ファイルずつ。最後に生FFIの落とし穴を整理。</p>
+
+    <div class="cols-2">
+      <div>
+        <div class="card bordered-left" style="margin-top:0">
+          <div class="card-title" style="color:#5e88a6">PART 1 — 設計案</div>
+          <table class="tbl" style="margin:0.5rem 0 0">
+            <tr><td>03</td><td>アーキテクチャ全体像（核心：C_GetFunctionList）</td></tr>
+            <tr><td>04</td><td>ファイル構成案</td></tr>
+            <tr><td>05</td><td>モジュール依存図</td></tr>
+            <tr><td>06</td><td>型設計案（CK_* 型のマッピング）</td></tr>
+            <tr><td>07</td><td>関数シグネチャ案（FFI型 + 公開API）</td></tr>
+          </table>
+        </div>
+        <div class="card rust-accent">
+          <div class="card-title" style="color:var(--rust)">PART 3 — まとめ</div>
+          <table class="tbl" style="margin:0.5rem 0 0">
+            <tr><td>19</td><td>生FFIの落とし穴と対策</td></tr>
+            <tr><td>20</td><td>References（一次資料）</td></tr>
+          </table>
+        </div>
+      </div>
+      <div>
+        <div class="card rust-accent" style="margin-top:0">
+          <div class="card-title" style="color:var(--rust)">PART 2 — 本編コード</div>
+          <table class="tbl" style="margin:0.5rem 0 0">
+            <tr><td>08</td><td><code>Cargo.toml</code> + プロジェクト初期化</td></tr>
+            <tr><td>09</td><td><code>ffi/types.rs</code> — 基本型</td></tr>
+            <tr><td>10</td><td><code>ffi/function_list.rs</code> — ★順序の罠</td></tr>
+            <tr><td>11</td><td><code>ffi/constants.rs</code> — 定数</td></tr>
+            <tr><td>12</td><td><code>error.rs</code> — CK_RV → Result</td></tr>
+            <tr><td>13</td><td><code>loader.rs</code> — ★.so動的ロード核心</td></tr>
+            <tr><td>14</td><td><code>session.rs</code> — ライフサイクル</td></tr>
+            <tr><td>15</td><td><code>ops/random.rs</code> <span class="map-badge">Ch1対応</span></td></tr>
+            <tr><td>16</td><td><code>ops/sign.rs</code> <span class="map-badge">Ch2対応</span></td></tr>
+            <tr><td>17</td><td><code>ops/keygen.rs</code> <span class="map-badge">Ch3対応</span></td></tr>
+            <tr><td>18</td><td><code>main.rs</code> — 全体配線</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 03: Architecture ====== -->
+<section class="slide" data-title="アーキテクチャ全体像">
+  <span class="slide-num">03 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag design">PART 1 · 設計案</span>
+    <h2><span class="num">03</span>アーキテクチャ全体像 — 核心は C_GetFunctionList</h2>
+    <p class="lead">生FFIの肝は1点だけ。<strong>PKCS#11ライブラリがエクスポートする関数は実質 <code>C_GetFunctionList</code> ただ1つ</strong>。これを呼ぶと、全関数ポインタが詰まった構造体が返ってくる。</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 400" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+        <!-- Rust app -->
+        <rect x="40" y="30" width="200" height="110" fill="#fdfaf2" stroke="var(--rust)" stroke-width="2"/>
+        <text x="140" y="55" text-anchor="middle" font-size="13" fill="#d97757" font-weight="700" font-family="JetBrains Mono">Rust アプリ</text>
+        <line x1="60" y1="65" x2="220" y2="65" stroke="#d6cdb7"/>
+        <text x="140" y="85" text-anchor="middle" font-size="10" fill="#3c4865">libloading で .so を開く</text>
+        <text x="140" y="103" text-anchor="middle" font-size="10" fill="#3c4865">↓</text>
+        <text x="140" y="121" text-anchor="middle" font-size="10" fill="#3c4865">シンボル1個だけ取得</text>
+
+        <!-- arrow 1 -->
+        <path d="M 245 85 L 295 85" stroke="#18233a" stroke-width="2" marker-end="url(#a3)"/>
+        <text x="270" y="77" text-anchor="middle" font-size="8" fill="#6d7591">dlopen</text>
+
+        <!-- .so -->
+        <rect x="300" y="30" width="220" height="110" fill="#faf6ec" stroke="#8b6a2a" stroke-width="2"/>
+        <text x="410" y="55" text-anchor="middle" font-size="13" fill="#8b6a2a" font-weight="700" font-family="JetBrains Mono">libXXX.so</text>
+        <line x1="320" y1="65" x2="500" y2="65" stroke="#d6cdb7"/>
+        <text x="410" y="85" text-anchor="middle" font-size="10" fill="#18233a" font-family="JetBrains Mono" font-weight="700">C_GetFunctionList</text>
+        <text x="410" y="101" text-anchor="middle" font-size="9" fill="#3c4865">（唯一の公開シンボル）</text>
+        <text x="410" y="120" text-anchor="middle" font-size="9" fill="#a83a2b" font-style="italic">これさえ呼べば全部繋がる</text>
+
+        <!-- arrow 2 down -->
+        <path d="M 410 145 L 410 185" stroke="#18233a" stroke-width="2" marker-end="url(#a3)"/>
+        <text x="455" y="168" text-anchor="middle" font-size="9" fill="#6d7591">返り値</text>
+
+        <!-- function list struct -->
+        <rect x="250" y="190" width="320" height="180" fill="#fdfaf2" stroke="#5e88a6" stroke-width="2"/>
+        <text x="410" y="213" text-anchor="middle" font-size="12" fill="#5e88a6" font-weight="700" font-family="JetBrains Mono">CK_FUNCTION_LIST</text>
+        <line x1="270" y1="223" x2="550" y2="223" stroke="#d6cdb7"/>
+        <text x="410" y="240" text-anchor="middle" font-size="9" fill="#6d7591">関数ポインタの巨大な構造体</text>
+
+        <g font-family="JetBrains Mono" font-size="9.5">
+          <text x="285" y="262" fill="#3c4865">version</text>
+          <text x="285" y="280" fill="#18233a">C_Initialize ────→ fn ptr</text>
+          <text x="285" y="296" fill="#18233a">C_OpenSession ──→ fn ptr</text>
+          <text x="285" y="312" fill="#18233a">C_Login ───────→ fn ptr</text>
+          <text x="285" y="328" fill="#d97757" font-weight="700">C_GenerateRandom → fn ptr</text>
+          <text x="285" y="344" fill="#d97757" font-weight="700">C_SignInit / C_Sign → fn ptr</text>
+          <text x="285" y="360" fill="#d97757" font-weight="700">C_GenerateKeyPair → fn ptr</text>
+        </g>
+
+        <!-- callback arrow -->
+        <path d="M 245 290 L 140 290 L 140 145" stroke="#5e88a6" stroke-width="1.5" stroke-dasharray="4,3" fill="none" marker-end="url(#a3b)"/>
+        <text x="155" y="220" font-size="9" fill="#5e88a6">この構造体経由で</text>
+        <text x="155" y="234" font-size="9" fill="#5e88a6">全関数を呼ぶ</text>
+
+        <defs>
+          <marker id="a3" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto"><polygon points="0,0 9,3.5 0,7" fill="#18233a"/></marker>
+          <marker id="a3b" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto"><polygon points="0,0 9,3.5 0,7" fill="#5e88a6"/></marker>
+        </defs>
+      </svg>
+    </div>
+    <div class="diagram-caption">シンボルを1個ずつ dlsym する必要はない。C_GetFunctionList が全部まとめて渡してくれる</div>
+
+    <div class="cols-2">
+      <div class="card bordered-left">
+        <div class="card-title">なぜこの設計なのか</div>
+        <p style="font-size:0.92rem">PKCS#11仕様が「<code>C_GetFunctionList</code> だけは必ずエクスポートせよ。他はオプション」と定めているため。バージョン差や関数の有無をこの構造体1つで吸収できる。</p>
+      </div>
+      <div class="card warn">
+        <div class="card-title">cryptoki はこれを隠している</div>
+        <p style="font-size:0.92rem">高レベルの <code>cryptoki</code> クレートは、この <code>C_GetFunctionList</code> 呼び出しと構造体管理を内部でやってくれる。今回は<strong>その内部を自分で書く</strong>。</p>
+      </div>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[1] PKCS#11 Spec v3.2 §5.4</a><a href="#slide-19">[3] libloading docs</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 04: File structure ====== -->
+<section class="slide" data-title="ファイル構成案">
+  <span class="slide-num">04 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag design">PART 1 · 設計案</span>
+    <h2><span class="num">04</span>ファイル構成案</h2>
+    <p class="lead">関心ごとに3層に分ける。<strong>FFI境界（unsafe）・ライフサイクル管理・操作実装</strong>。第2部の3操作は <code>ops/</code> に1ファイルずつ対応させる。</p>
+
+    <div class="tree">
+<span class="dir">pkcs11-raw/</span>
+├─ <span class="file">Cargo.toml</span>            <span class="note"># libloading 依存</span>
+└─ <span class="dir">src/</span>
+   ├─ <span class="file">main.rs</span>            <span class="note"># 全体配線・デモ実行 (slide 18)</span>
+   ├─ <span class="file">error.rs</span>           <span class="note"># CK_RV → Result&lt;T, Error&gt; (slide 12)</span>
+   ├─ <span class="file">loader.rs</span>          <span class="hl"># ★ .so動的ロードの核心 (slide 13)</span>
+   ├─ <span class="file">session.rs</span>         <span class="note"># Init/Login/Session ライフサイクル (slide 14)</span>
+   ├─ <span class="dir">ffi/</span>               <span class="note"># ── unsafe な C 境界 ──</span>
+   │  ├─ <span class="file">mod.rs</span>
+   │  ├─ <span class="file">types.rs</span>        <span class="note"># CK_RV, CK_MECHANISM 等の型 (slide 9)</span>
+   │  ├─ <span class="file">function_list.rs</span> <span class="hl"># ★ CK_FUNCTION_LIST 構造体 (slide 10)</span>
+   │  └─ <span class="file">constants.rs</span>    <span class="note"># CKM_*, CKA_*, CKR_* 定数 (slide 11)</span>
+   └─ <span class="dir">ops/</span>               <span class="note"># ── 第2部の3操作に対応 ──</span>
+      ├─ <span class="file">mod.rs</span>
+      ├─ <span class="file">random.rs</span>       <span class="hl"># Ch1 乱数生成 (slide 15)</span>
+      ├─ <span class="file">sign.rs</span>         <span class="hl"># Ch2 署名 (slide 16)</span>
+      └─ <span class="file">keygen.rs</span>       <span class="hl"># Ch3 鍵生成 (slide 17)</span>
+    </div>
+
+    <div class="cols-3">
+      <div class="card bordered-left" style="margin-top:0">
+        <div class="card-title" style="font-size:0.95rem">第1層：FFI境界</div>
+        <p style="font-size:0.88rem"><code>ffi/</code> 配下。C構造体・型・定数を<code>#[repr(C)]</code>で正確に写す。<strong>unsafeはここに閉じ込める</strong>。</p>
+      </div>
+      <div class="card bordered-left" style="margin-top:0">
+        <div class="card-title" style="font-size:0.95rem">第2層：管理</div>
+        <p style="font-size:0.88rem"><code>loader.rs</code> / <code>session.rs</code>。.soのロード・解放、セッションの開閉を<strong>RAIIで安全に</strong>包む。</p>
+      </div>
+      <div class="card bordered-left" style="margin-top:0">
+        <div class="card-title" style="font-size:0.95rem">第3層：操作</div>
+        <p style="font-size:0.88rem"><code>ops/</code>配下。乱数・署名・鍵生成を<strong>安全な公開API</strong>として提供。第2部のフローと1対1。</p>
+      </div>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[2] cryptoki crate (構成の参考)</a><a href="#slide-19">[6] Rust API Guidelines</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 05: Module dependency ====== -->
+<section class="slide" data-title="モジュール依存図">
+  <span class="slide-num">05 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag design">PART 1 · 設計案</span>
+    <h2><span class="num">05</span>モジュール依存図</h2>
+    <p class="lead">依存は<strong>一方向</strong>。上位（ops）が下位（ffi）に依存し、逆流しない。unsafeは下に行くほど濃く、上に行くほど安全になる。</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 420" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+        <!-- main -->
+        <rect x="300" y="20" width="160" height="50" fill="#fdfaf2" stroke="var(--rust)" stroke-width="2"/>
+        <text x="380" y="42" text-anchor="middle" font-size="12" fill="#d97757" font-weight="700" font-family="JetBrains Mono">main.rs</text>
+        <text x="380" y="58" text-anchor="middle" font-size="9" fill="#6d7591">エントリポイント</text>
+
+        <!-- ops layer -->
+        <rect x="120" y="120" width="150" height="55" fill="#fdfaf2" stroke="#6b8e5e" stroke-width="1.5"/>
+        <text x="195" y="142" text-anchor="middle" font-size="11" fill="#6b8e5e" font-weight="700" font-family="JetBrains Mono">ops/random</text>
+        <text x="195" y="158" text-anchor="middle" font-size="8" fill="#6d7591">Ch1</text>
+
+        <rect x="305" y="120" width="150" height="55" fill="#fdfaf2" stroke="#6b8e5e" stroke-width="1.5"/>
+        <text x="380" y="142" text-anchor="middle" font-size="11" fill="#6b8e5e" font-weight="700" font-family="JetBrains Mono">ops/sign</text>
+        <text x="380" y="158" text-anchor="middle" font-size="8" fill="#6d7591">Ch2</text>
+
+        <rect x="490" y="120" width="150" height="55" fill="#fdfaf2" stroke="#6b8e5e" stroke-width="1.5"/>
+        <text x="565" y="142" text-anchor="middle" font-size="11" fill="#6b8e5e" font-weight="700" font-family="JetBrains Mono">ops/keygen</text>
+        <text x="565" y="158" text-anchor="middle" font-size="8" fill="#6d7591">Ch3</text>
+
+        <!-- session -->
+        <rect x="250" y="220" width="260" height="50" fill="#faf6ec" stroke="#b88a3c" stroke-width="1.5"/>
+        <text x="380" y="242" text-anchor="middle" font-size="11" fill="#8b6a2a" font-weight="700" font-family="JetBrains Mono">session.rs</text>
+        <text x="380" y="258" text-anchor="middle" font-size="8" fill="#6d7591">Session&lt;'a&gt; / ライフサイクル</text>
+
+        <!-- loader -->
+        <rect x="250" y="305" width="260" height="50" fill="#faf6ec" stroke="#b88a3c" stroke-width="2"/>
+        <text x="380" y="327" text-anchor="middle" font-size="11" fill="#8b6a2a" font-weight="700" font-family="JetBrains Mono">loader.rs</text>
+        <text x="380" y="343" text-anchor="middle" font-size="8" fill="#a83a2b">★ libloading で .so 保持</text>
+
+        <!-- ffi -->
+        <rect x="180" y="375" width="400" height="35" fill="#1d2435" stroke="#5e88a6" stroke-width="2"/>
+        <text x="380" y="397" text-anchor="middle" font-size="11" fill="#7ab8e6" font-weight="700" font-family="JetBrains Mono">ffi/ (types · function_list · constants)  ← unsafe境界</text>
+
+        <!-- error (side) -->
+        <rect x="610" y="220" width="130" height="50" fill="#faf6ec" stroke="#a83a2b" stroke-width="1.5"/>
+        <text x="675" y="242" text-anchor="middle" font-size="11" fill="#a83a2b" font-weight="700" font-family="JetBrains Mono">error.rs</text>
+        <text x="675" y="258" text-anchor="middle" font-size="8" fill="#6d7591">全層が利用</text>
+
+        <!-- arrows main->ops -->
+        <path d="M 340 72 L 220 118" stroke="#18233a" stroke-width="1.3" marker-end="url(#a5)"/>
+        <path d="M 380 72 L 380 118" stroke="#18233a" stroke-width="1.3" marker-end="url(#a5)"/>
+        <path d="M 420 72 L 545 118" stroke="#18233a" stroke-width="1.3" marker-end="url(#a5)"/>
+
+        <!-- arrows ops->session -->
+        <path d="M 210 177 L 320 218" stroke="#18233a" stroke-width="1.3" marker-end="url(#a5)"/>
+        <path d="M 380 177 L 380 218" stroke="#18233a" stroke-width="1.3" marker-end="url(#a5)"/>
+        <path d="M 555 177 L 445 218" stroke="#18233a" stroke-width="1.3" marker-end="url(#a5)"/>
+
+        <!-- session->loader -->
+        <path d="M 380 272 L 380 303" stroke="#18233a" stroke-width="1.3" marker-end="url(#a5)"/>
+        <!-- loader->ffi -->
+        <path d="M 380 357 L 380 373" stroke="#18233a" stroke-width="1.3" marker-end="url(#a5)"/>
+
+        <!-- error usage (dashed) -->
+        <path d="M 610 245 L 512 245" stroke="#a83a2b" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#a5r)"/>
+
+        <text x="690" y="120" font-size="9" fill="#6d7591" letter-spacing="1" transform="rotate(90 690 120)">↓ unsafe が濃くなる</text>
+
+        <defs>
+          <marker id="a5" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><polygon points="0,0 8,3 0,6" fill="#18233a"/></marker>
+          <marker id="a5r" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><polygon points="0,0 8,3 0,6" fill="#a83a2b"/></marker>
+        </defs>
+      </svg>
+    </div>
+    <div class="diagram-caption">上位ほど安全なAPI、下位ほど生のC境界。依存は上から下への一方向</div>
+
+    <div class="card bordered-left">
+      <div class="card-title">設計の狙い</div>
+      <ul style="margin:0.4rem 0">
+        <li><strong>unsafeの局所化</strong>：<code>ffi/</code> と <code>loader.rs</code> 以外に <code>unsafe</code> を書かせない</li>
+        <li><strong>テスト容易性</strong>：<code>ops/</code> は <code>Session</code> さえあれば単体で扱える</li>
+        <li><strong>第2部との対応</strong>：<code>ops/{random,sign,keygen}.rs</code> がフロー図と1対1</li>
+      </ul>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[6] Rust API Guidelines</a><a href="#slide-19">[7] Rustonomicon (FFI)</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 06: Type design ====== -->
+<section class="slide" data-title="型設計案">
+  <span class="slide-num">06 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag design">PART 1 · 設計案</span>
+    <h2><span class="num">06</span>型設計案 — C型を Rust にどう写すか</h2>
+    <p class="lead">PKCS#11のC型を<code>#[repr(C)]</code>で<strong>バイト配置を一致</strong>させる。整数は <code>c_ulong</code> 系、構造体はフィールド順を厳守。ここがズレると即UB。</p>
+
+    <div class="cols-2">
+      <div>
+        <h3><span class="marker">▸</span>スカラ型のマッピング</h3>
+        <table class="tbl">
+          <tr><th>PKCS#11 (C)</th><th>Rust</th></tr>
+          <tr><td>CK_BYTE</td><td><code>u8</code></td></tr>
+          <tr><td>CK_BBOOL</td><td><code>u8</code> (0/1)</td></tr>
+          <tr><td>CK_ULONG</td><td><code>c_ulong</code></td></tr>
+          <tr><td>CK_RV</td><td><code>c_ulong</code></td></tr>
+          <tr><td>CK_SESSION_HANDLE</td><td><code>c_ulong</code></td></tr>
+          <tr><td>CK_OBJECT_HANDLE</td><td><code>c_ulong</code></td></tr>
+          <tr><td>CK_xxx_PTR</td><td><code>*mut T</code></td></tr>
+        </table>
+        <p style="font-size:0.84rem; color:var(--ink-muted)">※ <code>CK_ULONG</code> はプラットフォームのlong幅依存。<code>c_ulong</code>を使えば自動で合う</p>
+      </div>
+      <div>
+        <h3><span class="marker">▸</span>構造体（フィールド順厳守）</h3>
+        <div class="code-block">
+<span class="code-lang">Rust</span><pre><span class="attr-c">#[repr(C)]</span>
+<span class="kw">pub struct</span> <span class="ty">CK_MECHANISM</span> {
+    <span class="kw">pub</span> mechanism:     <span class="ty">CK_MECHANISM_TYPE</span>,
+    <span class="kw">pub</span> pParameter:    <span class="kw">*mut</span> <span class="ty">c_void</span>,
+    <span class="kw">pub</span> ulParameterLen:<span class="ty">CK_ULONG</span>,
+}
+
+<span class="attr-c">#[repr(C)]</span>
+<span class="kw">pub struct</span> <span class="ty">CK_ATTRIBUTE</span> {
+    <span class="kw">pub</span> type_:      <span class="ty">CK_ATTRIBUTE_TYPE</span>,
+    <span class="kw">pub</span> pValue:     <span class="kw">*mut</span> <span class="ty">c_void</span>,
+    <span class="kw">pub</span> ulValueLen: <span class="ty">CK_ULONG</span>,
+}</pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="card warn">
+      <div class="card-title">設計上の決定事項</div>
+      <ul style="margin:0.4rem 0">
+        <li><strong>命名はC流を維持</strong>：<code>CK_MECHANISM</code> 等を <code>#[allow(non_camel_case_types)]</code> でそのまま使う。仕様書と突き合わせやすくするため（第2部の図とも一致）</li>
+        <li><strong>関数ポインタは <code>Option&lt;unsafe extern "C" fn(...)&gt;</code></strong>：Cでは<code>NULL</code>になり得るため、<code>Option</code>でNULL安全に表現</li>
+        <li><strong>ハンドルは透過的</strong>：<code>CK_SESSION_HANDLE</code> 等は単なる整数だが、newtypeで包むかは好み。今回は素直に整数のまま</li>
+      </ul>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[1] PKCS#11 Spec v3.2 §3-4 (型定義)</a><a href="#slide-19">[7] Rustonomicon (repr(C))</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 07: Function signatures ====== -->
+<section class="slide" data-title="関数シグネチャ案">
+  <span class="slide-num">07 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag design">PART 1 · 設計案</span>
+    <h2><span class="num">07</span>関数シグネチャ案 — 2つのレイヤー</h2>
+    <p class="lead">シグネチャは<strong>2層で考える</strong>。下層は生のFFI関数ポインタ型（C仕様そのまま）。上層はそれを包んだ<strong>安全な公開API</strong>（Rust流）。</p>
+
+    <div class="cols-2">
+      <div>
+        <h3><span class="marker">▸</span>下層：FFI関数ポインタ型</h3>
+        <div class="code-block">
+<span class="code-lang">Rust · ffi</span><pre><span class="com">// C_GetFunctionList のシグネチャ</span>
+<span class="kw">type</span> <span class="ty">CGetFunctionList</span> = <span class="kw">unsafe extern</span> <span class="str">"C"</span> <span class="kw">fn</span>(
+    <span class="kw">*mut *mut</span> <span class="ty">CK_FUNCTION_LIST</span>,
+) -> <span class="ty">CK_RV</span>;
+
+<span class="com">// 構造体内の関数ポインタ（例）</span>
+<span class="kw">pub</span> C_GenerateRandom: <span class="ty">Option</span>&lt;<span class="kw">unsafe extern</span> <span class="str">"C"</span> <span class="kw">fn</span>(
+    <span class="ty">CK_SESSION_HANDLE</span>,
+    <span class="kw">*mut</span> <span class="ty">CK_BYTE</span>,   <span class="com">// 出力バッファ</span>
+    <span class="ty">CK_ULONG</span>,        <span class="com">// 長さ</span>
+) -> <span class="ty">CK_RV</span>&gt;,</pre>
+        </div>
+        <p style="font-size:0.86rem; color:var(--ink-muted)">C仕様の関数プロトタイプをそのまま型にする。引数の順序・型を厳守</p>
+      </div>
+      <div>
+        <h3><span class="marker">▸</span>上層：安全な公開API</h3>
+        <div class="code-block">
+<span class="code-lang">Rust · 公開API</span><pre><span class="kw">impl</span> <span class="ty">Module</span> {
+    <span class="kw">pub fn</span> <span class="fn-name">load</span>(path: &<span class="ty">str</span>)
+        -> <span class="ty">Result</span>&lt;<span class="ty">Module</span>, <span class="ty">Error</span>&gt;;
+    <span class="kw">pub fn</span> <span class="fn-name">open_session</span>(&<span class="kw">self</span>, slot: <span class="ty">CK_SLOT_ID</span>)
+        -> <span class="ty">Result</span>&lt;<span class="ty">Session</span>, <span class="ty">Error</span>&gt;;
+}
+
+<span class="kw">impl</span> <span class="ty">Session</span>&lt;<span class="lt">'_</span>&gt; {
+    <span class="com">// Ch1</span>
+    <span class="kw">pub fn</span> <span class="fn-name">generate_random</span>(&<span class="kw">self</span>, n: <span class="ty">usize</span>)
+        -> <span class="ty">Result</span>&lt;<span class="ty">Vec</span>&lt;<span class="ty">u8</span>&gt;, <span class="ty">Error</span>&gt;;
+    <span class="com">// Ch2</span>
+    <span class="kw">pub fn</span> <span class="fn-name">sign</span>(&<span class="kw">self</span>, m: <span class="ty">CK_MECHANISM_TYPE</span>,
+        key: <span class="ty">CK_OBJECT_HANDLE</span>, data: &[<span class="ty">u8</span>])
+        -> <span class="ty">Result</span>&lt;<span class="ty">Vec</span>&lt;<span class="ty">u8</span>&gt;, <span class="ty">Error</span>&gt;;
+    <span class="com">// Ch3</span>
+    <span class="kw">pub fn</span> <span class="fn-name">generate_rsa_keypair</span>(&<span class="kw">self</span>,
+        bits: <span class="ty">CK_ULONG</span>)
+        -> <span class="ty">Result</span>&lt;(<span class="ty">CK_OBJECT_HANDLE</span>,
+                  <span class="ty">CK_OBJECT_HANDLE</span>), <span class="ty">Error</span>&gt;;
+}</pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="card bordered-left">
+      <div class="card-title">設計方針：生のCを上層に漏らさない</div>
+      <p style="font-size:0.93rem">下層は <code>*mut</code> ポインタと <code>CK_RV</code> 整数まみれ。上層では<strong>これらを <code>Vec&lt;u8&gt;</code> や <code>Result</code> に変換</strong>して返す。呼び出し側（<code>main.rs</code>）は <code>unsafe</code> を一切書かずに済む。これがcryptokiがやっていることの再現。</p>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[1] PKCS#11 Spec v3.2 §5.13/5.15/5.18</a><a href="#slide-19">[6] Rust API Guidelines</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 08: Cargo.toml ====== -->
+<section class="slide" data-title="Cargo.toml + 初期化">
+  <span class="slide-num">08 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag impl">PART 2 · 本編コード</span>
+    <h2><span class="num">08</span>Cargo.toml + プロジェクト初期化</h2>
+    <p class="lead">依存は <code>libloading</code> 1つだけ。生FFIなので<code>cryptoki</code>は使わない。<code>libc</code> も <code>std::os::raw</code> があれば不要。</p>
+
+    <div class="cols-2">
+      <div>
+        <span class="filename">Cargo.toml</span>
+        <div class="code-block toml">
+<span class="code-lang">TOML</span><pre><span class="kw">[package]</span>
+name = <span class="str">"pkcs11-raw"</span>
+version = <span class="str">"0.1.0"</span>
+edition = <span class="str">"2021"</span>
+
+<span class="kw">[dependencies]</span>
+<span class="com"># .so を実行時に動的ロードする唯一の依存</span>
+libloading = <span class="str">"0.8"</span></pre>
+        </div>
+
+        <span class="filename">セットアップ（SoftHSM2で試す）</span>
+        <div class="code-block shell">
+<span class="code-lang">Shell</span><pre><span class="com"># SoftHSM2 を入れて動作確認用トークン作成</span>
+<span class="fn-name">sudo</span> apt install libsofthsm2
+<span class="fn-name">softhsm2-util</span> --init-token --slot <span class="num">0</span> \
+  --label <span class="str">"test"</span> --pin <span class="num">1234</span> --so-pin <span class="num">5678</span>
+
+<span class="com"># 実行（.so のパスを環境変数で渡す）</span>
+<span class="kw">export</span> PKCS11_MODULE=<span class="str">/usr/lib/softhsm/libsofthsm2.so</span>
+<span class="fn-name">cargo</span> run</pre>
+        </div>
+      </div>
+      <div>
+        <span class="filename">src/ffi/mod.rs</span>
+        <div class="code-block">
+<span class="code-lang">Rust</span><pre><span class="kw">pub mod</span> types;
+<span class="kw">pub mod</span> function_list;
+<span class="kw">pub mod</span> constants;</pre>
+        </div>
+
+        <span class="filename">src/ops/mod.rs</span>
+        <div class="code-block">
+<span class="code-lang">Rust</span><pre><span class="com">// 各操作は Session の impl を生やす形で実装</span>
+<span class="com">// （第2部 Ch1/Ch2/Ch3 に対応）</span>
+<span class="kw">pub mod</span> random;
+<span class="kw">pub mod</span> sign;
+<span class="kw">pub mod</span> keygen;</pre>
+        </div>
+
+        <div class="card bordered-left" style="margin-top:1rem">
+          <div class="card-title">なぜ libloading か</div>
+          <p style="font-size:0.9rem"><code>libloading</code> は <code>dlopen</code>/<code>dlsym</code>（Windowsなら<code>LoadLibrary</code>）を<strong>クロスプラットフォームかつ型安全に</strong>包んだ定番クレート。生の<code>libc::dlopen</code>を直接使うより遥かに安全。</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[3] libloading docs.rs</a><a href="#slide-19">[4] SoftHSM2</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 09: ffi/types.rs ====== -->
+<section class="slide" data-title="ffi/types.rs">
+  <span class="slide-num">09 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag impl">PART 2 · 本編コード</span>
+    <h2><span class="num">09</span>ffi/types.rs — 基本型</h2>
+    <p class="lead">C型を<code>#[repr(C)]</code>でRustへマッピングしたFFI境界の土台。設計案（slide 06）をそのままコードに落とす。</p>
+
+    <span class="filename">src/ffi/types.rs</span>
+    <div class="code-block">
+<span class="code-lang">Rust</span><pre><span class="attr-c">#![allow(non_camel_case_types)]</span>
+<span class="kw">use</span> std::os::raw::{c_uchar, c_ulong, c_void};
+
+<span class="com">// ── スカラ型（C仕様のtypedefを忠実に）──</span>
+<span class="kw">pub type</span> <span class="ty">CK_BYTE</span>            = c_uchar;
+<span class="kw">pub type</span> <span class="ty">CK_BBOOL</span>           = c_uchar;   <span class="com">// 0 = false, それ以外 = true</span>
+<span class="kw">pub type</span> <span class="ty">CK_ULONG</span>           = c_ulong;
+<span class="kw">pub type</span> <span class="ty">CK_RV</span>              = c_ulong;   <span class="com">// 戻り値コード</span>
+<span class="kw">pub type</span> <span class="ty">CK_FLAGS</span>           = c_ulong;
+<span class="kw">pub type</span> <span class="ty">CK_SLOT_ID</span>         = c_ulong;
+<span class="kw">pub type</span> <span class="ty">CK_SESSION_HANDLE</span>  = c_ulong;   <span class="com">// 第2部の「セッション」</span>
+<span class="kw">pub type</span> <span class="ty">CK_OBJECT_HANDLE</span>   = c_ulong;   <span class="com">// 第2部の「預かり証」=鍵ハンドル</span>
+<span class="kw">pub type</span> <span class="ty">CK_USER_TYPE</span>       = c_ulong;
+<span class="kw">pub type</span> <span class="ty">CK_MECHANISM_TYPE</span>  = c_ulong;   <span class="com">// CKM_*</span>
+<span class="kw">pub type</span> <span class="ty">CK_ATTRIBUTE_TYPE</span>  = c_ulong;   <span class="com">// CKA_*</span>
+
+<span class="com">// ── バージョン構造体 ──</span>
+<span class="attr-c">#[repr(C)]</span>
+<span class="attr-c">#[derive(Debug, Clone, Copy)]</span>
+<span class="kw">pub struct</span> <span class="ty">CK_VERSION</span> {
+    <span class="kw">pub</span> major: <span class="ty">CK_BYTE</span>,
+    <span class="kw">pub</span> minor: <span class="ty">CK_BYTE</span>,
+}
+
+<span class="com">// ── メカニズム（署名・鍵生成で「方式」を指定）──</span>
+<span class="attr-c">#[repr(C)]</span>
+<span class="kw">pub struct</span> <span class="ty">CK_MECHANISM</span> {
+    <span class="kw">pub</span> mechanism:      <span class="ty">CK_MECHANISM_TYPE</span>,
+    <span class="kw">pub</span> pParameter:     <span class="kw">*mut</span> c_void,   <span class="com">// PSS等の追加パラメータ。無ければ null</span>
+    <span class="kw">pub</span> ulParameterLen: <span class="ty">CK_ULONG</span>,
+}
+
+<span class="com">// ── 属性（鍵生成のテンプレート要素）──</span>
+<span class="attr-c">#[repr(C)]</span>
+<span class="kw">pub struct</span> <span class="ty">CK_ATTRIBUTE</span> {
+    <span class="kw">pub</span> type_:      <span class="ty">CK_ATTRIBUTE_TYPE</span>,  <span class="com">// CKA_TOKEN 等</span>
+    <span class="kw">pub</span> pValue:     <span class="kw">*mut</span> c_void,        <span class="com">// 値へのポインタ</span>
+    <span class="kw">pub</span> ulValueLen: <span class="ty">CK_ULONG</span>,           <span class="com">// 値のバイト長</span>
+}
+
+<span class="com">// セッションコールバック（今回は使わないので常に None を渡す）</span>
+<span class="kw">pub type</span> <span class="ty">CK_NOTIFY</span> = <span class="ty">Option</span>&lt;
+    <span class="kw">unsafe extern</span> <span class="str">"C"</span> <span class="kw">fn</span>(<span class="ty">CK_SESSION_HANDLE</span>, <span class="ty">CK_ULONG</span>, <span class="kw">*mut</span> c_void) -> <span class="ty">CK_RV</span>
+&gt;;</pre>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[1] PKCS#11 Spec v3.2 §3-4</a><a href="#slide-19">[7] Rustonomicon (FFI types)</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 10: ffi/function_list.rs ====== -->
+<section class="slide" data-title="ffi/function_list.rs">
+  <span class="slide-num">10 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag impl">PART 2 · 本編コード</span>
+    <h2><span class="num">10</span>ffi/function_list.rs — ★ 順序の罠</h2>
+    <p class="lead"><strong>最大の落とし穴がここ</strong>。<code>CK_FUNCTION_LIST</code>の各フィールドは<strong>仕様で定められた順序で全関数を並べる必要がある</strong>。順番を間違えると別の関数を呼んでしまう。</p>
+
+    <div class="card warn">
+      <div class="card-title"><span style="color:var(--red)">⚠</span> なぜ順序が致命的か</div>
+      <p style="font-size:0.93rem">この構造体はメモリ上で<strong>関数ポインタが連続して並んだ配列</strong>のようなもの。<code>C_Sign</code>を呼んだつもりが、フィールドを1つ飛ばしていたら隣の<code>C_SignUpdate</code>を呼ぶことになる。コンパイルは通り、実行時に謎の挙動になる。<strong>必要な関数だけ抜き出して書いてはいけない</strong>。</p>
+    </div>
+
+    <span class="filename">src/ffi/function_list.rs（抜粋：先頭から仕様順に）</span>
+    <div class="code-block">
+<span class="code-lang">Rust</span><pre><span class="attr-c">#![allow(non_snake_case)]</span>
+<span class="kw">use</span> std::os::raw::c_void;
+<span class="kw">use super</span>::types::*;
+
+<span class="com">// 関数ポインタ型のエイリアス（よく使う形）</span>
+<span class="kw">type</span> <span class="ty">Fn1</span>&lt;A&gt;        = <span class="ty">Option</span>&lt;<span class="kw">unsafe extern</span> <span class="str">"C"</span> <span class="kw">fn</span>(A) -> <span class="ty">CK_RV</span>&gt;;
+
+<span class="attr-c">#[repr(C)]</span>
+<span class="kw">pub struct</span> <span class="ty">CK_FUNCTION_LIST</span> {
+    <span class="kw">pub</span> version: <span class="ty">CK_VERSION</span>,        <span class="com">// ← 必ず先頭</span>
+
+    <span class="com">// ↓↓↓ ここからは PKCS#11 仕様の C_xxx 出現順を厳守 ↓↓↓</span>
+    <span class="kw">pub</span> C_Initialize:   <span class="ty">Fn1</span>&lt;<span class="kw">*mut</span> c_void&gt;,                 <span class="com">// 1</span>
+    <span class="kw">pub</span> C_Finalize:     <span class="ty">Fn1</span>&lt;<span class="kw">*mut</span> c_void&gt;,                 <span class="com">// 2</span>
+    <span class="kw">pub</span> C_GetInfo:      <span class="ty">Fn1</span>&lt;<span class="kw">*mut</span> c_void&gt;,                 <span class="com">// 3</span>
+    <span class="kw">pub</span> C_GetFunctionList: <span class="ty">Fn1</span>&lt;<span class="kw">*mut</span> c_void&gt;,              <span class="com">// 4</span>
+    <span class="kw">pub</span> C_GetSlotList:  <span class="ty">Option</span>&lt;<span class="kw">unsafe extern</span> <span class="str">"C"</span> <span class="kw">fn</span>(        <span class="com">// 5</span>
+        <span class="ty">CK_BBOOL</span>, <span class="kw">*mut</span> <span class="ty">CK_SLOT_ID</span>, <span class="kw">*mut</span> <span class="ty">CK_ULONG</span>) -> <span class="ty">CK_RV</span>&gt;,
+    <span class="com">// ... 6〜12 は GetSlotInfo/GetTokenInfo/GetMechanism.../InitToken/InitPIN/SetPIN ...</span>
+
+    <span class="kw">pub</span> C_OpenSession:  <span class="ty">Option</span>&lt;<span class="kw">unsafe extern</span> <span class="str">"C"</span> <span class="kw">fn</span>(        <span class="com">// 13</span>
+        <span class="ty">CK_SLOT_ID</span>, <span class="ty">CK_FLAGS</span>, <span class="kw">*mut</span> c_void,
+        <span class="ty">CK_NOTIFY</span>, <span class="kw">*mut</span> <span class="ty">CK_SESSION_HANDLE</span>) -> <span class="ty">CK_RV</span>&gt;,
+    <span class="kw">pub</span> C_CloseSession: <span class="ty">Fn1</span>&lt;<span class="ty">CK_SESSION_HANDLE</span>&gt;,            <span class="com">// 14</span>
+    <span class="com">// ... 15〜18 ...</span>
+    <span class="kw">pub</span> C_Login:        <span class="ty">Option</span>&lt;<span class="kw">unsafe extern</span> <span class="str">"C"</span> <span class="kw">fn</span>(        <span class="com">// 19</span>
+        <span class="ty">CK_SESSION_HANDLE</span>, <span class="ty">CK_USER_TYPE</span>,
+        <span class="kw">*mut</span> <span class="ty">CK_BYTE</span>, <span class="ty">CK_ULONG</span>) -> <span class="ty">CK_RV</span>&gt;,
+    <span class="kw">pub</span> C_Logout:       <span class="ty">Fn1</span>&lt;<span class="ty">CK_SESSION_HANDLE</span>&gt;,            <span class="com">// 20</span>
+    <span class="com">// ... 21〜42 (オブジェクト操作・暗号・ダイジェスト) ...</span>
+
+    <span class="kw">pub</span> C_SignInit:     <span class="ty">Option</span>&lt;<span class="kw">unsafe extern</span> <span class="str">"C"</span> <span class="kw">fn</span>(        <span class="com">// 43</span>
+        <span class="ty">CK_SESSION_HANDLE</span>, <span class="kw">*mut</span> <span class="ty">CK_MECHANISM</span>, <span class="ty">CK_OBJECT_HANDLE</span>) -> <span class="ty">CK_RV</span>&gt;,
+    <span class="kw">pub</span> C_Sign:         <span class="ty">Option</span>&lt;<span class="kw">unsafe extern</span> <span class="str">"C"</span> <span class="kw">fn</span>(        <span class="com">// 44</span>
+        <span class="ty">CK_SESSION_HANDLE</span>, <span class="kw">*mut</span> <span class="ty">CK_BYTE</span>, <span class="ty">CK_ULONG</span>,
+        <span class="kw">*mut</span> <span class="ty">CK_BYTE</span>, <span class="kw">*mut</span> <span class="ty">CK_ULONG</span>) -> <span class="ty">CK_RV</span>&gt;,
+    <span class="com">// ... 45〜58 (SignUpdate/Final, Verify系, 複合系) ...</span>
+
+    <span class="kw">pub</span> C_GenerateKey:  <span class="ty">Option</span>&lt;<span class="kw">unsafe extern</span> <span class="str">"C"</span> <span class="kw">fn</span>(        <span class="com">// 59</span>
+        <span class="ty">CK_SESSION_HANDLE</span>, <span class="kw">*mut</span> <span class="ty">CK_MECHANISM</span>,
+        <span class="kw">*mut</span> <span class="ty">CK_ATTRIBUTE</span>, <span class="ty">CK_ULONG</span>, <span class="kw">*mut</span> <span class="ty">CK_OBJECT_HANDLE</span>) -> <span class="ty">CK_RV</span>&gt;,
+    <span class="kw">pub</span> C_GenerateKeyPair: <span class="ty">Option</span>&lt;<span class="kw">unsafe extern</span> <span class="str">"C"</span> <span class="kw">fn</span>(     <span class="com">// 60</span>
+        <span class="ty">CK_SESSION_HANDLE</span>, <span class="kw">*mut</span> <span class="ty">CK_MECHANISM</span>,
+        <span class="kw">*mut</span> <span class="ty">CK_ATTRIBUTE</span>, <span class="ty">CK_ULONG</span>,    <span class="com">// 公開鍵テンプレート</span>
+        <span class="kw">*mut</span> <span class="ty">CK_ATTRIBUTE</span>, <span class="ty">CK_ULONG</span>,    <span class="com">// 秘密鍵テンプレート</span>
+        <span class="kw">*mut</span> <span class="ty">CK_OBJECT_HANDLE</span>, <span class="kw">*mut</span> <span class="ty">CK_OBJECT_HANDLE</span>) -> <span class="ty">CK_RV</span>&gt;,
+    <span class="com">// ... 61〜64 (WrapKey/UnwrapKey/DeriveKey/SeedRandom) ...</span>
+
+    <span class="kw">pub</span> C_GenerateRandom: <span class="ty">Option</span>&lt;<span class="kw">unsafe extern</span> <span class="str">"C"</span> <span class="kw">fn</span>(      <span class="com">// 65</span>
+        <span class="ty">CK_SESSION_HANDLE</span>, <span class="kw">*mut</span> <span class="ty">CK_BYTE</span>, <span class="ty">CK_ULONG</span>) -> <span class="ty">CK_RV</span>&gt;,
+    <span class="com">// ... 66〜68 (GetFunctionStatus/CancelFunction/WaitForSlotEvent) で終端 ...</span>
+}</pre>
+    </div>
+
+    <div class="card bordered-left">
+      <div class="card-title">実務での現実解</div>
+      <p style="font-size:0.93rem">全68関数を手で書くのは現実的でない。実際は <strong><code>cryptoki-sys</code> クレート（bindgen生成済み）を使う</strong>か、<code>pkcs11.h</code> から <code>bindgen</code> で自動生成する。ここでは「中で何が起きているか」を理解するために手書きの形を示している。</p>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[1] PKCS#11 Spec v3.2 §5.4 (CK_FUNCTION_LIST)</a><a href="#slide-19">[5] cryptoki-sys</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 11: ffi/constants.rs ====== -->
+<section class="slide" data-title="ffi/constants.rs">
+  <span class="slide-num">11 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag impl">PART 2 · 本編コード</span>
+    <h2><span class="num">11</span>ffi/constants.rs — 定数</h2>
+    <p class="lead">第2部で登場した <code>CKR_*</code>（戻り値）・<code>CKM_*</code>（メカニズム）・<code>CKA_*</code>（属性）・<code>CKF_*</code>（フラグ）を数値で定義。値はPKCS#11仕様で固定されている。</p>
+
+    <span class="filename">src/ffi/constants.rs</span>
+    <div class="code-block">
+<span class="code-lang">Rust</span><pre><span class="attr-c">#![allow(dead_code)]</span>
+<span class="kw">use</span> <span class="kw">super</span>::types::{CK_ULONG, CK_FLAGS, CK_USER_TYPE};
+
+<span class="com">// ── 戻り値 CK_RV（第2部「結果フェーズ」で頻出）──</span>
+<span class="kw">pub const</span> <span class="ty">CKR_OK</span>:                  <span class="ty">CK_ULONG</span> = <span class="num">0x0000_0000</span>;
+<span class="kw">pub const</span> <span class="ty">CKR_ARGUMENTS_BAD</span>:       <span class="ty">CK_ULONG</span> = <span class="num">0x0000_0007</span>;
+<span class="kw">pub const</span> <span class="ty">CKR_SESSION_HANDLE_INVALID</span>: <span class="ty">CK_ULONG</span> = <span class="num">0x0000_00B3</span>;
+
+<span class="com">// ── セッションフラグ（OpenSession で使用）──</span>
+<span class="kw">pub const</span> <span class="ty">CKF_RW_SESSION</span>:     <span class="ty">CK_FLAGS</span> = <span class="num">0x0000_0002</span>;
+<span class="kw">pub const</span> <span class="ty">CKF_SERIAL_SESSION</span>: <span class="ty">CK_FLAGS</span> = <span class="num">0x0000_0004</span>;  <span class="com">// 必須</span>
+
+<span class="com">// ── ユーザー種別（Login で使用）──</span>
+<span class="kw">pub const</span> <span class="ty">CKU_USER</span>: <span class="ty">CK_USER_TYPE</span> = <span class="num">1</span>;
+
+<span class="com">// ── メカニズム CKM_*（署名・鍵生成の「方式」）──</span>
+<span class="kw">pub const</span> <span class="ty">CKM_RSA_PKCS_KEY_PAIR_GEN</span>: <span class="ty">CK_ULONG</span> = <span class="num">0x0000_0000</span>;  <span class="com">// Ch3 RSA鍵生成</span>
+<span class="kw">pub const</span> <span class="ty">CKM_RSA_PKCS</span>:              <span class="ty">CK_ULONG</span> = <span class="num">0x0000_0001</span>;
+<span class="kw">pub const</span> <span class="ty">CKM_SHA256_RSA_PKCS</span>:       <span class="ty">CK_ULONG</span> = <span class="num">0x0000_0040</span>;  <span class="com">// Ch2 署名</span>
+<span class="kw">pub const</span> <span class="ty">CKM_AES_KEY_GEN</span>:           <span class="ty">CK_ULONG</span> = <span class="num">0x0000_1080</span>;
+
+<span class="com">// ── 属性 CKA_*（鍵生成テンプレートのキー。第2部 Ch3 の図と一致）──</span>
+<span class="kw">pub const</span> <span class="ty">CKA_CLASS</span>:           <span class="ty">CK_ULONG</span> = <span class="num">0x0000_0000</span>;
+<span class="kw">pub const</span> <span class="ty">CKA_TOKEN</span>:           <span class="ty">CK_ULONG</span> = <span class="num">0x0000_0001</span>;  <span class="com">// 永続化</span>
+<span class="kw">pub const</span> <span class="ty">CKA_PRIVATE</span>:         <span class="ty">CK_ULONG</span> = <span class="num">0x0000_0002</span>;
+<span class="kw">pub const</span> <span class="ty">CKA_KEY_TYPE</span>:        <span class="ty">CK_ULONG</span> = <span class="num">0x0000_0100</span>;
+<span class="kw">pub const</span> <span class="ty">CKA_SENSITIVE</span>:       <span class="ty">CK_ULONG</span> = <span class="num">0x0000_0103</span>;  <span class="com">// ★秘密値保護</span>
+<span class="kw">pub const</span> <span class="ty">CKA_SIGN</span>:            <span class="ty">CK_ULONG</span> = <span class="num">0x0000_0108</span>;  <span class="com">// 署名可</span>
+<span class="kw">pub const</span> <span class="ty">CKA_VERIFY</span>:          <span class="ty">CK_ULONG</span> = <span class="num">0x0000_010A</span>;  <span class="com">// 検証可</span>
+<span class="kw">pub const</span> <span class="ty">CKA_MODULUS_BITS</span>:    <span class="ty">CK_ULONG</span> = <span class="num">0x0000_0121</span>;  <span class="com">// RSA鍵長</span>
+<span class="kw">pub const</span> <span class="ty">CKA_PUBLIC_EXPONENT</span>: <span class="ty">CK_ULONG</span> = <span class="num">0x0000_0122</span>;
+<span class="kw">pub const</span> <span class="ty">CKA_EXTRACTABLE</span>:     <span class="ty">CK_ULONG</span> = <span class="num">0x0000_0162</span>;  <span class="com">// ★持ち出し可否</span>
+
+<span class="com">// 真偽値（属性に渡す実体）</span>
+<span class="kw">pub const</span> <span class="ty">CK_TRUE</span>:  u8 = <span class="num">1</span>;
+<span class="kw">pub const</span> <span class="ty">CK_FALSE</span>: u8 = <span class="num">0</span>;</pre>
+    </div>
+
+    <div class="card warn">
+      <div class="card-title">数値はベタ書きだが仕様で確定</div>
+      <p style="font-size:0.92rem">これらの16進値はPKCS#11ヘッダ（<code>pkcs11t.h</code>）で定義された固定値。<strong>勝手に変えてはいけない</strong>。ベンダー拡張は<code>CKM_VENDOR_DEFINED</code>(<code>0x8000_0000</code>)以降の領域を使う。</p>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[1] PKCS#11 Spec v3.2 §3 (定数定義)</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 12: error.rs ====== -->
+<section class="slide" data-title="error.rs">
+  <span class="slide-num">12 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag impl">PART 2 · 本編コード</span>
+    <h2><span class="num">12</span>error.rs — CK_RV を Result に変える</h2>
+    <p class="lead">C流の「<strong>戻り値で成否を返す</strong>」を、Rust流の <code>Result</code> に変換する境界。これで上層は <code>?</code> 演算子で素直にエラー伝播できる。</p>
+
+    <span class="filename">src/error.rs</span>
+    <div class="code-block">
+<span class="code-lang">Rust</span><pre><span class="kw">use</span> <span class="kw">crate</span>::ffi::types::CK_RV;
+<span class="kw">use</span> <span class="kw">crate</span>::ffi::constants::CKR_OK;
+
+<span class="attr-c">#[derive(Debug)]</span>
+<span class="kw">pub enum</span> <span class="ty">Error</span> {
+    <span class="com">// .so のロード失敗（libloading由来）</span>
+    <span class="ty">Load</span>(libloading::<span class="ty">Error</span>),
+    <span class="com">// C_GetFunctionList が NULL を返した</span>
+    <span class="ty">NullFunctionList</span>,
+    <span class="com">// その関数ポインタが NULL（= 未実装）だった</span>
+    <span class="ty">FunctionNotSupported</span>(&<span class="lt">'static</span> <span class="ty">str</span>),
+    <span class="com">// PKCS#11 がエラーコードを返した（CK_RV != CKR_OK）</span>
+    <span class="ty">Pkcs11</span>(<span class="ty">CK_RV</span>),
+}
+
+<span class="com">// libloading::Error を自動変換（? で使えるように）</span>
+<span class="kw">impl</span> <span class="ty">From</span>&lt;libloading::<span class="ty">Error</span>&gt; <span class="kw">for</span> <span class="ty">Error</span> {
+    <span class="kw">fn</span> <span class="fn-name">from</span>(e: libloading::<span class="ty">Error</span>) -> <span class="ty">Self</span> { <span class="ty">Error</span>::<span class="ty">Load</span>(e) }
+}
+
+<span class="com">// CK_RV をチェックして Result に変換する中核ヘルパ</span>
+<span class="attr-c">#[inline]</span>
+<span class="kw">pub fn</span> <span class="fn-name">check</span>(rv: <span class="ty">CK_RV</span>) -> <span class="ty">Result</span>&lt;(), <span class="ty">Error</span>&gt; {
+    <span class="kw">if</span> rv == <span class="ty">CKR_OK</span> {
+        <span class="ty">Ok</span>(())
+    } <span class="kw">else</span> {
+        <span class="ty">Err</span>(<span class="ty">Error</span>::<span class="ty">Pkcs11</span>(rv))
+    }
+}
+
+<span class="com">// Option&lt;fn&gt; を取り出すヘルパ（NULL関数ポインタ対策）</span>
+<span class="kw">pub fn</span> <span class="fn-name">require</span>&lt;F&gt;(f: <span class="ty">Option</span>&lt;F&gt;, name: &<span class="lt">'static</span> <span class="ty">str</span>) -> <span class="ty">Result</span>&lt;F, <span class="ty">Error</span>&gt; {
+    f.<span class="fn-name">ok_or</span>(<span class="ty">Error</span>::<span class="ty">FunctionNotSupported</span>(name))
+}
+
+<span class="kw">impl</span> std::fmt::<span class="ty">Display</span> <span class="kw">for</span> <span class="ty">Error</span> {
+    <span class="kw">fn</span> <span class="fn-name">fmt</span>(&<span class="kw">self</span>, f: &<span class="kw">mut</span> std::fmt::<span class="ty">Formatter</span>) -> std::fmt::<span class="ty">Result</span> {
+        <span class="kw">match</span> <span class="kw">self</span> {
+            <span class="ty">Error</span>::<span class="ty">Load</span>(e)            => <span class="fn-name">write!</span>(f, <span class="str">"load error: {e}"</span>),
+            <span class="ty">Error</span>::<span class="ty">NullFunctionList</span>    => <span class="fn-name">write!</span>(f, <span class="str">"C_GetFunctionList returned null"</span>),
+            <span class="ty">Error</span>::<span class="ty">FunctionNotSupported</span>(n) => <span class="fn-name">write!</span>(f, <span class="str">"function not supported: {n}"</span>),
+            <span class="ty">Error</span>::<span class="ty">Pkcs11</span>(rv)         => <span class="fn-name">write!</span>(f, <span class="str">"PKCS#11 error: 0x{rv:08x}"</span>),
+        }
+    }
+}
+<span class="kw">impl</span> std::error::<span class="ty">Error</span> <span class="kw">for</span> <span class="ty">Error</span> {}</pre>
+    </div>
+
+    <div class="card bordered-left">
+      <div class="card-title">この変換が「安全な層」の入口</div>
+      <p style="font-size:0.92rem"><code>check(rv)?</code> と書けば、エラーコードが自動で <code>Error::Pkcs11</code> に化けて伝播する。第2部で挙げた <code>CKR_SESSION_HANDLE_INVALID</code> 等は、すべてこの <code>Error::Pkcs11(0x...)</code> に集約される。</p>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[1] PKCS#11 Spec v3.2 §5.1 (戻り値)</a><a href="#slide-19">[6] Rust API Guidelines (C-GOOD-ERR)</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 13: loader.rs ====== -->
+<section class="slide" data-title="loader.rs">
+  <span class="slide-num">13 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag impl">PART 2 · 本編コード</span>
+    <h2><span class="num">13</span>loader.rs — ★ .so動的ロードの核心</h2>
+    <p class="lead">このドキュメントの主役。<strong>libloadingで.soを開き、<code>C_GetFunctionList</code>を1回だけ呼んで、関数ポインタ束を手に入れる</strong>。slide 03の図がそのままコードになる。</p>
+
+    <span class="filename">src/loader.rs</span>
+    <div class="code-block">
+<span class="code-lang">Rust</span><pre><span class="kw">use</span> libloading::{<span class="ty">Library</span>, <span class="ty">Symbol</span>};
+<span class="kw">use</span> std::ptr;
+<span class="kw">use</span> <span class="kw">crate</span>::ffi::function_list::CK_FUNCTION_LIST;
+<span class="kw">use</span> <span class="kw">crate</span>::ffi::types::CK_RV;
+<span class="kw">use</span> <span class="kw">crate</span>::error::{check, <span class="ty">Error</span>};
+
+<span class="com">// C_GetFunctionList のシグネチャ（唯一エクスポートされるシンボル）</span>
+<span class="kw">type</span> <span class="ty">CGetFunctionList</span> =
+    <span class="kw">unsafe extern</span> <span class="str">"C"</span> <span class="kw">fn</span>(<span class="kw">*mut *mut</span> <span class="ty">CK_FUNCTION_LIST</span>) -> <span class="ty">CK_RV</span>;
+
+<span class="kw">pub struct</span> <span class="ty">Module</span> {
+    <span class="com">// ★最重要：Library を保持し続ける。drop されると .so がアンロード(dlclose)され、</span>
+    <span class="com">//          関数ポインタが全てダングリングになる。順序も drop 順に効く。</span>
+    _lib: <span class="ty">Library</span>,
+    <span class="com">// .so 内部の静的構造体を指すポインタ（所有はしない）</span>
+    funcs: <span class="kw">*const</span> <span class="ty">CK_FUNCTION_LIST</span>,
+}
+
+<span class="kw">impl</span> <span class="ty">Module</span> {
+    <span class="com">// 指定パスの .so をロードし、関数リストを取得する</span>
+    <span class="kw">pub fn</span> <span class="fn-name">load</span>(path: &<span class="ty">str</span>) -> <span class="ty">Result</span>&lt;<span class="ty">Module</span>, <span class="ty">Error</span>&gt; {
+        <span class="kw">unsafe</span> {
+            <span class="com">// (1) .so を開く（dlopen 相当）</span>
+            <span class="kw">let</span> lib = <span class="ty">Library</span>::<span class="fn-name">new</span>(path)?;
+
+            <span class="com">// (2) C_GetFunctionList シンボルを取得（唯一必要な dlsym）</span>
+            <span class="kw">let</span> entry: <span class="ty">Symbol</span>&lt;<span class="ty">CGetFunctionList</span>&gt; =
+                lib.<span class="fn-name">get</span>(<span class="str">b"C_GetFunctionList"</span>)?;
+
+            <span class="com">// (3) 呼び出して関数リストへのポインタを受け取る</span>
+            <span class="kw">let mut</span> list: <span class="kw">*mut</span> <span class="ty">CK_FUNCTION_LIST</span> = ptr::<span class="fn-name">null_mut</span>();
+            <span class="kw">let</span> rv = <span class="fn-name">entry</span>(&<span class="kw">mut</span> list);
+            <span class="fn-name">check</span>(rv)?;
+            <span class="kw">if</span> list.<span class="fn-name">is_null</span>() {
+                <span class="kw">return</span> <span class="ty">Err</span>(<span class="ty">Error</span>::<span class="ty">NullFunctionList</span>);
+            }
+
+            <span class="com">// (4) Library を一緒に保持して返す（ここが寿命管理の肝）</span>
+            <span class="ty">Ok</span>(<span class="ty">Module</span> { _lib: lib, funcs: list })
+        }
+    }
+
+    <span class="com">// 関数リストへの安全な参照を返す内部ヘルパ</span>
+    <span class="attr-c">#[inline]</span>
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="fn-name">funcs</span>(&<span class="kw">self</span>) -> &<span class="ty">CK_FUNCTION_LIST</span> {
+        <span class="com">// load() で null チェック済みなので参照化は安全</span>
+        <span class="kw">unsafe</span> { &*<span class="kw">self</span>.funcs }
+    }
+}
+
+<span class="com">// .so ロード時点では C_Initialize はまだ呼んでいない。</span>
+<span class="com">// → Initialize / Finalize は session.rs 側で扱う（次スライド）</span></pre>
+    </div>
+
+    <div class="card warn">
+      <div class="card-title"><span style="color:var(--red)">⚠</span> Library を捨ててはいけない</div>
+      <p style="font-size:0.92rem">よくあるバグ：<code>C_GetFunctionList</code>でポインタだけ取って<code>Library</code>をスコープ外に落とす。すると<code>.so</code>がアンロードされ、後で関数を呼んだ瞬間にSEGV。<code>_lib</code>フィールドで<strong>構造体の寿命に縛り付ける</strong>のが正解。</p>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[1] PKCS#11 Spec v3.2 §5.4</a><a href="#slide-19">[3] libloading docs</a><a href="#slide-19">[7] Rustonomicon</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 14: session.rs ====== -->
+<section class="slide" data-title="session.rs">
+  <span class="slide-num">14 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag impl">PART 2 · 本編コード</span>
+    <h2><span class="num">14</span>session.rs — ライフサイクル管理</h2>
+    <p class="lead">第2部の14ステップ・ライフサイクルのうち、<strong>Initialize → OpenSession → Login → (操作) → CloseSession → Finalize</strong> を RAII で安全に包む。<code>Drop</code>で後始末を自動化。</p>
+
+    <span class="filename">src/session.rs</span>
+    <div class="code-block">
+<span class="code-lang">Rust</span><pre><span class="kw">use</span> std::ptr;
+<span class="kw">use</span> <span class="kw">crate</span>::loader::Module;
+<span class="kw">use</span> <span class="kw">crate</span>::ffi::types::*;
+<span class="kw">use</span> <span class="kw">crate</span>::ffi::constants::*;
+<span class="kw">use</span> <span class="kw">crate</span>::error::{check, require, <span class="ty">Error</span>};
+
+<span class="kw">impl</span> <span class="ty">Module</span> {
+    <span class="com">// ライブラリ全体の初期化（第2部 step: C_Initialize）</span>
+    <span class="kw">pub fn</span> <span class="fn-name">initialize</span>(&<span class="kw">self</span>) -> <span class="ty">Result</span>&lt;(), <span class="ty">Error</span>&gt; {
+        <span class="kw">let</span> f = <span class="fn-name">require</span>(<span class="kw">self</span>.<span class="fn-name">funcs</span>().C_Initialize, <span class="str">"C_Initialize"</span>)?;
+        <span class="com">// pInitArgs は NULL でOK（シングルスレッド既定）</span>
+        <span class="fn-name">check</span>(<span class="kw">unsafe</span> { <span class="fn-name">f</span>(ptr::<span class="fn-name">null_mut</span>()) })
+    }
+
+    <span class="com">// 最初の「トークン入りスロット」を取得</span>
+    <span class="kw">pub fn</span> <span class="fn-name">first_slot</span>(&<span class="kw">self</span>) -> <span class="ty">Result</span>&lt;<span class="ty">CK_SLOT_ID</span>, <span class="ty">Error</span>&gt; {
+        <span class="kw">let</span> f = <span class="fn-name">require</span>(<span class="kw">self</span>.<span class="fn-name">funcs</span>().C_GetSlotList, <span class="str">"C_GetSlotList"</span>)?;
+        <span class="kw">let mut</span> count: <span class="ty">CK_ULONG</span> = <span class="num">0</span>;
+        <span class="com">// 1回目：個数だけ取得（2-call convention）</span>
+        <span class="fn-name">check</span>(<span class="kw">unsafe</span> { <span class="fn-name">f</span>(<span class="ty">CK_TRUE</span>, ptr::<span class="fn-name">null_mut</span>(), &<span class="kw">mut</span> count) })?;
+        <span class="kw">let mut</span> slots = <span class="fn-name">vec!</span>[<span class="num">0</span> <span class="kw">as</span> <span class="ty">CK_SLOT_ID</span>; count <span class="kw">as</span> <span class="ty">usize</span>];
+        <span class="com">// 2回目：実データ取得</span>
+        <span class="fn-name">check</span>(<span class="kw">unsafe</span> { <span class="fn-name">f</span>(<span class="ty">CK_TRUE</span>, slots.<span class="fn-name">as_mut_ptr</span>(), &<span class="kw">mut</span> count) })?;
+        slots.<span class="fn-name">first</span>().<span class="fn-name">copied</span>().<span class="fn-name">ok_or</span>(<span class="ty">Error</span>::<span class="ty">Pkcs11</span>(<span class="num">0</span>))
+    }
+
+    <span class="com">// セッションを開く（第2部 step: C_OpenSession）</span>
+    <span class="kw">pub fn</span> <span class="fn-name">open_session</span>(&<span class="kw">self</span>, slot: <span class="ty">CK_SLOT_ID</span>) -> <span class="ty">Result</span>&lt;<span class="ty">Session</span>, <span class="ty">Error</span>&gt; {
+        <span class="kw">let</span> f = <span class="fn-name">require</span>(<span class="kw">self</span>.<span class="fn-name">funcs</span>().C_OpenSession, <span class="str">"C_OpenSession"</span>)?;
+        <span class="kw">let mut</span> h: <span class="ty">CK_SESSION_HANDLE</span> = <span class="num">0</span>;
+        <span class="kw">let</span> flags = <span class="ty">CKF_SERIAL_SESSION</span> | <span class="ty">CKF_RW_SESSION</span>;
+        <span class="fn-name">check</span>(<span class="kw">unsafe</span> {
+            <span class="fn-name">f</span>(slot, flags, ptr::<span class="fn-name">null_mut</span>(), <span class="ty">None</span>, &<span class="kw">mut</span> h)
+        })?;
+        <span class="ty">Ok</span>(<span class="ty">Session</span> { module: <span class="kw">self</span>, handle: h })
+    }
+}
+
+<span class="com">// セッションは Module を借用する（'a で寿命を縛る）</span>
+<span class="kw">pub struct</span> <span class="ty">Session</span>&lt;<span class="lt">'a</span>&gt; {
+    <span class="kw">pub</span>(<span class="kw">crate</span>) module: &<span class="lt">'a</span> <span class="ty">Module</span>,
+    <span class="kw">pub</span>(<span class="kw">crate</span>) handle: <span class="ty">CK_SESSION_HANDLE</span>,
+}
+
+<span class="kw">impl</span> <span class="ty">Session</span>&lt;<span class="lt">'_</span>&gt; {
+    <span class="com">// ログイン（第2部 step: C_Login）</span>
+    <span class="kw">pub fn</span> <span class="fn-name">login</span>(&<span class="kw">self</span>, pin: &<span class="ty">str</span>) -> <span class="ty">Result</span>&lt;(), <span class="ty">Error</span>&gt; {
+        <span class="kw">let</span> f = <span class="fn-name">require</span>(<span class="kw">self</span>.module.<span class="fn-name">funcs</span>().C_Login, <span class="str">"C_Login"</span>)?;
+        <span class="kw">let</span> pin_bytes = pin.<span class="fn-name">as_bytes</span>();
+        <span class="fn-name">check</span>(<span class="kw">unsafe</span> {
+            <span class="fn-name">f</span>(<span class="kw">self</span>.handle, <span class="ty">CKU_USER</span>,
+              pin_bytes.<span class="fn-name">as_ptr</span>() <span class="kw">as</span> <span class="kw">*mut</span> <span class="ty">CK_BYTE</span>,
+              pin_bytes.<span class="fn-name">len</span>() <span class="kw">as</span> <span class="ty">CK_ULONG</span>)
+        })
+    }
+}
+
+<span class="com">// ★ RAII：Session が drop されると自動で CloseSession</span>
+<span class="kw">impl</span> <span class="ty">Drop</span> <span class="kw">for</span> <span class="ty">Session</span>&lt;<span class="lt">'_</span>&gt; {
+    <span class="kw">fn</span> <span class="fn-name">drop</span>(&<span class="kw">mut</span> <span class="kw">self</span>) {
+        <span class="kw">if let</span> <span class="ty">Some</span>(f) = <span class="kw">self</span>.module.<span class="fn-name">funcs</span>().C_CloseSession {
+            <span class="kw">unsafe</span> { f(<span class="kw">self</span>.handle); }  <span class="com">// エラーは握り潰す（drop中なので）</span>
+        }
+    }
+}</pre>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[1] PKCS#11 Spec v3.2 §5.5-5.6</a><a href="#slide-19">[2] cryptoki (Session設計の参考)</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 15: ops/random.rs ====== -->
+<section class="slide" data-title="ops/random.rs">
+  <span class="slide-num">15 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag impl">PART 2 · 本編コード</span>
+    <h2><span class="num">15</span>ops/random.rs <span class="map-badge">第2部 Ch1 対応</span></h2>
+    <p class="lead">第2部Chapter 1の乱数生成フローを生FFIで実装。<strong>Init/Finalなしの単発呼び出し</strong>。バッファをRust側で確保し、ポインタを渡すだけ。</p>
+
+    <span class="filename">src/ops/random.rs</span>
+    <div class="code-block">
+<span class="code-lang">Rust</span><pre><span class="kw">use</span> <span class="kw">crate</span>::session::Session;
+<span class="kw">use</span> <span class="kw">crate</span>::ffi::types::*;
+<span class="kw">use</span> <span class="kw">crate</span>::error::{check, require, <span class="ty">Error</span>};
+
+<span class="kw">impl</span> <span class="ty">Session</span>&lt;<span class="lt">'_</span>&gt; {
+    <span class="com">/// 乱数生成（第2部 Ch1）。C_GenerateRandom を1回呼ぶだけ。</span>
+    <span class="kw">pub fn</span> <span class="fn-name">generate_random</span>(&<span class="kw">self</span>, len: <span class="ty">usize</span>) -> <span class="ty">Result</span>&lt;<span class="ty">Vec</span>&lt;<span class="ty">u8</span>&gt;, <span class="ty">Error</span>&gt; {
+        <span class="com">// (準備) 出力バッファを Rust 側で確保</span>
+        <span class="kw">let mut</span> buf = <span class="fn-name">vec!</span>[<span class="num">0u8</span>; len];
+
+        <span class="com">// 関数ポインタを取得（NULL なら未サポート）</span>
+        <span class="kw">let</span> f = <span class="fn-name">require</span>(<span class="kw">self</span>.module.<span class="fn-name">funcs</span>().C_GenerateRandom, <span class="str">"C_GenerateRandom"</span>)?;
+
+        <span class="com">// (実行) HSM内のTRNGからバイト列を取得</span>
+        <span class="kw">let</span> rv = <span class="kw">unsafe</span> {
+            <span class="fn-name">f</span>(
+                <span class="kw">self</span>.handle,
+                buf.<span class="fn-name">as_mut_ptr</span>(),          <span class="com">// *mut CK_BYTE</span>
+                buf.<span class="fn-name">len</span>() <span class="kw">as</span> <span class="ty">CK_ULONG</span>,     <span class="com">// 長さ</span>
+            )
+        };
+
+        <span class="com">// (結果) CK_RV を Result に変換して返す</span>
+        <span class="fn-name">check</span>(rv)?;
+        <span class="ty">Ok</span>(buf)
+    }
+}</pre>
+    </div>
+
+    <div class="cols-2">
+      <div class="card bordered-left">
+        <div class="card-title">第2部フローとの対応</div>
+        <ul style="font-size:0.9rem; margin:0.3rem 0">
+          <li><span class="step-badge">準備</span><code>vec![0u8; len]</code> でバッファ確保</li>
+          <li><span class="step-badge">実行</span><code>f(handle, ptr, len)</code> でHSMのTRNG呼び出し</li>
+          <li><span class="step-badge">結果</span><code>check(rv)?</code> で成否判定、<code>Vec&lt;u8&gt;</code> を返す</li>
+        </ul>
+      </div>
+      <div class="card rust-accent">
+        <div class="card-title">生FFIの安全化ポイント</div>
+        <p style="font-size:0.9rem"><code>unsafe</code>ブロックは<strong>関数呼び出しの1行だけ</strong>。バッファ確保も結果変換も安全なRustコード。呼び出し側は<code>session.generate_random(32)?</code>と書くだけで、ポインタもunsafeも見えない。</p>
+      </div>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[1] PKCS#11 Spec v3.2 §5.18.2 (C_GenerateRandom)</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 16: ops/sign.rs ====== -->
+<section class="slide" data-title="ops/sign.rs">
+  <span class="slide-num">16 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag impl">PART 2 · 本編コード</span>
+    <h2><span class="num">16</span>ops/sign.rs <span class="map-badge">第2部 Ch2 対応</span></h2>
+    <p class="lead">第2部Chapter 2の署名フローを実装。<strong>C_SignInit → C_Sign の2段</strong>。さらに<strong>2-call convention</strong>（署名長を先に問い合わせ）も再現する。</p>
+
+    <span class="filename">src/ops/sign.rs</span>
+    <div class="code-block">
+<span class="code-lang">Rust</span><pre><span class="kw">use</span> std::ptr;
+<span class="kw">use</span> <span class="kw">crate</span>::session::Session;
+<span class="kw">use</span> <span class="kw">crate</span>::ffi::types::*;
+<span class="kw">use</span> <span class="kw">crate</span>::error::{check, require, <span class="ty">Error</span>};
+
+<span class="kw">impl</span> <span class="ty">Session</span>&lt;<span class="lt">'_</span>&gt; {
+    <span class="com">/// 署名（第2部 Ch2）。SignInit → Sign(長さ取得) → Sign(本番) の流れ。</span>
+    <span class="kw">pub fn</span> <span class="fn-name">sign</span>(
+        &<span class="kw">self</span>,
+        mech: <span class="ty">CK_MECHANISM_TYPE</span>,
+        key: <span class="ty">CK_OBJECT_HANDLE</span>,
+        data: &[<span class="ty">u8</span>],
+    ) -> <span class="ty">Result</span>&lt;<span class="ty">Vec</span>&lt;<span class="ty">u8</span>&gt;, <span class="ty">Error</span>&gt; {
+        <span class="com">// (準備) メカニズム構造体を組む。パラメータ無しの方式を想定</span>
+        <span class="kw">let mut</span> mechanism = <span class="ty">CK_MECHANISM</span> {
+            mechanism: mech,
+            pParameter: ptr::<span class="fn-name">null_mut</span>(),
+            ulParameterLen: <span class="num">0</span>,
+        };
+
+        <span class="com">// ── C_SignInit：このセッションを「署名待ち」状態に ──</span>
+        <span class="kw">let</span> sign_init = <span class="fn-name">require</span>(<span class="kw">self</span>.module.<span class="fn-name">funcs</span>().C_SignInit, <span class="str">"C_SignInit"</span>)?;
+        <span class="fn-name">check</span>(<span class="kw">unsafe</span> {
+            <span class="fn-name">sign_init</span>(<span class="kw">self</span>.handle, &<span class="kw">mut</span> mechanism, key)
+        })?;
+
+        <span class="kw">let</span> sign = <span class="fn-name">require</span>(<span class="kw">self</span>.module.<span class="fn-name">funcs</span>().C_Sign, <span class="str">"C_Sign"</span>)?;
+        <span class="kw">let</span> data_ptr = data.<span class="fn-name">as_ptr</span>() <span class="kw">as</span> <span class="kw">*mut</span> <span class="ty">CK_BYTE</span>;
+        <span class="kw">let</span> data_len = data.<span class="fn-name">len</span>() <span class="kw">as</span> <span class="ty">CK_ULONG</span>;
+
+        <span class="com">// ── 1回目：pSignature = NULL で署名長を問い合わせ ──</span>
+        <span class="kw">let mut</span> sig_len: <span class="ty">CK_ULONG</span> = <span class="num">0</span>;
+        <span class="fn-name">check</span>(<span class="kw">unsafe</span> {
+            <span class="fn-name">sign</span>(<span class="kw">self</span>.handle, data_ptr, data_len,
+                 ptr::<span class="fn-name">null_mut</span>(), &<span class="kw">mut</span> sig_len)
+        })?;
+
+        <span class="com">// ── 2回目：確定した長さでバッファを確保して本番署名 ──</span>
+        <span class="kw">let mut</span> sig = <span class="fn-name">vec!</span>[<span class="num">0u8</span>; sig_len <span class="kw">as</span> <span class="ty">usize</span>];
+        <span class="fn-name">check</span>(<span class="kw">unsafe</span> {
+            <span class="fn-name">sign</span>(<span class="kw">self</span>.handle, data_ptr, data_len,
+                 sig.<span class="fn-name">as_mut_ptr</span>(), &<span class="kw">mut</span> sig_len)
+        })?;
+
+        <span class="com">// HSMが返した実際の長さに切り詰める</span>
+        sig.<span class="fn-name">truncate</span>(sig_len <span class="kw">as</span> <span class="ty">usize</span>);
+        <span class="ty">Ok</span>(sig)
+        <span class="com">// ※ C_Sign 完了でセッション状態は自動リセット（第2部参照）</span>
+    }
+}</pre>
+    </div>
+
+    <div class="card warn">
+      <div class="card-title">2-call convention を省略する場合</div>
+      <p style="font-size:0.92rem">RSA-2048なら署名長は常に256バイトと分かっているので、1回目を省いて固定サイズバッファで呼んでも動く。ただし<strong>鍵長やメカニズムが可変なら2回呼びが安全</strong>。第2部で触れた通り。</p>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[1] PKCS#11 Spec v3.2 §5.13.1-5.13.2</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 17: ops/keygen.rs ====== -->
+<section class="slide" data-title="ops/keygen.rs">
+  <span class="slide-num">17 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag impl">PART 2 · 本編コード</span>
+    <h2><span class="num">17</span>ops/keygen.rs <span class="map-badge">第2部 Ch3 対応</span></h2>
+    <p class="lead">第2部Chapter 3の鍵生成フローを実装。<strong>属性テンプレート配列を組んで C_GenerateKeyPair に渡す</strong>。slide 15（第2部）の公開鍵/秘密鍵テンプレート図がそのままコードになる。</p>
+
+    <span class="filename">src/ops/keygen.rs</span>
+    <div class="code-block">
+<span class="code-lang">Rust</span><pre><span class="kw">use</span> std::os::raw::c_void;
+<span class="kw">use</span> std::ptr;
+<span class="kw">use</span> <span class="kw">crate</span>::session::Session;
+<span class="kw">use</span> <span class="kw">crate</span>::ffi::types::*;
+<span class="kw">use</span> <span class="kw">crate</span>::ffi::constants::*;
+<span class="kw">use</span> <span class="kw">crate</span>::error::{check, require, <span class="ty">Error</span>};
+
+<span class="com">// 属性を1つ作るヘルパ（CK_ATTRIBUTE の組み立てを短く）</span>
+<span class="kw">fn</span> <span class="fn-name">attr</span>(t: <span class="ty">CK_ATTRIBUTE_TYPE</span>, val: <span class="kw">*mut</span> c_void, len: <span class="ty">usize</span>) -> <span class="ty">CK_ATTRIBUTE</span> {
+    <span class="ty">CK_ATTRIBUTE</span> { type_: t, pValue: val, ulValueLen: len <span class="kw">as</span> <span class="ty">CK_ULONG</span> }
+}
+
+<span class="kw">impl</span> <span class="ty">Session</span>&lt;<span class="lt">'_</span>&gt; {
+    <span class="com">/// RSA鍵ペア生成（第2部 Ch3）。(公開鍵ハンドル, 秘密鍵ハンドル) を返す。</span>
+    <span class="kw">pub fn</span> <span class="fn-name">generate_rsa_keypair</span>(
+        &<span class="kw">self</span>,
+        modulus_bits: <span class="ty">CK_ULONG</span>,
+    ) -> <span class="ty">Result</span>&lt;(<span class="ty">CK_OBJECT_HANDLE</span>, <span class="ty">CK_OBJECT_HANDLE</span>), <span class="ty">Error</span>&gt; {
+        <span class="com">// (準備1) メカニズム = RSA鍵ペア生成</span>
+        <span class="kw">let mut</span> mech = <span class="ty">CK_MECHANISM</span> {
+            mechanism: <span class="ty">CKM_RSA_PKCS_KEY_PAIR_GEN</span>,
+            pParameter: ptr::<span class="fn-name">null_mut</span>(),
+            ulParameterLen: <span class="num">0</span>,
+        };
+
+        <span class="com">// (準備2) 属性値の実体。HSMは読むだけなので true は共有してよい</span>
+        <span class="kw">let mut</span> bits = modulus_bits;
+        <span class="kw">let mut</span> pub_exp: [<span class="ty">u8</span>; <span class="num">3</span>] = [<span class="num">0x01</span>, <span class="num">0x00</span>, <span class="num">0x01</span>];  <span class="com">// 65537</span>
+        <span class="kw">let mut</span> yes = <span class="ty">CK_TRUE</span>;
+        <span class="kw">let mut</span> no  = <span class="ty">CK_FALSE</span>;
+        <span class="kw">let</span> b = |p: &<span class="kw">mut</span> <span class="ty">u8</span>| p <span class="kw">as</span> <span class="kw">*mut</span> _ <span class="kw">as</span> <span class="kw">*mut</span> c_void;
+
+        <span class="com">// (準備3) 公開鍵テンプレート（第2部 slide15 左側）</span>
+        <span class="kw">let mut</span> pub_tpl = [
+            <span class="fn-name">attr</span>(<span class="ty">CKA_TOKEN</span>,           <span class="fn-name">b</span>(&<span class="kw">mut</span> yes), <span class="num">1</span>),
+            <span class="fn-name">attr</span>(<span class="ty">CKA_MODULUS_BITS</span>,    &<span class="kw">mut</span> bits <span class="kw">as</span> <span class="kw">*mut</span> _ <span class="kw">as</span> <span class="kw">*mut</span> c_void,
+                                     std::mem::<span class="fn-name">size_of</span>::&lt;<span class="ty">CK_ULONG</span>&gt;()),
+            <span class="fn-name">attr</span>(<span class="ty">CKA_PUBLIC_EXPONENT</span>, pub_exp.<span class="fn-name">as_mut_ptr</span>() <span class="kw">as</span> <span class="kw">*mut</span> c_void, <span class="num">3</span>),
+            <span class="fn-name">attr</span>(<span class="ty">CKA_VERIFY</span>,          <span class="fn-name">b</span>(&<span class="kw">mut</span> yes), <span class="num">1</span>),
+        ];
+
+        <span class="com">// (準備4) 秘密鍵テンプレート（第2部 slide15 右側。★が要）</span>
+        <span class="kw">let mut</span> priv_tpl = [
+            <span class="fn-name">attr</span>(<span class="ty">CKA_TOKEN</span>,       <span class="fn-name">b</span>(&<span class="kw">mut</span> yes), <span class="num">1</span>),
+            <span class="fn-name">attr</span>(<span class="ty">CKA_PRIVATE</span>,     <span class="fn-name">b</span>(&<span class="kw">mut</span> yes), <span class="num">1</span>),
+            <span class="fn-name">attr</span>(<span class="ty">CKA_SIGN</span>,        <span class="fn-name">b</span>(&<span class="kw">mut</span> yes), <span class="num">1</span>),
+            <span class="fn-name">attr</span>(<span class="ty">CKA_SENSITIVE</span>,   <span class="fn-name">b</span>(&<span class="kw">mut</span> yes), <span class="num">1</span>),  <span class="com">// ★秘密値保護</span>
+            <span class="fn-name">attr</span>(<span class="ty">CKA_EXTRACTABLE</span>, <span class="fn-name">b</span>(&<span class="kw">mut</span> no),  <span class="num">1</span>),  <span class="com">// ★持ち出し禁止</span>
+        ];
+
+        <span class="com">// (実行) HSM内で素数探索 → 鍵ペア構築 → 2つのハンドルを受け取る</span>
+        <span class="kw">let mut</span> h_pub: <span class="ty">CK_OBJECT_HANDLE</span> = <span class="num">0</span>;
+        <span class="kw">let mut</span> h_priv: <span class="ty">CK_OBJECT_HANDLE</span> = <span class="num">0</span>;
+        <span class="kw">let</span> gen = <span class="fn-name">require</span>(<span class="kw">self</span>.module.<span class="fn-name">funcs</span>().C_GenerateKeyPair, <span class="str">"C_GenerateKeyPair"</span>)?;
+        <span class="fn-name">check</span>(<span class="kw">unsafe</span> {
+            <span class="fn-name">gen</span>(
+                <span class="kw">self</span>.handle,
+                &<span class="kw">mut</span> mech,
+                pub_tpl.<span class="fn-name">as_mut_ptr</span>(),  pub_tpl.<span class="fn-name">len</span>() <span class="kw">as</span> <span class="ty">CK_ULONG</span>,
+                priv_tpl.<span class="fn-name">as_mut_ptr</span>(), priv_tpl.<span class="fn-name">len</span>() <span class="kw">as</span> <span class="ty">CK_ULONG</span>,
+                &<span class="kw">mut</span> h_pub, &<span class="kw">mut</span> h_priv,
+            )
+        })?;
+
+        <span class="ty">Ok</span>((h_pub, h_priv))
+    }
+}</pre>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[1] PKCS#11 Spec v3.2 §5.15.4 (C_GenerateKeyPair)</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 18: main.rs ====== -->
+<section class="slide" data-title="main.rs">
+  <span class="slide-num">18 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag impl">PART 2 · 本編コード</span>
+    <h2><span class="num">18</span>main.rs — 全体配線</h2>
+    <p class="lead">全部つなぐ。<strong>ロード → 初期化 → スロット選択 → セッション → ログイン → 3操作</strong>。第2部の14ステップ・ライフサイクルが、ここで1本の流れになる。</p>
+
+    <span class="filename">src/main.rs</span>
+    <div class="code-block">
+<span class="code-lang">Rust</span><pre><span class="kw">mod</span> error;
+<span class="kw">mod</span> loader;
+<span class="kw">mod</span> session;
+<span class="kw">mod</span> ffi;
+<span class="kw">mod</span> ops;
+
+<span class="kw">use</span> loader::Module;
+<span class="kw">use</span> ffi::constants::CKM_SHA256_RSA_PKCS;
+
+<span class="kw">fn</span> <span class="fn-name">main</span>() -> <span class="ty">Result</span>&lt;(), <span class="ty">Box</span>&lt;<span class="kw">dyn</span> std::error::<span class="ty">Error</span>&gt;&gt; {
+    <span class="com">// .so のパスは環境変数で（既定は SoftHSM2）</span>
+    <span class="kw">let</span> path = std::env::<span class="fn-name">var</span>(<span class="str">"PKCS11_MODULE"</span>)
+        .<span class="fn-name">unwrap_or_else</span>(|_| <span class="str">"/usr/lib/softhsm/libsofthsm2.so"</span>.<span class="fn-name">into</span>());
+
+    <span class="com">// (1) .so を動的ロードして関数リスト取得（slide 13）</span>
+    <span class="kw">let</span> module = <span class="ty">Module</span>::<span class="fn-name">load</span>(&path)?;
+    <span class="fn-name">println!</span>(<span class="str">"loaded: {path}"</span>);
+
+    <span class="com">// (2) ライブラリ初期化（C_Initialize）</span>
+    module.<span class="fn-name">initialize</span>()?;
+
+    <span class="com">// (3) トークン入りスロットを選ぶ</span>
+    <span class="kw">let</span> slot = module.<span class="fn-name">first_slot</span>()?;
+    <span class="fn-name">println!</span>(<span class="str">"slot: {slot}"</span>);
+
+    <span class="com">// (4) セッション開設 + ログイン</span>
+    <span class="kw">let</span> session = module.<span class="fn-name">open_session</span>(slot)?;
+    session.<span class="fn-name">login</span>(<span class="str">"1234"</span>)?;
+
+    <span class="com">// ───── 第2部の3操作を実行 ─────</span>
+
+    <span class="com">// Ch1: 乱数生成</span>
+    <span class="kw">let</span> random = session.<span class="fn-name">generate_random</span>(<span class="num">32</span>)?;
+    <span class="fn-name">println!</span>(<span class="str">"random (32B): {:02x?}"</span>, &random[..<span class="num">8</span>]);
+
+    <span class="com">// Ch3: RSA-2048 鍵ペア生成（署名に使う鍵を先に作る）</span>
+    <span class="kw">let</span> (pub_key, priv_key) = session.<span class="fn-name">generate_rsa_keypair</span>(<span class="num">2048</span>)?;
+    <span class="fn-name">println!</span>(<span class="str">"keypair: pub={pub_key}, priv={priv_key}"</span>);
+
+    <span class="com">// Ch2: 署名</span>
+    <span class="kw">let</span> sig = session.<span class="fn-name">sign</span>(<span class="ty">CKM_SHA256_RSA_PKCS</span>, priv_key, <span class="str">b"hello pkcs11"</span>)?;
+    <span class="fn-name">println!</span>(<span class="str">"signature: {} bytes"</span>, sig.<span class="fn-name">len</span>());
+
+    <span class="ty">Ok</span>(())
+    <span class="com">// session が drop → C_CloseSession 自動実行（slide 14）</span>
+    <span class="com">// module が drop → .so アンロード</span>
+}</pre>
+    </div>
+
+    <div class="card bordered-left">
+      <div class="card-title">実行結果イメージ</div>
+      <div class="code-block shell" style="margin-top:0.5rem">
+<span class="code-lang">Shell</span><pre>loaded: /usr/lib/softhsm/libsofthsm2.so
+slot: <span class="num">1</span>
+random (32B): [<span class="num">a3</span>, <span class="num">f1</span>, <span class="num">2c</span>, <span class="num">8b</span>, <span class="num">9d</span>, <span class="num">04</span>, <span class="num">e7</span>, <span class="num">5a</span>]
+keypair: pub=<span class="num">2</span>, priv=<span class="num">3</span>
+signature: <span class="num">256</span> bytes</pre>
+      </div>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[1] PKCS#11 Spec v3.2 §5</a><a href="#slide-19">[4] SoftHSM2</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 19: Pitfalls ====== -->
+<section class="slide" data-title="生FFIの落とし穴">
+  <span class="slide-num">19 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag closing">PART 3 · まとめ</span>
+    <h2><span class="num">19</span>生FFIの落とし穴と対策</h2>
+    <p class="lead">cryptokiが隠してくれている危険を、自分で書くと全部踏みうる。<strong>コンパイルが通っても実行時に壊れる</strong>類いが多いのが厄介。要点を5つ。</p>
+
+    <div class="cols-2">
+      <div>
+        <div class="card warn">
+          <div class="card-title"><span style="color:var(--red)">①</span> Library の寿命</div>
+          <p style="font-size:0.9rem"><code>Library</code>をdropすると<code>.so</code>がアンロードされ、関数ポインタが全部ダングリング。→ <strong>必ず構造体に<code>_lib</code>として保持</strong>（slide 13）。</p>
+        </div>
+        <div class="card warn">
+          <div class="card-title"><span style="color:var(--red)">②</span> CK_FUNCTION_LIST の順序</div>
+          <p style="font-size:0.9rem">フィールドを1つ飛ばすと隣の関数を呼ぶ。コンパイルは通る。→ <strong>全関数を仕様順に書く</strong>か<code>cryptoki-sys</code>/<code>bindgen</code>で生成（slide 10）。</p>
+        </div>
+        <div class="card warn">
+          <div class="card-title"><span style="color:var(--red)">③</span> 関数ポインタのNULL</div>
+          <p style="font-size:0.9rem">未実装の関数は<code>NULL</code>。<code>Option</code>のまま<code>unwrap</code>せず<code>require()</code>で<strong>明示的にチェック</strong>（slide 12）。</p>
+        </div>
+      </div>
+      <div>
+        <div class="card warn">
+          <div class="card-title"><span style="color:var(--red)">④</span> repr(C) とフィールド順</div>
+          <p style="font-size:0.9rem"><code>#[repr(C)]</code>を付け忘れるとRustがフィールドを並べ替え、レイアウトがCと不一致に。構造体の<strong>定義順も型もC仕様と完全一致</strong>させる（slide 06/09）。</p>
+        </div>
+        <div class="card warn">
+          <div class="card-title"><span style="color:var(--red)">⑤</span> drop順序と二重解放</div>
+          <p style="font-size:0.9rem"><code>Session</code>より先に<code>Module</code>がdropされると、<code>C_CloseSession</code>が死んだ<code>.so</code>を叩く。→ <strong>借用<code>&'a Module</code>で寿命を縛り</strong>、Sessionが先にdropされることを型で保証（slide 14）。</p>
+        </div>
+        <div class="card rust-accent">
+          <div class="card-title">実務の結論</div>
+          <p style="font-size:0.9rem">学習・検証には生FFIで内部理解。<strong>本番は<code>cryptoki</code>（高レベル）を使う</strong>のが安全。今回のコードは「cryptokiの中身」を自分で書いたもの。</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card bordered-left">
+      <div class="card-title">第2部（性能評価）との接続</div>
+      <p style="font-size:0.92rem">性能測定をやるなら、この<code>ops/</code>の各関数を<code>std::time::Instant</code>で挟むだけ。ただし第2部で述べた通り、<strong>鍵生成は署名と時間スケールが違うので別ベンチにする</strong>・<strong>ウォームアップを入れる</strong>のを忘れずに。生FFIなら測定オーバーヘッドが最小なのも利点。</p>
+    </div>
+
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[3] libloading docs</a><a href="#slide-19">[5] cryptoki-sys</a><a href="#slide-19">[7] Rustonomicon (FFI/repr)</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 20: References ====== -->
+<section class="slide" data-title="References">
+  <span class="slide-num">20 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag closing">PART 3 · まとめ</span>
+    <h2><span class="num">20</span>References — 一次資料</h2>
+    <p class="lead">本ドキュメントのコード・仕様記述が依拠する一次資料。</p>
+
+    <div class="cols-2">
+      <div>
+        <div class="ref-section">
+          <div class="ref-section-title">仕様（OASIS PKCS#11）</div>
+          <ul class="ref-list">
+            <li>
+              <span class="ref-num">[1]</span>
+              <span class="ref-title">PKCS #11 Specification Version 3.2</span>
+              <span class="ref-meta">OASIS Committee Spec 01 · 2025-11-14 · §5 関数, §3-4 型/定数, §5.4 CK_FUNCTION_LIST</span>
+              <a class="ref-url" href="https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.2/pkcs11-spec-v3.2.html">docs.oasis-open.org/pkcs11/pkcs11-spec/v3.2/</a>
+            </li>
+            <li>
+              <span class="ref-num">[2]</span>
+              <span class="ref-title">cryptoki — Rust idiomatic wrapper</span>
+              <span class="ref-meta">crates.io · v0.12.0 (2026-01-22) · 高レベルAPI設計の参考</span>
+              <a class="ref-url" href="https://crates.io/crates/cryptoki">crates.io/crates/cryptoki</a>
+            </li>
+          </ul>
+        </div>
+        <div class="ref-section">
+          <div class="ref-section-title">動的ロード / FFI</div>
+          <ul class="ref-list">
+            <li>
+              <span class="ref-num">[3]</span>
+              <span class="ref-title">libloading — クロスプラットフォーム動的ロード</span>
+              <span class="ref-meta">docs.rs · v0.8 · Library::new / Symbol</span>
+              <a class="ref-url" href="https://docs.rs/libloading/">docs.rs/libloading/</a>
+            </li>
+            <li>
+              <span class="ref-num">[4]</span>
+              <span class="ref-title">SoftHSM2 — 検証用ソフトウェアHSM</span>
+              <span class="ref-meta">OpenDNSSEC · /usr/lib/softhsm/libsofthsm2.so</span>
+              <a class="ref-url" href="https://www.opendnssec.org/softhsm/">opendnssec.org/softhsm/</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+      <div>
+        <div class="ref-section">
+          <div class="ref-section-title">FFIバインディング</div>
+          <ul class="ref-list">
+            <li>
+              <span class="ref-num">[5]</span>
+              <span class="ref-title">cryptoki-sys — 生FFIバインディング</span>
+              <span class="ref-meta">crates.io · bindgen生成 · CK_FUNCTION_LIST全関数を提供</span>
+              <a class="ref-url" href="https://crates.io/crates/cryptoki-sys">crates.io/crates/cryptoki-sys</a>
+            </li>
+          </ul>
+        </div>
+        <div class="ref-section">
+          <div class="ref-section-title">Rust設計指針</div>
+          <ul class="ref-list">
+            <li>
+              <span class="ref-num">[6]</span>
+              <span class="ref-title">Rust API Guidelines</span>
+              <span class="ref-meta">エラー型・型設計・命名の指針（C-GOOD-ERR 等）</span>
+              <a class="ref-url" href="https://rust-lang.github.io/api-guidelines/">rust-lang.github.io/api-guidelines/</a>
+            </li>
+            <li>
+              <span class="ref-num">[7]</span>
+              <span class="ref-title">The Rustonomicon</span>
+              <span class="ref-meta">unsafe / FFI / repr(C) / 関数ポインタの章</span>
+              <a class="ref-url" href="https://doc.rust-lang.org/nomicon/">doc.rust-lang.org/nomicon/</a>
+            </li>
+            <li>
+              <span class="ref-num">[8]</span>
+              <span class="ref-title">rust-cryptoki リポジトリ</span>
+              <span class="ref-meta">parallaxsecond · cryptoki + cryptoki-sys の実装例</span>
+              <a class="ref-url" href="https://github.com/parallaxsecond/rust-cryptoki">github.com/parallaxsecond/rust-cryptoki</a>
+            </li>
+          </ul>
+        </div>
+        <div class="card rust-accent" style="margin-top:1rem">
+          <p style="font-size:0.86rem; margin:0">本シリーズ全3部：<strong>入門</strong> → <strong>操作フロー詳解</strong> → <strong>生FFI実装</strong>。本書のコードは第2部の3操作（乱数・署名・鍵生成）に1対1対応。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<nav class="nav-bottom" aria-label="スライドナビゲーション">
+  <button id="prevBtn" type="button" aria-label="前のスライドへ">← PREV</button>
+  <button id="nextBtn" type="button" aria-label="次のスライドへ">NEXT →</button>
+</nav>
+
+<script src="assets/deck.js"></script>
+
+</body>
+</html>

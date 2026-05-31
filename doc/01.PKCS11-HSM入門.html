@@ -1,0 +1,1338 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HSM × PKCS#11 入門 — 性能評価に向けて</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/common.css">
+<link rel="stylesheet" href="assets/01.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="dot"></span>HSM × PKCS#11 入門</div>
+  <div style="display: flex; gap: 1rem; align-items: center;">
+    <div class="progress"><span class="cur" id="curNum">01</span><span class="total"> / <span id="totalNum">18</span></span></div>
+    <button class="toc-btn" id="tocBtn" type="button" aria-label="目次を開く" aria-haspopup="dialog">INDEX</button>
+  </div>
+</header>
+
+<div class="toc-modal" id="tocModal" role="dialog" aria-modal="true" aria-label="目次">
+  <div class="toc-content">
+    <h3>目次 — INDEX</h3>
+    <ul class="toc-list" id="tocList"></ul>
+  </div>
+</div>
+
+<main class="deck" id="deck">
+
+<!-- ====== SLIDE 01: TITLE ====== -->
+<section class="slide title-slide" data-title="タイトル">
+  <span class="slide-num">01 / 19</span>
+  <div class="slide-inner">
+    <div class="title-mark">A Beginner's Field Notes</div>
+    <h1 class="title">
+      HSMと<span class="accent">PKCS#11</span><br>
+      入門
+    </h1>
+    <div class="title-line"></div>
+    <p class="subtitle">
+      ネットワーク型HSMの性能評価に向けて<br>
+      銀行金庫のたとえで理解する基礎概念
+    </p>
+    <div class="title-meta">
+      <strong>対象</strong> :  HSMをこれから触る開発者<br>
+      <strong>到達点</strong> : 仕様書とベンダーマニュアルが読める状態<br>
+      <strong>進め方</strong> : 概念 → 構造 → 関数 → フロー
+    </div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 02: TOC ====== -->
+<section class="slide" data-title="目次">
+  <span class="slide-num">02 / 19</span>
+  <div class="slide-inner">
+    <span class="slide-tag">CONTENTS</span>
+    <h2>このドキュメントの構成</h2>
+    <p class="lead">概念から始めて、ライブラリ内部、関数、典型フロー、性能評価まで段階的に積み上げる。</p>
+    <div class="cols-2">
+      <div>
+        <div class="kv">
+          <div class="kv-row"><div class="k">PART I</div><div class="v">概念の地図</div></div>
+          <div class="kv-row"><div class="k">03</div><div class="v">HSMとは何か</div></div>
+          <div class="kv-row"><div class="k">04</div><div class="v">PKCS#11とは何か</div></div>
+          <div class="kv-row"><div class="k">05</div><div class="v">全体アーキテクチャ</div></div>
+        </div>
+        <div class="kv">
+          <div class="kv-row"><div class="k">PART II</div><div class="v">5つの基本概念</div></div>
+          <div class="kv-row"><div class="k">06</div><div class="v">Slot / Token</div></div>
+          <div class="kv-row"><div class="k">07</div><div class="v">Session</div></div>
+          <div class="kv-row"><div class="k">08</div><div class="v">Object と Handle</div></div>
+          <div class="kv-row"><div class="k">09</div><div class="v">Attribute</div></div>
+          <div class="kv-row"><div class="k">10</div><div class="v">Mechanism</div></div>
+        </div>
+      </div>
+      <div>
+        <div class="kv">
+          <div class="kv-row"><div class="k">PART III</div><div class="v">ライブラリの内側</div></div>
+          <div class="kv-row"><div class="k">11</div><div class="v">ライブラリ内部の4つの役割</div></div>
+          <div class="kv-row"><div class="k">12</div><div class="v">実装パターン4種</div></div>
+        </div>
+        <div class="kv">
+          <div class="kv-row"><div class="k">PART IV</div><div class="v">関数と処理フロー</div></div>
+          <div class="kv-row"><div class="k">13</div><div class="v">関数の命名規則</div></div>
+          <div class="kv-row"><div class="k">14</div><div class="v">機能カテゴリマップ</div></div>
+          <div class="kv-row"><div class="k">15</div><div class="v">3段ロケット構造</div></div>
+          <div class="kv-row"><div class="k">16</div><div class="v">完全ライフサイクル</div></div>
+        </div>
+        <div class="kv">
+          <div class="kv-row"><div class="k">PART V</div><div class="v">性能評価</div></div>
+          <div class="kv-row"><div class="k">17</div><div class="v">測定パターンとエラー処理</div></div>
+          <div class="kv-row"><div class="k">18</div><div class="v">次のステップ</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 03: HSM ====== -->
+<section class="slide" data-title="HSMとは">
+  <span class="slide-num">03 / 19</span>
+  <div class="slide-inner">
+    <span class="slide-tag">PART I — 概念</span>
+    <h2><span class="num">03</span>HSMとは何か</h2>
+    <p class="lead">HSM（Hardware Security Module）は、<strong>鍵を保管し、暗号処理を「中で」実行する専用ハードウェア</strong>。アプリには鍵を渡さず、処理だけを請け負う。</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 720 320" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+        <!-- background grid -->
+        <defs>
+          <pattern id="grid1" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#e6dcc4" stroke-width="0.5"/>
+          </pattern>
+        </defs>
+        <rect width="720" height="320" fill="url(#grid1)" opacity="0.5"/>
+
+        <!-- App -->
+        <rect x="40" y="120" width="140" height="80" fill="#fdfaf2" stroke="#18233a" stroke-width="1.5"/>
+        <text x="110" y="150" text-anchor="middle" font-size="14" fill="#18233a" font-weight="700">あなた</text>
+        <text x="110" y="170" text-anchor="middle" font-size="11" fill="#3c4865">（アプリ）</text>
+        <text x="110" y="188" text-anchor="middle" font-size="10" fill="#6d7591">客</text>
+
+        <!-- Vault -->
+        <rect x="490" y="60" width="200" height="200" fill="#faf6ec" stroke="#8b6a2a" stroke-width="2"/>
+        <rect x="490" y="60" width="200" height="30" fill="#b88a3c"/>
+        <text x="590" y="80" text-anchor="middle" font-size="13" fill="#faf6ec" font-weight="700" letter-spacing="2">HSM / VAULT</text>
+
+        <!-- Keys inside -->
+        <text x="510" y="130" font-size="22" fill="#b88a3c">🔑</text>
+        <text x="540" y="135" font-size="12" fill="#18233a" font-weight="600">秘密鍵</text>
+        <text x="510" y="165" font-size="22" fill="#b88a3c">🔑</text>
+        <text x="540" y="170" font-size="12" fill="#18233a" font-weight="600">公開鍵</text>
+        <text x="510" y="200" font-size="22" fill="#b88a3c">🎲</text>
+        <text x="540" y="205" font-size="12" fill="#18233a" font-weight="600">乱数生成器</text>
+        <text x="510" y="235" font-size="22" fill="#b88a3c">⚙</text>
+        <text x="540" y="240" font-size="12" fill="#18233a" font-weight="600">暗号エンジン</text>
+
+        <!-- Window -->
+        <rect x="260" y="100" width="180" height="120" fill="#fdfaf2" stroke="#18233a" stroke-width="1.5" stroke-dasharray="0"/>
+        <text x="350" y="125" text-anchor="middle" font-size="13" fill="#18233a" font-weight="700">窓口</text>
+        <text x="350" y="145" text-anchor="middle" font-size="11" fill="#3c4865">（注文書のやりとり）</text>
+        <line x1="270" y1="155" x2="430" y2="155" stroke="#d6cdb7" stroke-width="1"/>
+        <text x="350" y="175" text-anchor="middle" font-size="10" fill="#a83a2b" font-weight="600">鍵は通さない</text>
+        <text x="350" y="195" text-anchor="middle" font-size="10" fill="#6d7591">結果だけ通す</text>
+
+        <!-- Arrows -->
+        <path d="M 180 155 L 255 155" stroke="#18233a" stroke-width="1.5" marker-end="url(#arr1)"/>
+        <path d="M 445 175 L 490 175" stroke="#18233a" stroke-width="1.5" marker-end="url(#arr1)"/>
+        <path d="M 490 195 L 445 195" stroke="#18233a" stroke-width="1.5" marker-end="url(#arr1)"/>
+        <path d="M 255 215 L 180 215" stroke="#18233a" stroke-width="1.5" marker-end="url(#arr1)"/>
+
+        <text x="217" y="148" text-anchor="middle" font-size="9" fill="#3c4865">依頼</text>
+        <text x="217" y="232" text-anchor="middle" font-size="9" fill="#3c4865">結果</text>
+
+        <defs>
+          <marker id="arr1" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <polygon points="0,0 8,3 0,6" fill="#18233a"/>
+          </marker>
+        </defs>
+      </svg>
+    </div>
+
+    <div class="cols-2">
+      <div class="card bordered-left">
+        <div class="card-title">何をしてくれる？</div>
+        <ul>
+          <li>鍵の生成・保管</li>
+          <li>署名・検証</li>
+          <li>暗号化・復号</li>
+          <li>乱数生成</li>
+          <li>鍵のラップ（暗号化して持ち出し）</li>
+        </ul>
+      </div>
+      <div class="card warn">
+        <div class="card-title">絶対にしないこと</div>
+        <ul>
+          <li><em>秘密鍵を外に出す</em>こと<br><span style="font-size:0.85em;color:var(--ink-muted)">（属性で許可した場合の例外を除く）</span></li>
+          <li>アプリのメモリに鍵を載せること</li>
+          <li>認証なしで秘密操作をすること</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 04: PKCS#11 ====== -->
+<section class="slide" data-title="PKCS#11とは">
+  <span class="slide-num">04 / 19</span>
+  <div class="slide-inner">
+    <span class="slide-tag">PART I — 概念</span>
+    <h2><span class="num">04</span>PKCS#11とは何か</h2>
+    <p class="lead"><strong>暗号デバイス（HSM、スマートカード等）を操作するためのC言語API標準仕様</strong>。OASIS PKCS 11 TCが管理。別名 <code>Cryptoki</code>。最新は v3.2（2024）。</p>
+
+    <div class="cols-2">
+      <div>
+        <h3><span class="marker">▸</span>たとえると「統一注文書フォーマット」</h3>
+        <p>HSMメーカーは Thales、Utimaco、AWS、Yubico など多数あって中身はバラバラ。でも <strong>外向けの注文書だけは同じ書式で受け付けようや</strong> という業界合意。</p>
+        <p>SuicaとICOCAとPASMOの関係に似てる。中身は違うけど、レジでの読み取り操作は同じ。</p>
+      </div>
+      <div>
+        <div class="diagram" style="margin: 0;">
+          <svg viewBox="0 0 360 280" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+            <text x="180" y="25" text-anchor="middle" font-size="11" fill="#6d7591" letter-spacing="2">SAME ORDER FORM →</text>
+
+            <!-- Form -->
+            <rect x="120" y="40" width="120" height="80" fill="#fdfaf2" stroke="#18233a" stroke-width="1.5"/>
+            <line x1="135" y1="60" x2="225" y2="60" stroke="#d6cdb7" stroke-width="0.5"/>
+            <line x1="135" y1="75" x2="225" y2="75" stroke="#d6cdb7" stroke-width="0.5"/>
+            <line x1="135" y1="90" x2="225" y2="90" stroke="#d6cdb7" stroke-width="0.5"/>
+            <line x1="135" y1="105" x2="225" y2="105" stroke="#d6cdb7" stroke-width="0.5"/>
+            <text x="180" y="52" text-anchor="middle" font-size="9" fill="#b88a3c" font-weight="700">PKCS#11</text>
+
+            <!-- Branches -->
+            <line x1="180" y1="120" x2="60" y2="170" stroke="#18233a" stroke-width="1"/>
+            <line x1="180" y1="120" x2="180" y2="170" stroke="#18233a" stroke-width="1"/>
+            <line x1="180" y1="120" x2="300" y2="170" stroke="#18233a" stroke-width="1"/>
+
+            <!-- Vendors -->
+            <rect x="20" y="170" width="80" height="50" fill="#fdfaf2" stroke="#18233a" stroke-width="1.2"/>
+            <text x="60" y="190" text-anchor="middle" font-size="11" fill="#18233a" font-weight="600">Thales</text>
+            <text x="60" y="205" text-anchor="middle" font-size="9" fill="#6d7591">Luna</text>
+
+            <rect x="140" y="170" width="80" height="50" fill="#fdfaf2" stroke="#18233a" stroke-width="1.2"/>
+            <text x="180" y="190" text-anchor="middle" font-size="11" fill="#18233a" font-weight="600">AWS</text>
+            <text x="180" y="205" text-anchor="middle" font-size="9" fill="#6d7591">CloudHSM</text>
+
+            <rect x="260" y="170" width="80" height="50" fill="#fdfaf2" stroke="#18233a" stroke-width="1.2"/>
+            <text x="300" y="190" text-anchor="middle" font-size="11" fill="#18233a" font-weight="600">Utimaco</text>
+            <text x="300" y="205" text-anchor="middle" font-size="9" fill="#6d7591">CryptoServer</text>
+
+            <text x="180" y="250" text-anchor="middle" font-size="10" fill="#a83a2b" font-style="italic">中身は別物。でも入口は共通。</text>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <div class="card bordered-left">
+      <div class="card-title">アプリ開発者にとっての意味</div>
+      <p>ベンダー提供の <code>.so</code>（Linux）や <code>.dll</code>（Windows）を <strong>ロードして、決まった関数を呼ぶ</strong>。HSMメーカーを変えてもアプリ側のロジックは（基本的に）動く。<em>※ 実際はベンダーごとの方言あり</em></p>
+    </div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-18">[1] PKCS#11 Spec v3.2</a><a href="#slide-18">[5] OASIS PKCS 11 TC</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 05: Architecture ====== -->
+<section class="slide" data-title="アーキテクチャ">
+  <span class="slide-num">05 / 19</span>
+  <div class="slide-inner">
+    <span class="slide-tag">PART I — 概念</span>
+    <h2><span class="num">05</span>全体アーキテクチャ</h2>
+    <p class="lead">ネットワーク型HSMでの構成。<strong>3つのレイヤー</strong>を意識する。</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 800 360" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+        <!-- App layer -->
+        <rect x="60" y="40" width="680" height="70" fill="#fdfaf2" stroke="#18233a" stroke-width="1.5" rx="2"/>
+        <text x="80" y="68" font-size="13" fill="#18233a" font-weight="700">① あなたのアプリケーション</text>
+        <text x="80" y="88" font-size="11" fill="#3c4865">PKCS#11標準関数を呼ぶ ・ ビジネスロジックを実装する</text>
+        <text x="720" y="65" text-anchor="end" font-size="9" fill="#6d7591" font-family="JetBrains Mono">YOUR CODE</text>
+
+        <text x="400" y="125" text-anchor="middle" font-size="11" fill="#b88a3c">▼ 関数呼び出し（C_xxx）</text>
+
+        <!-- Library layer -->
+        <rect x="60" y="140" width="680" height="90" fill="#faf6ec" stroke="#b88a3c" stroke-width="1.5" rx="2"/>
+        <text x="80" y="168" font-size="13" fill="#18233a" font-weight="700">② PKCS#11ライブラリ <tspan font-family="JetBrains Mono" font-size="11" fill="#8b6a2a">（ベンダー提供の .so / .dll）</tspan></text>
+        <text x="80" y="190" font-size="11" fill="#3c4865">受付係 ・ 帳簿係 ・ 翻訳係 ・ 配達係  の4つの仕事を内部でこなす</text>
+        <text x="80" y="210" font-size="11" fill="#3c4865">標準API → HSM独自プロトコル に変換し、ネットワークを越えて通信</text>
+        <text x="720" y="165" text-anchor="end" font-size="9" fill="#6d7591" font-family="JetBrains Mono">VENDOR LIB</text>
+
+        <text x="400" y="250" text-anchor="middle" font-size="11" fill="#b88a3c">▼ TLS / 独自プロトコル</text>
+
+        <!-- HSM layer -->
+        <rect x="60" y="265" width="680" height="70" fill="#fdfaf2" stroke="#18233a" stroke-width="1.5" rx="2"/>
+        <text x="80" y="293" font-size="13" fill="#18233a" font-weight="700">③ HSM本体（ネットワーク先のアプライアンス）</text>
+        <text x="80" y="313" font-size="11" fill="#3c4865">鍵の保管 ・ 暗号演算 ・ アクセス制御 ・ 監査ログ</text>
+        <text x="720" y="290" text-anchor="end" font-size="9" fill="#6d7591" font-family="JetBrains Mono">HARDWARE</text>
+      </svg>
+    </div>
+
+    <div class="cols-3">
+      <div class="card">
+        <div class="card-title">① アプリ</div>
+        <p style="font-size:0.9rem">標準APIを呼ぶ。<br>本ドキュメントが対象とする層。</p>
+      </div>
+      <div class="card">
+        <div class="card-title">② ライブラリ</div>
+        <p style="font-size:0.9rem">ベンダーが書いて配る。<br>差し替えればHSMを変えられる。</p>
+      </div>
+      <div class="card">
+        <div class="card-title">③ HSM本体</div>
+        <p style="font-size:0.9rem">物理アプライアンス。<br>ネットワーク経由でアクセス。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 06: Slot/Token ====== -->
+<section class="slide" data-title="Slot / Token">
+  <span class="slide-num">06 / 19</span>
+  <div class="slide-inner">
+    <span class="slide-tag">PART II — 5つの基本概念</span>
+    <h2><span class="num">06</span>Slot と Token</h2>
+    <p class="lead"><strong>Slot = 棚の番号</strong>、<strong>Token = その棚に置いてある実際の箱</strong>。1台のHSMを複数チームで分割使用するときの単位にもなる。</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 720 240" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+        <!-- HSM container -->
+        <rect x="40" y="40" width="640" height="170" fill="#faf6ec" stroke="#8b6a2a" stroke-width="2" rx="2"/>
+        <text x="60" y="65" font-size="13" fill="#8b6a2a" font-weight="700">HSM (金庫室)</text>
+
+        <!-- Slot 0 -->
+        <rect x="80" y="90" width="170" height="100" fill="#fdfaf2" stroke="#18233a" stroke-width="1.2"/>
+        <text x="165" y="110" text-anchor="middle" font-size="11" fill="#6d7591" font-family="JetBrains Mono">SLOT 0</text>
+        <rect x="105" y="125" width="120" height="50" fill="#f3eee3" stroke="#b88a3c" stroke-width="1.5"/>
+        <text x="165" y="148" text-anchor="middle" font-size="12" fill="#18233a" font-weight="600">Token</text>
+        <text x="165" y="165" text-anchor="middle" font-size="10" fill="#6d7591">"prod-keys"</text>
+
+        <!-- Slot 1 -->
+        <rect x="275" y="90" width="170" height="100" fill="#fdfaf2" stroke="#18233a" stroke-width="1.2"/>
+        <text x="360" y="110" text-anchor="middle" font-size="11" fill="#6d7591" font-family="JetBrains Mono">SLOT 1</text>
+        <rect x="300" y="125" width="120" height="50" fill="#f3eee3" stroke="#b88a3c" stroke-width="1.5"/>
+        <text x="360" y="148" text-anchor="middle" font-size="12" fill="#18233a" font-weight="600">Token</text>
+        <text x="360" y="165" text-anchor="middle" font-size="10" fill="#6d7591">"dev-keys"</text>
+
+        <!-- Slot 2 (empty) -->
+        <rect x="470" y="90" width="170" height="100" fill="#fdfaf2" stroke="#18233a" stroke-width="1.2" stroke-dasharray="3,3"/>
+        <text x="555" y="110" text-anchor="middle" font-size="11" fill="#6d7591" font-family="JetBrains Mono">SLOT 2</text>
+        <rect x="495" y="125" width="120" height="50" fill="none" stroke="#d6cdb7" stroke-width="1" stroke-dasharray="2,3"/>
+        <text x="555" y="155" text-anchor="middle" font-size="11" fill="#6d7591" font-style="italic">(空き)</text>
+      </svg>
+    </div>
+
+    <div class="cols-2">
+      <div class="card bordered-left">
+        <div class="card-title">Slot（スロット）</div>
+        <p>棚の番号。実機HSMでは「パーティション」と呼ばれることが多い。<strong>物がなくても番号は存在する</strong>。</p>
+        <p style="font-size:0.88rem; color: var(--ink-muted)">関数：<code>C_GetSlotList</code> / <code>C_GetSlotInfo</code></p>
+      </div>
+      <div class="card bordered-left">
+        <div class="card-title">Token（トークン）</div>
+        <p>その棚に置いてある実際の箱。<strong>鍵やデータが入る器</strong>。ラベル名、製造元、対応Mechanism等のメタ情報を持つ。</p>
+        <p style="font-size:0.88rem; color: var(--ink-muted)">関数：<code>C_GetTokenInfo</code></p>
+      </div>
+    </div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-18">[1] PKCS#11 Spec v3.2 §5</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 07: Session ====== -->
+<section class="slide" data-title="Session">
+  <span class="slide-num">07 / 19</span>
+  <div class="slide-inner">
+    <span class="slide-tag">PART II — 5つの基本概念</span>
+    <h2><span class="num">07</span>Session</h2>
+    <p class="lead"><strong>セッション = アプリとTokenの間の論理接続</strong>。電話と同じ感覚で、開いて、用件を済ませて、閉じる。</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 720 200" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+        <!-- Steps -->
+        <g>
+          <rect x="20" y="60" width="120" height="60" fill="#fdfaf2" stroke="#18233a" stroke-width="1.2"/>
+          <text x="80" y="85" text-anchor="middle" font-size="11" fill="#18233a" font-weight="600">受付</text>
+          <text x="80" y="103" text-anchor="middle" font-size="9" fill="#8b6a2a" font-family="JetBrains Mono">C_OpenSession</text>
+        </g>
+        <path d="M 145 90 L 165 90" stroke="#18233a" stroke-width="1.2" marker-end="url(#arr2)"/>
+        <g>
+          <rect x="170" y="60" width="120" height="60" fill="#fdfaf2" stroke="#18233a" stroke-width="1.2"/>
+          <text x="230" y="85" text-anchor="middle" font-size="11" fill="#18233a" font-weight="600">本人確認</text>
+          <text x="230" y="103" text-anchor="middle" font-size="9" fill="#8b6a2a" font-family="JetBrains Mono">C_Login</text>
+        </g>
+        <path d="M 295 90 L 315 90" stroke="#18233a" stroke-width="1.2" marker-end="url(#arr2)"/>
+        <g>
+          <rect x="320" y="60" width="120" height="60" fill="#faf6ec" stroke="#b88a3c" stroke-width="1.5"/>
+          <text x="380" y="80" text-anchor="middle" font-size="11" fill="#18233a" font-weight="600">業務</text>
+          <text x="380" y="95" text-anchor="middle" font-size="9" fill="#8b6a2a" font-family="JetBrains Mono">C_Sign,</text>
+          <text x="380" y="108" text-anchor="middle" font-size="9" fill="#8b6a2a" font-family="JetBrains Mono">C_Encrypt, ...</text>
+        </g>
+        <path d="M 445 90 L 465 90" stroke="#18233a" stroke-width="1.2" marker-end="url(#arr2)"/>
+        <g>
+          <rect x="470" y="60" width="120" height="60" fill="#fdfaf2" stroke="#18233a" stroke-width="1.2"/>
+          <text x="530" y="85" text-anchor="middle" font-size="11" fill="#18233a" font-weight="600">ログアウト</text>
+          <text x="530" y="103" text-anchor="middle" font-size="9" fill="#8b6a2a" font-family="JetBrains Mono">C_Logout</text>
+        </g>
+        <path d="M 595 90 L 615 90" stroke="#18233a" stroke-width="1.2" marker-end="url(#arr2)"/>
+        <g>
+          <rect x="620" y="60" width="90" height="60" fill="#fdfaf2" stroke="#18233a" stroke-width="1.2"/>
+          <text x="665" y="85" text-anchor="middle" font-size="11" fill="#18233a" font-weight="600">切断</text>
+          <text x="665" y="103" text-anchor="middle" font-size="8" fill="#8b6a2a" font-family="JetBrains Mono">C_CloseSession</text>
+        </g>
+
+        <!-- Phone metaphor -->
+        <text x="365" y="150" text-anchor="middle" font-size="11" fill="#6d7591" font-style="italic">電話と同じ — かけて、用件話して、切る</text>
+
+        <defs>
+          <marker id="arr2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <polygon points="0,0 8,3 0,6" fill="#18233a"/>
+          </marker>
+        </defs>
+      </svg>
+    </div>
+
+    <div class="card warn">
+      <div class="card-title"><span class="glyph">⚠</span>マルチスレッドの大原則</div>
+      <p><strong>1セッションを複数スレッドで共有しない</strong>。途中で別スレッドの操作が入ると、セッションの「今、何の操作中か」がぐちゃぐちゃになる。</p>
+      <p style="margin-top:0.6rem"><strong>スレッドごとに別の<code>C_OpenSession</code></strong>を持つのがルール。</p>
+    </div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-18">[1] PKCS#11 Spec v3.2 §5.6 Session</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 08: Object/Handle ====== -->
+<section class="slide" data-title="Object と Handle">
+  <span class="slide-num">08 / 19</span>
+  <div class="slide-inner">
+    <span class="slide-tag">PART II — 5つの基本概念 (★ 最重要)</span>
+    <h2><span class="num">08</span>Object と Handle</h2>
+    <p class="lead">HSMの本質はここ。<strong>鍵そのものはアプリに出てこない</strong>。代わりに<strong>整理番号（Handle）</strong>を受け取って、「47番でお願いします」と頼む。</p>
+
+    <div class="cols-2">
+      <div>
+        <h3><span class="marker">▸</span>普通のソフトウェア暗号</h3>
+        <div class="card warn" style="margin-top:0.5rem">
+          <pre style="font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; line-height: 1.5; color: var(--ink); white-space: pre-wrap;">key = "ABCDEF123456..."
+       ↑ 鍵そのものがメモリに乗る
+sign(key, data)
+       ↑ 流出リスク</pre>
+        </div>
+      </div>
+      <div>
+        <h3><span class="marker">▸</span>HSM経由</h3>
+        <div class="card bordered-left" style="margin-top:0.5rem">
+          <pre style="font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; line-height: 1.5; color: var(--ink); white-space: pre-wrap;">key_handle = 47
+       ↑ ただの整数（預かり証）
+sign(key_handle, data)
+       ↑ 鍵はHSM内で完結</pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="diagram">
+      <svg viewBox="0 0 720 240" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+        <!-- App -->
+        <rect x="40" y="80" width="160" height="80" fill="#fdfaf2" stroke="#18233a" stroke-width="1.5"/>
+        <text x="120" y="105" text-anchor="middle" font-size="12" fill="#18233a" font-weight="700">アプリ</text>
+        <text x="120" y="128" text-anchor="middle" font-size="10" fill="#6d7591">手元にある情報：</text>
+        <text x="120" y="148" text-anchor="middle" font-size="14" fill="#b88a3c" font-weight="700" font-family="JetBrains Mono">handle = 47</text>
+
+        <!-- Arrow with msg -->
+        <path d="M 200 120 L 480 120" stroke="#18233a" stroke-width="1.5" marker-end="url(#arr3)"/>
+        <rect x="240" y="100" width="200" height="40" fill="#faf6ec" stroke="#b88a3c" stroke-width="1"/>
+        <text x="340" y="118" text-anchor="middle" font-size="10" fill="#18233a" font-weight="600">「47番で署名して」</text>
+        <text x="340" y="132" text-anchor="middle" font-size="9" fill="#6d7591">(鍵そのものは渡さない)</text>
+
+        <!-- HSM -->
+        <rect x="500" y="40" width="180" height="160" fill="#faf6ec" stroke="#8b6a2a" stroke-width="2"/>
+        <text x="590" y="65" text-anchor="middle" font-size="12" fill="#8b6a2a" font-weight="700">HSM</text>
+        <text x="590" y="90" text-anchor="middle" font-size="10" fill="#6d7591">内部の対応表：</text>
+        <line x1="520" y1="100" x2="660" y2="100" stroke="#d6cdb7"/>
+        <text x="530" y="118" font-size="10" fill="#18233a" font-family="JetBrains Mono">handle 47 →</text>
+        <text x="540" y="135" font-size="11" fill="#a83a2b">🔑 (実際の鍵)</text>
+        <line x1="520" y1="148" x2="660" y2="148" stroke="#d6cdb7"/>
+        <text x="530" y="166" font-size="10" fill="#18233a" font-family="JetBrains Mono">handle 48 →</text>
+        <text x="540" y="183" font-size="11" fill="#a83a2b">🔑 (別の鍵)</text>
+
+        <!-- Return arrow -->
+        <path d="M 480 175 L 200 175" stroke="#18233a" stroke-width="1.5" marker-end="url(#arr3)"/>
+        <text x="340" y="170" text-anchor="middle" font-size="10" fill="#18233a">「署名結果はこれ」</text>
+
+        <defs>
+          <marker id="arr3" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <polygon points="0,0 8,3 0,6" fill="#18233a"/>
+          </marker>
+        </defs>
+      </svg>
+    </div>
+
+    <div class="card bordered-left">
+      <div class="card-title">なぜハンドル方式？</div>
+      <p>PCがマルウェアに感染しても、メモリには整数しかないから<strong>鍵自体は盗まれない</strong>。これがHSMを使う最大の理由。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 09: Attribute ====== -->
+<section class="slide" data-title="Attribute">
+  <span class="slide-num">09 / 19</span>
+  <div class="slide-inner">
+    <span class="slide-tag">PART II — 5つの基本概念</span>
+    <h2><span class="num">09</span>Attribute（属性）</h2>
+    <p class="lead">Object（鍵・証明書・データ）は<strong>すべて属性（タグ）の集合として表現される</strong>。鍵を作るときも検索するときも、属性で指定する。</p>
+
+    <div class="cols-2">
+      <div class="diagram" style="margin:0">
+        <svg viewBox="0 0 320 320" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+          <!-- Key object card -->
+          <rect x="40" y="20" width="240" height="280" fill="#fdfaf2" stroke="#18233a" stroke-width="1.5"/>
+          <rect x="40" y="20" width="240" height="40" fill="#b88a3c"/>
+          <text x="160" y="46" text-anchor="middle" font-size="13" fill="#faf6ec" font-weight="700">Object #47</text>
+
+          <!-- Attributes -->
+          <g font-size="11">
+            <text x="60" y="85" fill="#6d7591" font-family="JetBrains Mono">CKA_CLASS</text>
+            <text x="220" y="85" fill="#18233a" text-anchor="end" font-weight="600">PRIVATE_KEY</text>
+            <line x1="60" y1="93" x2="260" y2="93" stroke="#e6dcc4"/>
+
+            <text x="60" y="110" fill="#6d7591" font-family="JetBrains Mono">CKA_KEY_TYPE</text>
+            <text x="220" y="110" fill="#18233a" text-anchor="end" font-weight="600">RSA</text>
+            <line x1="60" y1="118" x2="260" y2="118" stroke="#e6dcc4"/>
+
+            <text x="60" y="135" fill="#6d7591" font-family="JetBrains Mono">CKA_MODULUS_BITS</text>
+            <text x="220" y="135" fill="#18233a" text-anchor="end" font-weight="600">2048</text>
+            <line x1="60" y1="143" x2="260" y2="143" stroke="#e6dcc4"/>
+
+            <text x="60" y="160" fill="#6d7591" font-family="JetBrains Mono">CKA_LABEL</text>
+            <text x="220" y="160" fill="#18233a" text-anchor="end" font-weight="600">"my-signing-key"</text>
+            <line x1="60" y1="168" x2="260" y2="168" stroke="#e6dcc4"/>
+
+            <text x="60" y="185" fill="#6d7591" font-family="JetBrains Mono">CKA_SIGN</text>
+            <text x="220" y="185" fill="#18233a" text-anchor="end" font-weight="600">true ✓</text>
+            <line x1="60" y1="193" x2="260" y2="193" stroke="#e6dcc4"/>
+
+            <text x="60" y="210" fill="#6d7591" font-family="JetBrains Mono">CKA_DECRYPT</text>
+            <text x="220" y="210" fill="#18233a" text-anchor="end" font-weight="600">false ✗</text>
+            <line x1="60" y1="218" x2="260" y2="218" stroke="#e6dcc4"/>
+
+            <text x="60" y="235" fill="#6d7591" font-family="JetBrains Mono">CKA_SENSITIVE</text>
+            <text x="220" y="235" fill="#18233a" text-anchor="end" font-weight="600">true ✓</text>
+            <line x1="60" y1="243" x2="260" y2="243" stroke="#e6dcc4"/>
+
+            <text x="60" y="260" fill="#6d7591" font-family="JetBrains Mono">CKA_EXTRACTABLE</text>
+            <text x="220" y="260" fill="#a83a2b" text-anchor="end" font-weight="700">false ✗</text>
+            <line x1="60" y1="268" x2="260" y2="268" stroke="#e6dcc4"/>
+
+            <text x="60" y="285" fill="#6d7591" font-family="JetBrains Mono">CKA_TOKEN</text>
+            <text x="220" y="285" fill="#18233a" text-anchor="end" font-weight="600">true ✓</text>
+          </g>
+        </svg>
+      </div>
+      <div>
+        <h3><span class="marker">▸</span>主な属性の意味</h3>
+        <div class="kv">
+          <div class="kv-row"><div class="k">CKA_CLASS</div><div class="v">オブジェクトの種類（秘密鍵・公開鍵・証明書等）</div></div>
+          <div class="kv-row"><div class="k">CKA_KEY_TYPE</div><div class="v">鍵のアルゴリズム（RSA / EC / AES）</div></div>
+          <div class="kv-row"><div class="k">CKA_LABEL</div><div class="v">ユーザー定義の名前。検索に使う</div></div>
+          <div class="kv-row"><div class="k">CKA_SIGN / CKA_VERIFY</div><div class="v">用途フラグ（署名OK・検証OK等）</div></div>
+          <div class="kv-row"><div class="k">CKA_SENSITIVE</div><div class="v">秘密値の保護フラグ</div></div>
+          <div class="kv-row"><div class="k">CKA_EXTRACTABLE</div><div class="v"><em>外部に持ち出し可能か（要注意）</em></div></div>
+          <div class="kv-row"><div class="k">CKA_TOKEN</div><div class="v">永続オブジェクト（true）／揮発（false）</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card warn">
+      <div class="card-title">設計上のキーポイント</div>
+      <p><code>CKA_EXTRACTABLE</code> を <code>true</code> にすると、鍵を暗号化して外に出せる。<strong>用途次第やけど、本番運用では基本 <code>false</code></strong>。一度<code>false</code>にしたら原則戻せない（ベンダー差あり）。</p>
+    </div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-18">[1] PKCS#11 Spec v3.2 §10 Object types</a><a href="#slide-18">[8] AWS CloudHSM Key attributes</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 10: Mechanism ====== -->
+<section class="slide" data-title="Mechanism">
+  <span class="slide-num">10 / 19</span>
+  <div class="slide-inner">
+    <span class="slide-tag">PART II — 5つの基本概念</span>
+    <h2><span class="num">10</span>Mechanism（メカニズム）</h2>
+    <p class="lead"><strong>暗号操作の「種類」「方式」を指定する仕様</strong>。鍵とメカニズムは別物。料理でいうと「材料」と「レシピ」の関係。</p>
+
+    <div class="cols-2">
+      <div>
+        <h3><span class="marker">▸</span>同じRSA鍵でも色んな使い方</h3>
+        <div class="kv">
+          <div class="kv-row"><div class="k"><code>CKM_RSA_PKCS</code></div><div class="v">古いパディング方式（PKCS#1 v1.5）</div></div>
+          <div class="kv-row"><div class="k"><code>CKM_RSA_PKCS_PSS</code></div><div class="v">PSSパディング（現代の推奨）</div></div>
+          <div class="kv-row"><div class="k"><code>CKM_RSA_PKCS_OAEP</code></div><div class="v">暗号化用パディング</div></div>
+          <div class="kv-row"><div class="k"><code>CKM_SHA256_RSA_PKCS</code></div><div class="v">ハッシュ込みのコンビ品</div></div>
+        </div>
+      </div>
+      <div>
+        <h3><span class="marker">▸</span>カテゴリ別の代表</h3>
+        <div class="kv">
+          <div class="kv-row"><div class="k">RSA系</div><div class="v">CKM_RSA_PKCS_PSS, CKM_RSA_PKCS_OAEP</div></div>
+          <div class="kv-row"><div class="k">EC系</div><div class="v">CKM_ECDSA_SHA256, CKM_ECDH1_DERIVE</div></div>
+          <div class="kv-row"><div class="k">AES系</div><div class="v">CKM_AES_CBC_PAD, CKM_AES_GCM</div></div>
+          <div class="kv-row"><div class="k">ハッシュ</div><div class="v">CKM_SHA256, CKM_SHA512</div></div>
+          <div class="kv-row"><div class="k">鍵生成</div><div class="v">CKM_RSA_PKCS_KEY_PAIR_GEN</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card bordered-left">
+      <div class="card-title">注文書のイメージ</div>
+      <p>「鍵 = #47」「メカニズム = RSA-PSS」「データ = ファイルの中身」<br>この3点セットを毎回 <code>C_SignInit</code> + <code>C_Sign</code> で渡す。</p>
+    </div>
+
+    <div class="card warn">
+      <div class="card-title"><span class="glyph">⚠</span>ベンダー差の罠</div>
+      <p>仕様書に載ってるMechanismでも、<strong>HSMが対応してない場合がある</strong>。最新のEdDSAとか、PSSの細かいパラメータとか。事前に <code>C_GetMechanismList</code> で対応一覧を取って確認する。</p>
+    </div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-18">[1] PKCS#11 Spec v3.2 §6 Mechanisms</a><a href="#slide-18">[7] CloudHSM Mechanisms</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 11: Library Internals ====== -->
+<section class="slide" data-title="ライブラリ内部">
+  <span class="slide-num">11 / 19</span>
+  <div class="slide-inner">
+    <span class="slide-tag">PART III — ライブラリの内側</span>
+    <h2><span class="num">11</span>ライブラリ内部の4つの役割</h2>
+    <p class="lead">「窓口係」と一言で呼んできたけど、実際は<strong>4つの仕事を兼ねてる</strong>。性能を理解するにはこの分担を意識する。</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 720 360" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+        <!-- App input -->
+        <text x="50" y="180" font-size="11" fill="#6d7591">アプリ呼び出し</text>
+        <text x="50" y="195" font-size="14" fill="#18233a" font-weight="600" font-family="JetBrains Mono">C_Sign()</text>
+        <path d="M 130 180 L 175 180" stroke="#18233a" stroke-width="1.5" marker-end="url(#arr4)"/>
+
+        <!-- Library box -->
+        <rect x="180" y="40" width="380" height="280" fill="#faf6ec" stroke="#b88a3c" stroke-width="2"/>
+        <text x="195" y="65" font-size="12" fill="#8b6a2a" font-weight="700">PKCS#11 LIBRARY ( .so )</text>
+
+        <!-- Role 1: receptionist -->
+        <rect x="200" y="80" width="160" height="50" fill="#fdfaf2" stroke="#18233a" stroke-width="1"/>
+        <text x="210" y="100" font-size="11" fill="#b88a3c" font-weight="700">① 受付係</text>
+        <text x="210" y="118" font-size="9" fill="#3c4865">標準関数の受け口</text>
+
+        <!-- Role 2: ledger -->
+        <rect x="380" y="80" width="160" height="50" fill="#fdfaf2" stroke="#18233a" stroke-width="1"/>
+        <text x="390" y="100" font-size="11" fill="#b88a3c" font-weight="700">② 帳簿係</text>
+        <text x="390" y="118" font-size="9" fill="#3c4865">セッション/ハンドル管理</text>
+
+        <!-- Role 3: translator -->
+        <rect x="200" y="160" width="160" height="50" fill="#fdfaf2" stroke="#18233a" stroke-width="1"/>
+        <text x="210" y="180" font-size="11" fill="#b88a3c" font-weight="700">③ 翻訳・梱包係</text>
+        <text x="210" y="198" font-size="9" fill="#3c4865">標準形式 → HSM独自形式</text>
+
+        <!-- Role 4: courier -->
+        <rect x="380" y="160" width="160" height="50" fill="#fdfaf2" stroke="#18233a" stroke-width="1"/>
+        <text x="390" y="180" font-size="11" fill="#b88a3c" font-weight="700">④ 配達係</text>
+        <text x="390" y="198" font-size="9" fill="#3c4865">TLS / USB / PCIe</text>
+
+        <!-- internal arrows -->
+        <path d="M 280 130 L 280 155" stroke="#6d7591" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#arr4s)"/>
+        <path d="M 460 130 L 460 155" stroke="#6d7591" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#arr4s)"/>
+        <path d="M 365 105 L 375 105" stroke="#6d7591" stroke-width="1" stroke-dasharray="3,2"/>
+        <path d="M 365 185 L 375 185" stroke="#6d7591" stroke-width="1" stroke-dasharray="3,2"/>
+
+        <!-- notes -->
+        <text x="200" y="260" font-size="10" fill="#6d7591" font-style="italic">①: 互換性を担保</text>
+        <text x="200" y="278" font-size="10" fill="#6d7591" font-style="italic">②: マルチスレッド時にロック</text>
+        <text x="200" y="296" font-size="10" fill="#6d7591" font-style="italic">③: シリアライズ処理</text>
+        <text x="200" y="314" font-size="10" fill="#6d7591" font-style="italic">④: 性能のボトルネックになりがち</text>
+
+        <!-- Output -->
+        <path d="M 565 180 L 605 180" stroke="#18233a" stroke-width="1.5" marker-end="url(#arr4)"/>
+        <text x="615" y="170" font-size="11" fill="#6d7591">HSMへ</text>
+        <text x="615" y="185" font-size="11" fill="#6d7591">送信</text>
+        <text x="615" y="200" font-size="9" fill="#a83a2b">(TLS)</text>
+
+        <defs>
+          <marker id="arr4" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <polygon points="0,0 8,3 0,6" fill="#18233a"/>
+          </marker>
+          <marker id="arr4s" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+            <polygon points="0,0 6,3 0,6" fill="#6d7591"/>
+          </marker>
+        </defs>
+      </svg>
+    </div>
+
+    <div class="cols-2">
+      <div class="card bordered-left">
+        <div class="card-title">① 受付係 / ② 帳簿係</div>
+        <p>標準APIの窓口と内部状態の管理。<strong>マルチスレッド性能はここの設計次第</strong>でスケールが決まる。</p>
+      </div>
+      <div class="card bordered-left">
+        <div class="card-title">③ 翻訳係 / ④ 配達係</div>
+        <p>ネットワーク型HSMでは<strong>④の通信レイテンシが性能の大部分</strong>を占めることが多い。TLS接続は使い回しが必須。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 12: Implementation patterns ====== -->
+<section class="slide" data-title="実装パターン">
+  <span class="slide-num">12 / 19</span>
+  <div class="slide-inner">
+    <span class="slide-tag">PART III — ライブラリの内側</span>
+    <h2><span class="num">12</span>実装パターン4種</h2>
+    <p class="lead">同じPKCS#11ライブラリでも、<strong>HSMとの通信手段によって性能特性がガラッと変わる</strong>。</p>
+
+    <div class="cols-2">
+      <div class="card">
+        <div class="card-title">A — ソフトウェアHSM</div>
+        <p style="font-size:0.9rem">例：<code>SoftHSM2</code>、<code>OpenSC</code></p>
+        <p style="font-size:0.9rem">アプリ → <code>.so</code> → ローカルファイル</p>
+        <p style="color:var(--vault); font-size:0.88rem; margin-top:0.6rem"><strong>用途</strong>: 開発・学習・API動作確認</p>
+        <p style="color:var(--red); font-size:0.85rem">性能評価には使えない（CPUだけ測る形になる）</p>
+      </div>
+      <div class="card">
+        <div class="card-title">B — ネットワーク型HSM <span style="color:var(--vault);font-size:0.85em">(★今回の対象)</span></div>
+        <p style="font-size:0.9rem">例：<code>AWS CloudHSM</code>、<code>Thales Luna</code></p>
+        <p style="font-size:0.9rem">アプリ → <code>.so</code> → TLS → アプライアンス</p>
+        <p style="color:var(--vault); font-size:0.88rem; margin-top:0.6rem"><strong>特徴</strong>: 1リクエストごとにネットワーク往復</p>
+        <p style="color:var(--red); font-size:0.85rem">レイテンシの大半がネットワーク。コネクション使い回し必須。</p>
+      </div>
+      <div class="card">
+        <div class="card-title">C — PCIeカード型</div>
+        <p style="font-size:0.9rem">例：<code>Thales ProtectServer</code>、<code>Marvell LiquidSecurity</code></p>
+        <p style="font-size:0.9rem">アプリ → <code>.so</code> → ドライバ → PCIeバス</p>
+        <p style="color:var(--vault); font-size:0.88rem; margin-top:0.6rem"><strong>特徴</strong>: 超低レイテンシ</p>
+        <p style="font-size:0.85rem">1台のサーバに数枚しか挿せない</p>
+      </div>
+      <div class="card">
+        <div class="card-title">D — USBトークン型</div>
+        <p style="font-size:0.9rem">例：<code>YubiHSM</code>、スマートカード</p>
+        <p style="font-size:0.9rem">アプリ → <code>.so</code> → libusb / PC/SC</p>
+        <p style="color:var(--vault); font-size:0.88rem; margin-top:0.6rem"><strong>特徴</strong>: 個人/小規模向け、低コスト</p>
+        <p style="font-size:0.85rem">USBプロトコルのレイテンシが乗る</p>
+      </div>
+    </div>
+
+    <div class="card bordered-left">
+      <div class="card-title">性能ボトルネックの分布</div>
+      <table class="tbl">
+        <tr><th>パターン</th><th>ボトルネック</th><th>備考</th></tr>
+        <tr><td>A (ソフト)</td><td>CPU・暗号演算</td><td>ライブラリ自体のオーバーヘッド測定に有用</td></tr>
+        <tr><td>B (ネット)</td><td>ネットワーク往復</td><td>RTTが支配的、並列化で稼ぐ</td></tr>
+        <tr><td>C (PCIe)</td><td>HSM内部演算</td><td>ほぼピュアな暗号演算性能が出る</td></tr>
+        <tr><td>D (USB)</td><td>USBプロトコル</td><td>シリアル通信に近い特性</td></tr>
+      </table>
+    </div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-18">[6] SoftHSM2</a><a href="#slide-18">[7] AWS CloudHSM</a><a href="#slide-18">[10] Thales Luna</a><a href="#slide-18">[11] NIST CMVP</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 13: Function naming ====== -->
+<section class="slide" data-title="関数の命名規則">
+  <span class="slide-num">13 / 19</span>
+  <div class="slide-inner">
+    <span class="slide-tag">PART IV — 関数と処理フロー</span>
+    <h2><span class="num">13</span>関数の命名規則</h2>
+    <p class="lead">PKCS#11の関数は <strong>すべて <code>C_</code> で始まる</strong>。名前自体が役割を語るように設計されてる。</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 720 200" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+        <!-- Pattern -->
+        <text x="360" y="50" text-anchor="middle" font-size="36" fill="#18233a" font-weight="700">
+          <tspan fill="#b88a3c">C_</tspan><tspan fill="#3c4865">Open</tspan><tspan fill="#a83a2b">Session</tspan>
+        </text>
+
+        <!-- annotations -->
+        <line x1="290" y1="60" x2="290" y2="100" stroke="#6d7591" stroke-width="0.8"/>
+        <line x1="290" y1="100" x2="280" y2="115" stroke="#6d7591" stroke-width="0.8"/>
+        <text x="270" y="135" text-anchor="end" font-size="11" fill="#b88a3c" font-weight="700" font-family="Zen Kaku Gothic New">プレフィックス</text>
+        <text x="270" y="153" text-anchor="end" font-size="10" fill="#6d7591" font-family="Zen Kaku Gothic New">全関数共通</text>
+
+        <line x1="360" y1="60" x2="360" y2="100" stroke="#6d7591" stroke-width="0.8"/>
+        <line x1="360" y1="100" x2="360" y2="115" stroke="#6d7591" stroke-width="0.8"/>
+        <text x="360" y="135" text-anchor="middle" font-size="11" fill="#3c4865" font-weight="700" font-family="Zen Kaku Gothic New">動作</text>
+        <text x="360" y="153" text-anchor="middle" font-size="10" fill="#6d7591" font-family="Zen Kaku Gothic New">Open / Close / Sign / Find...</text>
+
+        <line x1="440" y1="60" x2="440" y2="100" stroke="#6d7591" stroke-width="0.8"/>
+        <line x1="440" y1="100" x2="450" y2="115" stroke="#6d7591" stroke-width="0.8"/>
+        <text x="460" y="135" font-size="11" fill="#a83a2b" font-weight="700" font-family="Zen Kaku Gothic New">対象</text>
+        <text x="460" y="153" font-size="10" fill="#6d7591" font-family="Zen Kaku Gothic New">Session / Object / Key...</text>
+      </svg>
+    </div>
+
+    <div class="cols-2">
+      <div>
+        <h3><span class="marker">▸</span>動作の例</h3>
+        <ul>
+          <li><code>Open</code> / <code>Close</code> — 開く / 閉じる</li>
+          <li><code>Get</code> / <code>Set</code> — 取得 / 設定</li>
+          <li><code>Find</code> — 検索</li>
+          <li><code>Generate</code> — 生成</li>
+          <li><code>Sign</code> / <code>Verify</code> — 署名 / 検証</li>
+          <li><code>Encrypt</code> / <code>Decrypt</code> — 暗号化 / 復号</li>
+          <li><code>Wrap</code> / <code>Unwrap</code> — 鍵のラップ</li>
+        </ul>
+      </div>
+      <div>
+        <h3><span class="marker">▸</span>対象の例</h3>
+        <ul>
+          <li><code>Session</code> — セッション</li>
+          <li><code>SlotList</code> / <code>SlotInfo</code> — スロット</li>
+          <li><code>TokenInfo</code> — トークン情報</li>
+          <li><code>Object</code> / <code>Objects</code> — オブジェクト</li>
+          <li><code>Key</code> / <code>KeyPair</code> — 鍵</li>
+          <li><code>AttributeValue</code> — 属性値</li>
+          <li><code>Random</code> — 乱数</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card bordered-left">
+      <p>英語が読めれば関数名から動作を推測できる。<strong>これがPKCS#11の親切なところ</strong>。一度パターンを覚えたら、ベンダーが変わっても同じ関数名で書ける。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 14: Categories ====== -->
+<section class="slide" data-title="機能カテゴリマップ">
+  <span class="slide-num">14 / 19</span>
+  <div class="slide-inner">
+    <span class="slide-tag">PART IV — 関数と処理フロー</span>
+    <h2><span class="num">14</span>機能カテゴリマップ</h2>
+    <p class="lead">PKCS#11の全関数は<strong>大きく7グループ</strong>に分類できる。性能評価で叩くのは主に⑥。</p>
+
+    <table class="tbl">
+      <tr><th style="width:120px">カテゴリ</th><th style="width:280px">代表的な関数</th><th>役割</th></tr>
+      <tr>
+        <td>① 全体管理</td>
+        <td><code>C_Initialize</code> / <code>C_Finalize</code> / <code>C_GetFunctionList</code></td>
+        <td>ライブラリの起動と終了</td>
+      </tr>
+      <tr>
+        <td>② Slot/Token情報</td>
+        <td><code>C_GetSlotList</code> / <code>C_GetTokenInfo</code> / <code>C_GetMechanismList</code></td>
+        <td>環境情報の取得</td>
+      </tr>
+      <tr>
+        <td>③ セッション</td>
+        <td><code>C_OpenSession</code> / <code>C_CloseSession</code> / <code>C_Login</code> / <code>C_Logout</code></td>
+        <td>接続と認証</td>
+      </tr>
+      <tr>
+        <td>④ オブジェクト</td>
+        <td><code>C_FindObjects...</code> / <code>C_GetAttributeValue</code> / <code>C_CreateObject</code></td>
+        <td>鍵や証明書の検索・属性操作</td>
+      </tr>
+      <tr>
+        <td>⑤ 鍵管理</td>
+        <td><code>C_GenerateKey</code> / <code>C_GenerateKeyPair</code> / <code>C_WrapKey</code> / <code>C_UnwrapKey</code></td>
+        <td>鍵の生成・ラップ</td>
+      </tr>
+      <tr style="background: rgba(184, 138, 60, 0.06);">
+        <td><strong style="color:var(--vault)">⑥ 暗号操作</strong></td>
+        <td><code>C_Sign...</code> / <code>C_Verify...</code> / <code>C_Encrypt...</code> / <code>C_Decrypt...</code> / <code>C_Digest...</code> / <code>C_GenerateRandom</code></td>
+        <td><strong style="color:var(--vault)">★ 性能評価のメイン対象</strong></td>
+      </tr>
+      <tr>
+        <td>⑦ その他</td>
+        <td><code>C_SeedRandom</code> / <code>C_WaitForSlotEvent</code></td>
+        <td>付加機能</td>
+      </tr>
+    </table>
+
+    <div class="card bordered-left">
+      <div class="card-title">性能評価の設計指針</div>
+      <p>①〜⑤は<strong>準備フェーズ</strong>。⑥を繰り返し叩く部分が<strong>計測フェーズ</strong>。これをはっきり分けておくと、ベンチマーク結果の解釈が楽になる。</p>
+    </div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-18">[1] PKCS#11 Spec v3.2 §5 Function categories</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 15: 3-phase rocket ====== -->
+<section class="slide" data-title="3段ロケット構造">
+  <span class="slide-num">15 / 19</span>
+  <div class="slide-inner">
+    <span class="slide-tag">PART IV — 関数と処理フロー</span>
+    <h2><span class="num">15</span>3段ロケット構造</h2>
+    <p class="lead">PKCS#11の最大のクセ。<strong>データを処理する操作はだいたい3段階に分かれる</strong>。</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+        <!-- Phase 1: Init -->
+        <rect x="40" y="60" width="180" height="100" fill="#fdfaf2" stroke="#b88a3c" stroke-width="1.5"/>
+        <text x="130" y="85" text-anchor="middle" font-size="11" fill="#b88a3c" font-weight="700" font-family="JetBrains Mono">PHASE 1</text>
+        <text x="130" y="108" text-anchor="middle" font-size="14" fill="#18233a" font-weight="700" font-family="JetBrains Mono">C_xxxInit</text>
+        <text x="130" y="130" text-anchor="middle" font-size="10" fill="#6d7591">準備宣言</text>
+        <text x="130" y="146" text-anchor="middle" font-size="9" fill="#6d7591">鍵とMechanismを指定</text>
+
+        <path d="M 225 110 L 265 110" stroke="#18233a" stroke-width="1.5" marker-end="url(#arr5)"/>
+
+        <!-- Phase 2: Op -->
+        <rect x="270" y="60" width="180" height="100" fill="#faf6ec" stroke="#8b6a2a" stroke-width="2"/>
+        <text x="360" y="85" text-anchor="middle" font-size="11" fill="#b88a3c" font-weight="700" font-family="JetBrains Mono">PHASE 2 ★</text>
+        <text x="360" y="108" text-anchor="middle" font-size="14" fill="#18233a" font-weight="700" font-family="JetBrains Mono">C_xxx</text>
+        <text x="360" y="130" text-anchor="middle" font-size="10" fill="#6d7591">本処理</text>
+        <text x="360" y="146" text-anchor="middle" font-size="9" fill="#6d7591">データを渡して結果取得</text>
+
+        <path d="M 455 110 L 495 110" stroke="#18233a" stroke-width="1.5" stroke-dasharray="3,3"/>
+
+        <!-- Phase 3: Final -->
+        <rect x="500" y="60" width="180" height="100" fill="#fdfaf2" stroke="#b88a3c" stroke-width="1.5" stroke-dasharray="4,3"/>
+        <text x="590" y="85" text-anchor="middle" font-size="11" fill="#b88a3c" font-weight="700" font-family="JetBrains Mono">PHASE 3</text>
+        <text x="590" y="108" text-anchor="middle" font-size="14" fill="#18233a" font-weight="700" font-family="JetBrains Mono">C_xxxFinal</text>
+        <text x="590" y="130" text-anchor="middle" font-size="10" fill="#6d7591">分割処理時のみ</text>
+        <text x="590" y="146" text-anchor="middle" font-size="9" fill="#6d7591">大きいデータをストリーミング</text>
+
+        <!-- caption -->
+        <text x="360" y="195" text-anchor="middle" font-size="10" fill="#6d7591" font-style="italic">「下準備 → 本番 → 締め」のリズム</text>
+
+        <defs>
+          <marker id="arr5" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <polygon points="0,0 8,3 0,6" fill="#18233a"/>
+          </marker>
+        </defs>
+      </svg>
+    </div>
+
+    <h3><span class="marker">▸</span>操作別のセット</h3>
+    <table class="tbl">
+      <tr><th>操作</th><th>Init（準備）</th><th>本処理</th><th>Final（分割時）</th></tr>
+      <tr><td>署名</td><td><code>C_SignInit</code></td><td><code>C_Sign</code></td><td><code>C_SignFinal</code></td></tr>
+      <tr><td>検証</td><td><code>C_VerifyInit</code></td><td><code>C_Verify</code></td><td><code>C_VerifyFinal</code></td></tr>
+      <tr><td>暗号化</td><td><code>C_EncryptInit</code></td><td><code>C_Encrypt</code></td><td><code>C_EncryptFinal</code></td></tr>
+      <tr><td>復号</td><td><code>C_DecryptInit</code></td><td><code>C_Decrypt</code></td><td><code>C_DecryptFinal</code></td></tr>
+      <tr><td>ハッシュ</td><td><code>C_DigestInit</code></td><td><code>C_Digest</code></td><td><code>C_DigestFinal</code></td></tr>
+      <tr><td>検索</td><td><code>C_FindObjectsInit</code></td><td><code>C_FindObjects</code></td><td><code>C_FindObjectsFinal</code></td></tr>
+    </table>
+
+    <div class="cols-2">
+      <div class="card bordered-left">
+        <div class="card-title">なぜ3段？</div>
+        <p style="font-size:0.92rem"><strong>セッションが「今、何の操作中か」を覚えてる必要があるから</strong>。<code>C_Sign</code>単独では呼べない。先に<code>C_SignInit</code>で「これからどの鍵で、どのMechanismで」を宣言しておく。</p>
+      </div>
+      <div class="card bordered-left">
+        <div class="card-title">単発で完結する操作</div>
+        <p style="font-size:0.92rem"><code>C_GenerateKey</code>、<code>C_GenerateRandom</code>、<code>C_GetAttributeValue</code>、<code>C_WrapKey</code> などは単発。<strong>「データを処理する系」だけ3段</strong>と覚える。</p>
+      </div>
+    </div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-18">[1] PKCS#11 Spec v3.2 §5.13-5.18</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 16: Full lifecycle ====== -->
+<section class="slide" data-title="完全ライフサイクル">
+  <span class="slide-num">16 / 19</span>
+  <div class="slide-inner">
+    <span class="slide-tag">PART IV — 関数と処理フロー</span>
+    <h2><span class="num">16</span>完全ライフサイクル</h2>
+    <p class="lead">起動から1回署名して終わるまでの<strong>全14ステップ</strong>。銀行のたとえも併記。</p>
+
+    <div style="margin-top: 1rem;">
+      <div class="flow-step">
+        <div class="num">00</div>
+        <div>
+          <div><strong>.so ファイルをロード</strong></div>
+          <div class="desc">動的ロード機能で <code>libcloudhsm.so</code> 等を読み込む</div>
+        </div>
+      </div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">
+        <div class="num">01</div>
+        <div>
+          <div class="fn">C_GetFunctionList</div>
+          <div class="desc">関数メニュー表を取得。以降の呼び出しはこのメニュー経由</div>
+          <span class="bank">🏦 「使えるサービス一覧ください」</span>
+        </div>
+      </div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">
+        <div class="num">02</div>
+        <div>
+          <div class="fn">C_Initialize</div>
+          <div class="desc">ライブラリ起動。<code>CKF_OS_LOCKING_OK</code>でマルチスレッド有効化</div>
+          <span class="bank">🏦 「営業開始です」</span>
+        </div>
+      </div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">
+        <div class="num">03</div>
+        <div>
+          <div class="fn">C_GetSlotList</div>
+          <div class="desc">利用可能なスロット番号の配列を取得</div>
+          <span class="bank">🏦 「使える棚どれ？」</span>
+        </div>
+      </div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">
+        <div class="num">04</div>
+        <div>
+          <div class="fn">C_OpenSession</div>
+          <div class="desc">セッションハンドルを取得（マルチスレッド時はスレッドごと）</div>
+          <span class="bank">🏦 「整理券ください」</span>
+        </div>
+      </div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">
+        <div class="num">05</div>
+        <div>
+          <div class="fn">C_Login</div>
+          <div class="desc">User PIN認証。これ以降Private属性に触れる</div>
+          <span class="bank">🏦 「暗証番号は1234です」</span>
+        </div>
+      </div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">
+        <div class="num">06-08</div>
+        <div>
+          <div class="fn">C_FindObjectsInit → C_FindObjects → C_FindObjectsFinal</div>
+          <div class="desc">属性テンプレートで鍵を検索。鍵ハンドルが返ってくる</div>
+          <span class="bank">🏦 「『印鑑』ってラベルのやつ探して」</span>
+        </div>
+      </div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">
+        <div class="num">09</div>
+        <div>
+          <div class="fn">C_SignInit</div>
+          <div class="desc">「鍵#47でRSA-PSS署名」と宣言。セッションが署名待ち状態に</div>
+          <span class="bank">🏦 「47番の印鑑で判子押す準備して」</span>
+        </div>
+      </div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step" style="border-left-color: var(--red); background: rgba(168, 58, 43, 0.04);">
+        <div class="num" style="color: var(--red);">★10</div>
+        <div>
+          <div class="fn">C_Sign</div>
+          <div class="desc">データを渡して署名取得。<strong style="color:var(--red)">性能評価のメイン計測点</strong></div>
+          <span class="bank">🏦 「この書類に押してください」</span>
+        </div>
+      </div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">
+        <div class="num">11-12</div>
+        <div>
+          <div class="fn">C_Logout → C_CloseSession</div>
+          <div class="desc">ログアウトとセッション終了</div>
+          <span class="bank">🏦 「整理券返します」</span>
+        </div>
+      </div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">
+        <div class="num">13</div>
+        <div>
+          <div class="fn">C_Finalize</div>
+          <div class="desc">ライブラリ終了</div>
+          <span class="bank">🏦 「営業終了」</span>
+        </div>
+      </div>
+    </div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-18">[1] PKCS#11 Spec v3.2 §5</a><a href="#slide-18">[9] CloudHSM PKCS#11 Examples</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 17: Perf evaluation ====== -->
+<section class="slide" data-title="性能評価パターン">
+  <span class="slide-num">17 / 19</span>
+  <div class="slide-inner">
+    <span class="slide-tag">PART V — 性能評価</span>
+    <h2><span class="num">17</span>性能評価の構造</h2>
+    <p class="lead">毎回フル14ステップやってたら準備時間ばかり測ることに。<strong>準備と片付けは1回、本処理だけループ</strong>が原則。</p>
+
+    <div class="phase">
+      <div class="phase-label">準備</div>
+      <div class="phase-body">
+        <div style="color: var(--ink); font-weight: 600; margin-bottom: 0.3rem;">測定対象外</div>
+        <code>.soロード → C_GetFunctionList → C_Initialize → C_GetSlotList → C_OpenSession → C_Login → C_FindObjects...</code>
+      </div>
+    </div>
+    <div class="flow-arrow">↓</div>
+    <div class="phase">
+      <div class="phase-label">ウォーム<br>アップ</div>
+      <div class="phase-body">
+        <div style="color: var(--ink); font-weight: 600; margin-bottom: 0.3rem;">測定対象外（初回キャッシュミス対策）</div>
+        <code>for i in 1..100: C_SignInit + C_Sign（空打ち）</code>
+      </div>
+    </div>
+    <div class="flow-arrow">↓</div>
+    <div class="phase" style="border-color: var(--red); background: rgba(168, 58, 43, 0.03);">
+      <div class="phase-label" style="color: var(--red);">★計測</div>
+      <div class="phase-body">
+        <div style="color: var(--red); font-weight: 600; margin-bottom: 0.3rem;">この区間だけ測る</div>
+        <code>for i in 1..N: t0 = now()  →  C_SignInit + C_Sign  →  t1 = now()  →  latency[i] = t1 - t0</code>
+      </div>
+    </div>
+    <div class="flow-arrow">↓</div>
+    <div class="phase">
+      <div class="phase-label">集計</div>
+      <div class="phase-body">
+        <div style="color: var(--ink); font-weight: 600; margin-bottom: 0.3rem;">統計量を計算</div>
+        <code>平均、p50、p95、p99、max、min、スループット（ops/sec）</code>
+      </div>
+    </div>
+    <div class="flow-arrow">↓</div>
+    <div class="phase">
+      <div class="phase-label">片付け</div>
+      <div class="phase-body">
+        <code>C_Logout → C_CloseSession → C_Finalize</code>
+      </div>
+    </div>
+
+    <div class="cols-2" style="margin-top: 1.5rem">
+      <div class="card warn">
+        <div class="card-title">よくある測定の歪み</div>
+        <ul style="font-size:0.9rem">
+          <li>ウォームアップ忘れで初回TLS確立が混入</li>
+          <li>戻り値チェック忘れでエラー結果も計測</li>
+          <li><code>C_Sign</code>を呼ぶ前に<code>C_SignInit</code>を忘れる</li>
+          <li>鍵生成と署名を同じ枠で測る（外れ値が出る）</li>
+        </ul>
+      </div>
+      <div class="card bordered-left">
+        <div class="card-title">エラーハンドリング</div>
+        <p style="font-size:0.9rem">すべての関数は<code>CK_RV</code>型を返す。<code>CKR_OK = 0</code> なら成功、それ以外はエラー。</p>
+        <p style="font-size:0.85rem; color: var(--ink-muted)">よく見る：<code>CKR_SESSION_HANDLE_INVALID</code>, <code>CKR_USER_NOT_LOGGED_IN</code>, <code>CKR_MECHANISM_INVALID</code></p>
+      </div>
+    </div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-18">[1] PKCS#11 Spec v3.2 §5.1 Return values</a><a href="#slide-18">[3] PKCS#11 Usage Guide v3.2</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 18: Next steps ====== -->
+<section class="slide" data-title="まとめと次のステップ">
+  <span class="slide-num">18 / 19</span>
+  <div class="slide-inner">
+    <span class="slide-tag">CLOSING</span>
+    <h2><span class="num">18</span>まとめと次のステップ</h2>
+
+    <h3><span class="marker">▸</span>ここまでで得たもの</h3>
+    <div class="cols-2">
+      <div>
+        <ul>
+          <li>HSMの本質 = 鍵を出さず、処理だけ請け負う</li>
+          <li>PKCS#11 = ベンダー非依存の標準API</li>
+          <li>5つの基本概念（Slot/Token/Session/Object/Mechanism）</li>
+          <li>ハンドル方式の意味</li>
+        </ul>
+      </div>
+      <div>
+        <ul>
+          <li>ライブラリ内部の4つの役割分担</li>
+          <li>関数の命名規則と7カテゴリ</li>
+          <li>3段ロケット構造（Init → 本処理 → Final）</li>
+          <li>性能評価の測定設計</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3 style="margin-top: 2rem"><span class="marker">▸</span>性能評価PoCの推奨ステップ</h3>
+    <div style="margin-top: 1rem;">
+      <div class="flow-step">
+        <div class="num">01</div>
+        <div>
+          <div><strong>SoftHSM2で動作確認</strong></div>
+          <div class="desc">ローカルで完結。API習得とコード骨格を作る</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="num">02</div>
+        <div>
+          <div><strong>計測対象Mechanismを絞る</strong></div>
+          <div class="desc">仕様書v3.2 第10章とベンダーマニュアルを照合し、実運用で使う方式だけ抽出</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="num">03</div>
+        <div>
+          <div><strong>シングルスレッドで基準値を取る</strong></div>
+          <div class="desc">レイテンシのp50/p95/p99分布をMechanism別に把握</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="num">04</div>
+        <div>
+          <div><strong>スレッド数を増やしてスケーラビリティ測定</strong></div>
+          <div class="desc">セッション数・並列度を段階的に増やしてスループットの上限を探る</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="num">05</div>
+        <div>
+          <div><strong>HSM側のリソース上限を観察</strong></div>
+          <div class="desc">同時セッション数、Slot単位の並列度、ベンダー固有の制限を確認</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card bordered-left" style="margin-top: 2rem">
+      <div class="card-title">深堀りの選択肢</div>
+      <ul>
+        <li><strong>A</strong> Mechanismの種類整理（RSA系/EC系/AES系の使い分けと性能特性）</li>
+        <li><strong>B</strong> 属性の世界の深掘り（CKA_*の細部、セキュリティ的意味）</li>
+        <li><strong>C</strong> マルチスレッド設計の細部（セッションプール、HSM上限の見抜き方）</li>
+        <li><strong>D</strong> SoftHSM2のセットアップと実コード</li>
+      </ul>
+    </div>
+
+    <div style="text-align: center; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--line);">
+      <p style="font-family: 'Shippori Mincho', serif; font-size: 1.1rem; color: var(--ink); font-style: italic;">
+        — 概念が整理できたら、あとは仕様書とコードに向かうだけ —
+      </p>
+      <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--ink-muted); letter-spacing: 0.15em; margin-top: 1rem;">
+        CONTINUE TO REFERENCES →
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 19: References ====== -->
+<section class="slide" data-title="一次資料 / References">
+  <span class="slide-num">19 / 19</span>
+  <div class="slide-inner">
+    <span class="slide-tag">PRIMARY SOURCES — 一次資料</span>
+    <h2><span class="num">19</span>References</h2>
+    <p class="lead">本資料の記述が依拠する一次資料・公式ドキュメント。<strong>OASIS PKCS#11 v3.2は2025年11月14日公開の最新版</strong>。</p>
+
+    <div class="ref-section">
+      <div class="ref-section-title">▸ PKCS#11 公式仕様 (OASIS)</div>
+      <ul class="ref-list">
+        <li>
+          <span class="ref-num">[1]</span>
+          <span class="ref-title">PKCS #11 Specification Version 3.2</span>
+          <span class="ref-meta">Edited by Dieter Bong and Greg Scott. OASIS Committee Specification 01. 14 November 2025. — メイン仕様書（データ型・関数・Mechanism全部入り）</span>
+          <a class="ref-url" href="https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.2/pkcs11-spec-v3.2.html" target="_blank" rel="noopener">docs.oasis-open.org/pkcs11/pkcs11-spec/v3.2/pkcs11-spec-v3.2.html</a>
+        </li>
+        <li>
+          <span class="ref-num">[2]</span>
+          <span class="ref-title">PKCS #11 Profiles Version 3.2</span>
+          <span class="ref-meta">Edited by Tim Hudson. — Baseline、Extended、Authentication Token等のプロファイル定義</span>
+          <a class="ref-url" href="https://docs.oasis-open.org/pkcs11/pkcs11-profiles/v3.2/pkcs11-profiles-v3.2.html" target="_blank" rel="noopener">docs.oasis-open.org/pkcs11/pkcs11-profiles/v3.2/pkcs11-profiles-v3.2.html</a>
+        </li>
+        <li>
+          <span class="ref-num">[3]</span>
+          <span class="ref-title">PKCS #11 Usage Guide Version 3.2</span>
+          <span class="ref-meta">Edited by Dieter Bong. — 開発者向け使い方ガイド、フロー例も豊富</span>
+          <a class="ref-url" href="https://docs.oasis-open.org/pkcs11/pkcs11-ug/v3.2/pkcs11-ug-v3.2.html" target="_blank" rel="noopener">docs.oasis-open.org/pkcs11/pkcs11-ug/v3.2/pkcs11-ug-v3.2.html</a>
+        </li>
+        <li>
+          <span class="ref-num">[4]</span>
+          <span class="ref-title">PKCS #11 Specification Version 3.1</span>
+          <span class="ref-meta">OASIS Committee Specification 01. 11 August 2022. — 前バージョン（多くのベンダー実装が3.1ベース）</span>
+          <a class="ref-url" href="https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/pkcs11-spec-v3.1.html" target="_blank" rel="noopener">docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/pkcs11-spec-v3.1.html</a>
+        </li>
+        <li>
+          <span class="ref-num">[5]</span>
+          <span class="ref-title">OASIS PKCS 11 Technical Committee</span>
+          <span class="ref-meta">仕様の策定主体。最新の動向・公開レビュー情報</span>
+          <a class="ref-url" href="https://www.oasis-open.org/committees/pkcs11/" target="_blank" rel="noopener">www.oasis-open.org/committees/pkcs11/</a>
+        </li>
+      </ul>
+    </div>
+
+    <div class="ref-section">
+      <div class="ref-section-title">▸ ソフトウェア実装（学習・PoC用）</div>
+      <ul class="ref-list">
+        <li>
+          <span class="ref-num">[6]</span>
+          <span class="ref-title">SoftHSM2 — OpenDNSSEC Project</span>
+          <span class="ref-meta">PKCS#11互換のソフトウェアHSM。学習・API動作確認に最適。Botan / OpenSSLバックエンド選択可</span>
+          <a class="ref-url" href="https://www.opendnssec.org/softhsm/" target="_blank" rel="noopener">www.opendnssec.org/softhsm/</a><br>
+          <a class="ref-url" href="https://github.com/softhsm/SoftHSMv2" target="_blank" rel="noopener">github.com/softhsm/SoftHSMv2</a>
+        </li>
+      </ul>
+    </div>
+
+    <div class="ref-section">
+      <div class="ref-section-title">▸ ベンダー実装ドキュメント（参考例）</div>
+      <ul class="ref-list">
+        <li>
+          <span class="ref-num">[7]</span>
+          <span class="ref-title">AWS CloudHSM — PKCS #11 library</span>
+          <span class="ref-meta">CloudHSM Client SDK 5の公式リファレンス。対応Mechanism、属性デフォルト値、ベンダー固有拡張</span>
+          <a class="ref-url" href="https://docs.aws.amazon.com/cloudhsm/latest/userguide/pkcs11-library.html" target="_blank" rel="noopener">docs.aws.amazon.com/cloudhsm/latest/userguide/pkcs11-library.html</a>
+        </li>
+        <li>
+          <span class="ref-num">[8]</span>
+          <span class="ref-title">AWS CloudHSM — Key attributes</span>
+          <span class="ref-meta">属性のデフォルト値とベンダー固有の挙動。<code>CKA_EXTRACTABLE</code>等の運用知見</span>
+          <a class="ref-url" href="https://docs.aws.amazon.com/cloudhsm/latest/userguide/pkcs11-attributes.html" target="_blank" rel="noopener">docs.aws.amazon.com/cloudhsm/latest/userguide/pkcs11-attributes.html</a>
+        </li>
+        <li>
+          <span class="ref-num">[9]</span>
+          <span class="ref-title">AWS CloudHSM PKCS#11 サンプルコード集</span>
+          <span class="ref-meta">署名・暗号化・鍵生成・鍵ラップの完全な動作サンプル（C言語）</span>
+          <a class="ref-url" href="https://github.com/aws-samples/aws-cloudhsm-pkcs11-examples" target="_blank" rel="noopener">github.com/aws-samples/aws-cloudhsm-pkcs11-examples</a>
+        </li>
+        <li>
+          <span class="ref-num">[10]</span>
+          <span class="ref-title">Thales Luna HSM — FIPS 140-3</span>
+          <span class="ref-meta">Luna Network / Luna PCIe HSM（FIPS 140-3 Level 3、NIST cert #4684）</span>
+          <a class="ref-url" href="https://cpl.thalesgroup.com/compliance/fips-140-3" target="_blank" rel="noopener">cpl.thalesgroup.com/compliance/fips-140-3</a>
+        </li>
+      </ul>
+    </div>
+
+    <div class="ref-section">
+      <div class="ref-section-title">▸ 認証規格・関連標準 (NIST)</div>
+      <ul class="ref-list">
+        <li>
+          <span class="ref-num">[11]</span>
+          <span class="ref-title">NIST Cryptographic Module Validation Program (CMVP)</span>
+          <span class="ref-meta">FIPS 140-3に基づく暗号モジュール認証プログラム。HSM認証の一次情報源</span>
+          <a class="ref-url" href="https://csrc.nist.gov/projects/cryptographic-module-validation-program" target="_blank" rel="noopener">csrc.nist.gov/projects/cryptographic-module-validation-program</a>
+        </li>
+        <li>
+          <span class="ref-num">[12]</span>
+          <span class="ref-title">FIPS 140-3 Implementation Guidance</span>
+          <span class="ref-meta">FIPS 140-3 / ISO/IEC 19790:2012 の実装ガイダンス（NIST + CCCS）</span>
+          <a class="ref-url" href="https://csrc.nist.gov/projects/cryptographic-module-validation-program/fips-140-3-standards" target="_blank" rel="noopener">csrc.nist.gov/projects/cryptographic-module-validation-program/fips-140-3-standards</a>
+        </li>
+      </ul>
+    </div>
+
+    <div class="ref-section">
+      <div class="ref-section-title">▸ プログラミング言語バインディング</div>
+      <ul class="ref-list">
+        <li>
+          <span class="ref-num">[13]</span>
+          <span class="ref-title">cryptoki — Rust binding for PKCS#11</span>
+          <span class="ref-meta">PKCS#11のRustラッパー。ベンダーの<code>.so</code>をFFI経由で呼ぶ高レベルAPI</span>
+          <a class="ref-url" href="https://crates.io/crates/cryptoki" target="_blank" rel="noopener">crates.io/crates/cryptoki</a><br>
+          <a class="ref-url" href="https://docs.rs/cryptoki/" target="_blank" rel="noopener">docs.rs/cryptoki/</a>
+        </li>
+      </ul>
+    </div>
+
+    <div class="card bordered-left" style="margin-top: 2rem;">
+      <div class="card-title">読み進めるときの推奨順</div>
+      <p style="font-size: 0.92rem;"><strong>[3] Usage Guide</strong> → 全体感をつかむ・流れの理解<br><strong>[1] Specification</strong> → 関数・型・Mechanism の正確な定義の引き当て<br><strong>[7]〜[9] ベンダー資料</strong> → 自分が使うHSMの方言と制約を確認<br><strong>[6] SoftHSM2</strong> → 手を動かして触る</p>
+    </div>
+
+    <div style="text-align: center; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--line);">
+      <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--ink-muted); letter-spacing: 0.15em;">
+        END OF DOCUMENT
+      </p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<nav class="nav-bottom" aria-label="スライドナビゲーション">
+  <button id="prevBtn" type="button" aria-label="前のスライドへ">← PREV</button>
+  <button id="nextBtn" type="button" aria-label="次のスライドへ">NEXT →</button>
+</nav>
+
+<script src="assets/deck.js"></script>
+
+</body>
+</html>

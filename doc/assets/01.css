@@ -1,0 +1,124 @@
+/* =====================================================================
+ * 01.css — 「HSM × PKCS#11 入門」固有スタイル
+ * common.css の後に読み込む。固有部品と微調整のみ。
+ * アクセント色は金（既定の --vault）なので上書きしない。
+ * ===================================================================== */
+
+/* このページだけ card / cols / 表のゆとりがやや広め */
+.card { padding: 1.5rem 1.8rem; margin: 1rem 0; }
+.card-title { font-size: 1.1rem; margin-bottom: 0.6rem; }
+.cols-2 { gap: 1.5rem; margin: 1.5rem 0; }
+.cols-3 { gap: 1.2rem; margin: 1.5rem 0; }
+.tbl td code { font-size: 0.85em; }
+
+/* h1/h2/h3 の微調整（入門ページは少し大きめ） */
+h1.title { font-size: clamp(2.5rem, 6vw, 4.5rem); line-height: 1.15; }
+.subtitle { font-size: clamp(1.1rem, 2.2vw, 1.5rem); margin-bottom: 3rem; }
+h2 { font-size: clamp(1.8rem, 4vw, 2.8rem); }
+h3 { font-size: 1.15rem; }
+p { font-size: 0.98rem; }
+p.lead { font-size: 1.1rem; margin-bottom: 1.8rem; line-height: 1.7; }
+ul li { font-size: 0.98rem; }
+.title-meta { font-size: 0.8rem; }
+
+/* ---- フロー手順 ---------------------------------------------------- */
+.flow-step {
+  background: var(--bg-card);
+  border-left: 3px solid var(--gold);
+  padding: 0.8rem 1.2rem;
+  margin: 0.4rem 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1rem;
+  align-items: center;
+  font-size: 0.93rem;
+}
+.flow-step .num {
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 700;
+  color: var(--vault);
+  font-size: 0.85rem;
+  min-width: 2rem;
+}
+.flow-step .fn {
+  font-family: "JetBrains Mono", monospace;
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+.flow-step .desc {
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+  margin-top: 0.2rem;
+}
+.flow-step .bank {
+  color: var(--vault);
+  font-style: italic;
+  font-family: "Shippori Mincho", serif;
+  font-size: 0.85rem;
+  margin-top: 0.3rem;
+  display: block;
+}
+.flow-arrow {
+  text-align: center;
+  color: var(--line-strong);
+  font-size: 1.2rem;
+  margin: 0.1rem 0;
+}
+
+/* ---- フェーズ ------------------------------------------------------ */
+.phase {
+  border: 1px solid var(--line);
+  padding: 1rem 1.3rem;
+  margin: 0.5rem 0;
+  background: var(--bg-card);
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 1rem;
+  align-items: center;
+}
+.phase-label {
+  font-family: "Shippori Mincho", serif;
+  font-weight: 700;
+  color: var(--gold);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.phase-body code { display: block; margin: 0.2rem 0; font-size: 0.85rem; }
+
+/* ---- 数値強調 ------------------------------------------------------ */
+.bigstat {
+  font-family: "Shippori Mincho", serif;
+  font-size: 3rem;
+  font-weight: 700;
+  color: var(--vault);
+  line-height: 1;
+  margin: 1rem 0;
+}
+.bigstat-label {
+  font-size: 0.85rem;
+  color: var(--ink-muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-family: "JetBrains Mono", monospace;
+}
+
+/* ---- 絵文字的アイコン ---------------------------------------------- */
+.glyph {
+  display: inline-block;
+  width: 1.2em;
+  text-align: center;
+  color: var(--vault);
+}
+
+/* ---- モバイル微調整 ------------------------------------------------ */
+@media (max-width: 640px) {
+  .card { padding: 1.2rem; }
+  .diagram { padding: 0.8rem; }
+  .brand { font-size: 0.85rem; }
+  .flow-step { padding: 0.7rem 0.9rem; gap: 0.7rem; }
+  .phase { grid-template-columns: 1fr; gap: 0.3rem; padding: 0.8rem 1rem; }
+  h1.title { font-size: 2rem; }
+  h2 { font-size: 1.5rem; }
+}
