@@ -1,0 +1,8 @@
+[package]
+name = "study_pkcs"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+object="0.32"
+libloading="0.9"
