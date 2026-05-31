@@ -1,0 +1,1758 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PKCS#11 関数詳解 — 暗号化・検証・ハッシュ・鍵管理</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/common.css">
+<link rel="stylesheet" href="assets/04.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="dot"></span>PKCS#11 関数詳解</div>
+  <div style="display:flex;gap:1rem;align-items:center;">
+    <div class="progress"><span class="cur" id="curNum">01</span><span> / <span id="totalNum">20</span></span></div>
+    <button class="toc-btn" id="tocBtn" type="button" aria-label="目次を開く" aria-haspopup="dialog">INDEX</button>
+  </div>
+</header>
+
+<div class="toc-modal" id="tocModal" role="dialog" aria-modal="true" aria-label="目次">
+  <div class="toc-content">
+    <h3>目次 — INDEX</h3>
+    <ul class="toc-list" id="tocList"></ul>
+  </div>
+</div>
+
+<main class="deck" id="deck">
+
+<!-- ====== SLIDE 01: TITLE ====== -->
+<section class="slide title-slide" data-title="タイトル">
+  <span class="slide-num">01 / 20</span>
+  <div class="slide-inner">
+    <div class="title-mark">Extended Function Reference · 全68関数を読む</div>
+    <h1 class="title">
+      PKCS#11<br>
+      <span class="accent">関数詳解</span>
+    </h1>
+    <div class="title-line"></div>
+    <p class="subtitle">
+      暗号化・検証・ダイジェスト・オブジェクト管理<br>
+      鍵エスクロー・環境情報取得まで
+    </p>
+    <div class="title-meta">
+      <strong>前提</strong> : 第1部〜第3部（入門・操作フロー・Rust FFI）を読了<br>
+      <strong>対象</strong> : 乱数・署名・鍵生成 以外の残り関数を網羅<br>
+      <strong>構成</strong> : 6章 × 章ごとに図解 → シーケンス → コード例
+    </div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 02: TOC ====== -->
+<section class="slide" data-title="目次">
+  <span class="slide-num">02 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag">CONTENTS</span>
+    <h2>このドキュメントの構成</h2>
+    <p class="lead">6つの機能グループを順に解説。各章で<strong>シーケンス図 + コード例</strong>を提示する。</p>
+
+    <div class="cols-2">
+      <div>
+        <div class="kv">
+          <div class="kv-row"><div class="k" style="color:var(--ch1)">CHAPTER 1</div><div class="v" style="color:var(--ch1);font-weight:700">暗号化・復号</div></div>
+          <div class="kv-row"><div class="k">03</div><div class="v">概要 — AES-GCM構造図</div></div>
+          <div class="kv-row"><div class="k">04</div><div class="v">C_EncryptInit + C_Encrypt シーケンス</div></div>
+          <div class="kv-row"><div class="k">05</div><div class="v">C_Decrypt + コード例 + モード比較</div></div>
+        </div>
+        <div class="kv">
+          <div class="kv-row"><div class="k" style="color:var(--ch2)">CHAPTER 2</div><div class="v" style="color:var(--ch2);font-weight:700">署名検証</div></div>
+          <div class="kv-row"><div class="k">06</div><div class="v">C_VerifyInit + C_Verify シーケンス</div></div>
+          <div class="kv-row"><div class="k">07</div><div class="v">C_VerifyRecover の特殊ケース</div></div>
+        </div>
+        <div class="kv">
+          <div class="kv-row"><div class="k" style="color:var(--ch3)">CHAPTER 3</div><div class="v" style="color:var(--ch3);font-weight:700">ダイジェスト</div></div>
+          <div class="kv-row"><div class="k">08</div><div class="v">DigestInit / Digest + DigestKey</div></div>
+          <div class="kv-row"><div class="k">09</div><div class="v">複合操作（DigestEncryptUpdate 等）</div></div>
+        </div>
+      </div>
+      <div>
+        <div class="kv">
+          <div class="kv-row"><div class="k" style="color:var(--ch4)">CHAPTER 4</div><div class="v" style="color:var(--ch4);font-weight:700">オブジェクト管理</div></div>
+          <div class="kv-row"><div class="k">10</div><div class="v">FindObjects — 属性フィルタで検索</div></div>
+          <div class="kv-row"><div class="k">11</div><div class="v">GetAttributeValue / SetAttributeValue</div></div>
+          <div class="kv-row"><div class="k">12</div><div class="v">CreateObject / CopyObject / DestroyObject</div></div>
+        </div>
+        <div class="kv">
+          <div class="kv-row"><div class="k" style="color:var(--ch5)">CHAPTER 5</div><div class="v" style="color:var(--ch5);font-weight:700">鍵エスクロー・鍵導出</div></div>
+          <div class="kv-row"><div class="k">13</div><div class="v">WrapKey / UnwrapKey — 鍵の安全な移送</div></div>
+          <div class="kv-row"><div class="k">14</div><div class="v">DeriveKey — ECDH鍵合意</div></div>
+        </div>
+        <div class="kv">
+          <div class="kv-row"><div class="k" style="color:var(--ch6)">CHAPTER 6</div><div class="v" style="color:var(--ch6);font-weight:700">環境情報</div></div>
+          <div class="kv-row"><div class="k">15</div><div class="v">GetInfo / GetSlotInfo / GetTokenInfo</div></div>
+          <div class="kv-row"><div class="k">16</div><div class="v">GetMechanismList / GetMechanismInfo</div></div>
+          <div class="kv-row"><div class="k">17</div><div class="v">GetSessionInfo / GetOperationState</div></div>
+        </div>
+        <div class="kv">
+          <div class="kv-row"><div class="k">CLOSING</div><div class="v">全体まとめ</div></div>
+          <div class="kv-row"><div class="k">18</div><div class="v">Token管理 — InitToken / InitPIN / SetPIN</div></div>
+          <div class="kv-row"><div class="k">19</div><div class="v">全68関数マップ</div></div>
+          <div class="kv-row"><div class="k">20</div><div class="v">References</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 03: CHAPTER 1 - Encrypt Overview ====== -->
+<section class="slide" data-title="暗号化・復号 概要">
+  <span class="slide-num">03 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag ch1">CHAPTER 1 · 暗号化・復号 · 概要</span>
+    <h2><span class="num">03</span>暗号化・復号 — AES-GCM の構造を理解する</h2>
+    <p class="lead">署名が「秘密鍵操作」だったのに対し、暗号化は<strong>対称鍵（AES等）またはRSA公開鍵</strong>で行う。PKCS#11の暗号化APIも3段ロケット構造だが、<strong>IVや認証タグ（GCM）をどう扱うか</strong>がポイント。</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 380" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+        <defs>
+          <marker id="a04" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><polygon points="0,0 8,3 0,6" fill="#18233a"/></marker>
+          <marker id="a04r" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><polygon points="0,0 8,3 0,6" fill="#5e88a6"/></marker>
+        </defs>
+
+        <!-- Title -->
+        <text x="380" y="22" text-anchor="middle" font-size="12" fill="#5e88a6" font-weight="700" letter-spacing="2" font-family="JetBrains Mono">AES-GCM 暗号化の構造</text>
+
+        <!-- Input row -->
+        <rect x="40" y="40" width="100" height="44" fill="#fdfaf2" stroke="#5e88a6" stroke-width="1.5"/>
+        <text x="90" y="58" text-anchor="middle" font-size="10" fill="#5e88a6" font-weight="700">IV / Nonce</text>
+        <text x="90" y="73" text-anchor="middle" font-size="9" fill="#6d7591">12 bytes</text>
+
+        <rect x="160" y="40" width="120" height="44" fill="#fdfaf2" stroke="#6d7591" stroke-width="1"/>
+        <text x="220" y="58" text-anchor="middle" font-size="10" fill="#6d7591" font-weight="700">AAD (任意)</text>
+        <text x="220" y="73" text-anchor="middle" font-size="9" fill="#6d7591">追加認証データ</text>
+
+        <rect x="300" y="40" width="160" height="44" fill="#faf6ec" stroke="#18233a" stroke-width="1.5"/>
+        <text x="380" y="58" text-anchor="middle" font-size="10" fill="#18233a" font-weight="700">平文 (Plaintext)</text>
+        <text x="380" y="73" text-anchor="middle" font-size="9" fill="#6d7591">任意長</text>
+
+        <rect x="480" y="40" width="120" height="44" fill="#fdfaf2" stroke="#b88a3c" stroke-width="1.5"/>
+        <text x="540" y="58" text-anchor="middle" font-size="10" fill="#b88a3c" font-weight="700">AES-256鍵</text>
+        <text x="540" y="73" text-anchor="middle" font-size="9" fill="#6d7591">Token内に保管</text>
+
+        <rect x="620" y="40" width="110" height="44" fill="#fdfaf2" stroke="#6d7591" stroke-width="1"/>
+        <text x="675" y="58" text-anchor="middle" font-size="10" fill="#6d7591" font-weight="700">Tag長指定</text>
+        <text x="675" y="73" text-anchor="middle" font-size="9" fill="#6d7591">通常 16 bytes</text>
+
+        <!-- GCM Engine box -->
+        <rect x="160" y="145" width="440" height="80" fill="#faf6ec" stroke="#5e88a6" stroke-width="2" rx="2"/>
+        <text x="380" y="172" text-anchor="middle" font-size="13" fill="#5e88a6" font-weight="700">GCM 暗号エンジン（HSM内部）</text>
+        <text x="380" y="192" text-anchor="middle" font-size="10" fill="#3c4865">CTRモードで平文を暗号化 ＋ AAD・暗号文を GHASH で認証</text>
+        <text x="380" y="208" text-anchor="middle" font-size="9" fill="#a83a2b" font-weight="600">→ 改ざん検知（Authenticated Encryption）</text>
+
+        <!-- Arrows in -->
+        <path d="M 90 84 L 90 142 L 165 142" stroke="#5e88a6" stroke-width="1.5" marker-end="url(#a04r)" fill="none"/>
+        <path d="M 220 84 L 220 142 L 165 142" stroke="#6d7591" stroke-width="1" stroke-dasharray="4,3" fill="none"/>
+        <path d="M 380 84 L 380 143" stroke="#18233a" stroke-width="1.5" marker-end="url(#a04)" fill="none"/>
+        <path d="M 540 84 L 540 142 L 598 142" stroke="#b88a3c" stroke-width="1.5" marker-end="url(#a04)" fill="none"/>
+        <path d="M 675 84 L 675 142 L 600 142" stroke="#6d7591" stroke-width="1" stroke-dasharray="4,3" fill="none"/>
+
+        <!-- Output row -->
+        <rect x="160" y="270" width="280" height="44" fill="#faf6ec" stroke="#18233a" stroke-width="1.5"/>
+        <text x="300" y="288" text-anchor="middle" font-size="10" fill="#18233a" font-weight="700">暗号文 (Ciphertext)</text>
+        <text x="300" y="304" text-anchor="middle" font-size="9" fill="#6d7591">平文と同じバイト長</text>
+
+        <rect x="460" y="270" width="140" height="44" fill="#fdf0e0" stroke="#a83a2b" stroke-width="1.5"/>
+        <text x="530" y="288" text-anchor="middle" font-size="10" fill="#a83a2b" font-weight="700">認証タグ (Tag)</text>
+        <text x="530" y="304" text-anchor="middle" font-size="9" fill="#a83a2b">16 bytes — 改ざん検知</text>
+
+        <!-- Arrows out -->
+        <path d="M 300 225 L 300 268" stroke="#18233a" stroke-width="1.5" marker-end="url(#a04)" fill="none"/>
+        <path d="M 460 225 L 530 225 L 530 268" stroke="#a83a2b" stroke-width="1.5" marker-end="url(#a04)" fill="none"/>
+
+        <!-- Labels -->
+        <text x="90" y="345" text-anchor="middle" font-size="9" fill="#5e88a6" font-style="italic">PKCS#11: CK_GCM_PARAMS に IV/AAD/TagBits を格納して渡す</text>
+        <text x="540" y="330" text-anchor="middle" font-size="9" fill="#a83a2b" font-style="italic">GCM: 暗号化と認証を同時に</text>
+
+        <!-- IV must be unique label -->
+        <rect x="40" y="95" width="100" height="28" fill="rgba(168,58,43,0.06)" stroke="#a83a2b" stroke-width="0.8" stroke-dasharray="3,2"/>
+        <text x="90" y="108" text-anchor="middle" font-size="8.5" fill="#a83a2b" font-weight="600">⚠ 毎回ユニーク</text>
+        <text x="90" y="119" text-anchor="middle" font-size="8" fill="#6d7591">C_GenerateRandom で生成</text>
+      </svg>
+    </div>
+
+    <div class="cols-2">
+      <div class="card bordered-left">
+        <div class="card-title">暗号化関数の3段ロケット</div>
+        <ul class="op-steps">
+          <li><span class="step-n">①</span><div><span class="step-fn">C_EncryptInit</span><div class="step-desc">セッションに「どの鍵で・どのモードで」を宣言</div></div></li>
+          <li><span class="step-n">②</span><div><span class="step-fn">C_Encrypt</span> / <span class="step-fn">C_EncryptUpdate</span><div class="step-desc">データを渡して暗号文を取得</div></div></li>
+          <li><span class="step-n">③</span><div><span class="step-fn">C_EncryptFinal</span> <small style="color:var(--ink-muted)">(分割時のみ)</small><div class="step-desc">最終ブロックと認証タグを受け取る</div></div></li>
+        </ul>
+      </div>
+      <div class="card warn">
+        <div class="card-title">GCM vs CBC の違い</div>
+        <table class="param-table">
+          <tr><th>項目</th><th>AES-GCM</th><th>AES-CBC</th></tr>
+          <tr><td>認証タグ</td><td style="color:var(--ch2)">あり（改ざん検知）</td><td style="color:var(--red)">なし</td></tr>
+          <tr><td>パディング</td><td>不要</td><td>PKCS#7必要</td></tr>
+          <tr><td>並列化</td><td>可能</td><td>不可（前ブロック依存）</td></tr>
+          <tr><td>Mechanism</td><td><code>CKM_AES_GCM</code></td><td><code>CKM_AES_CBC_PAD</code></td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[1] PKCS#11 Spec v3.2 §5.14</a><a href="#slide-19">[2] PKCS#11 Spec v3.2 §2.11 AES-GCM</a><a href="#slide-19">[11] NIST SP 800-38D</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 04: Encrypt Sequence ====== -->
+<section class="slide" data-title="C_EncryptInit + C_Encrypt シーケンス">
+  <span class="slide-num">04 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag ch1">CHAPTER 1 · 暗号化 · シーケンス</span>
+    <h2><span class="num">04</span>C_EncryptInit → C_Encrypt — シーケンス図</h2>
+    <p class="lead"><code>C_EncryptInit</code> で「鍵＋メカニズム」を宣言し、<code>C_Encrypt</code> でデータを渡す。AES-GCMの場合、<strong>HSM内部でIVを生成し、暗号文と認証タグを合成して返す</strong>（またはアプリがIVを指定）。</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 560" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+        <defs>
+          <marker id="as04" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto"><polygon points="0,0 9,3.5 0,7" fill="#18233a"/></marker>
+        </defs>
+        <!-- Lane headers -->
+        <rect x="30" y="20" width="170" height="36" fill="#fdfaf2" stroke="#18233a" stroke-width="1.5"/>
+        <text x="115" y="44" text-anchor="middle" font-size="12" fill="#18233a" font-weight="700">アプリ</text>
+
+        <rect x="280" y="20" width="190" height="36" fill="#faf6ec" stroke="#b88a3c" stroke-width="1.5"/>
+        <text x="375" y="44" text-anchor="middle" font-size="12" fill="#8b6a2a" font-weight="700">PKCS#11ライブラリ</text>
+
+        <rect x="550" y="20" width="180" height="36" fill="#faf6ec" stroke="#5e88a6" stroke-width="2"/>
+        <text x="640" y="44" text-anchor="middle" font-size="12" fill="#5e88a6" font-weight="700">HSM (AES Engine)</text>
+
+        <!-- Lifelines -->
+        <line x1="115" y1="56" x2="115" y2="540" stroke="#18233a" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="375" y1="56" x2="375" y2="540" stroke="#b88a3c" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="640" y1="56" x2="640" y2="540" stroke="#5e88a6" stroke-width="1" stroke-dasharray="3,3"/>
+
+        <!-- Step 1: EncryptInit -->
+        <path d="M 120 90 L 370 90" stroke="#18233a" stroke-width="2" marker-end="url(#as04)"/>
+        <text x="245" y="82" text-anchor="middle" font-size="9.5" fill="#18233a" font-weight="600" font-family="JetBrains Mono">C_EncryptInit(sess, &amp;gcmMech, hAesKey)</text>
+
+        <rect x="370" y="90" width="10" height="60" fill="#b88a3c" opacity="0.25"/>
+        <rect x="270" y="100" width="210" height="34" fill="#fdfaf2" stroke="#b88a3c" stroke-width="1" stroke-dasharray="2,2"/>
+        <text x="375" y="115" text-anchor="middle" font-size="9" fill="#8b6a2a" font-weight="700">① 検証 / セッション状態を "暗号化待ち" に</text>
+        <text x="375" y="127" text-anchor="middle" font-size="8.5" fill="#6d7591">CK_GCM_PARAMS { iv, ivLen, aad, aadLen, tagBits }</text>
+
+        <path d="M 370 150 L 120 150" stroke="#18233a" stroke-width="2" marker-end="url(#as04)"/>
+        <text x="245" y="143" text-anchor="middle" font-size="9.5" fill="#18233a" font-weight="600" font-family="JetBrains Mono">return CKR_OK</text>
+
+        <!-- divider -->
+        <text x="375" y="175" text-anchor="middle" font-size="8.5" fill="#6d7591" font-style="italic">— EncryptInit 完了。セッションは「AES-GCM暗号化待ち」状態 —</text>
+
+        <!-- Step 2: Encrypt -->
+        <path d="M 120 200 L 370 200" stroke="#18233a" stroke-width="2" marker-end="url(#as04)"/>
+        <text x="245" y="192" text-anchor="middle" font-size="9.5" fill="#18233a" font-weight="600" font-family="JetBrains Mono">C_Encrypt(sess, plain, len, NULL, &amp;outLen)</text>
+
+        <rect x="370" y="200" width="10" height="35" fill="#b88a3c" opacity="0.25"/>
+        <rect x="270" y="208" width="210" height="22" fill="#fdfaf2" stroke="#b88a3c" stroke-width="1" stroke-dasharray="2,2"/>
+        <text x="375" y="221" text-anchor="middle" font-size="9" fill="#8b6a2a">② outLen に必要バッファサイズを返す</text>
+
+        <path d="M 370 236 L 120 236" stroke="#18233a" stroke-width="2" marker-end="url(#as04)"/>
+        <text x="245" y="229" text-anchor="middle" font-size="9.5" fill="#18233a" font-weight="600" font-family="JetBrains Mono">CKR_OK + outLen=(len+16)</text>
+
+        <!-- Step 3: actual encrypt -->
+        <path d="M 120 265 L 370 265" stroke="#18233a" stroke-width="2" marker-end="url(#as04)"/>
+        <text x="245" y="257" text-anchor="middle" font-size="9.5" fill="#18233a" font-weight="600" font-family="JetBrains Mono">C_Encrypt(sess, plain, len, outBuf, &amp;outLen)</text>
+
+        <rect x="370" y="265" width="10" height="170" fill="#b88a3c" opacity="0.25"/>
+        <rect x="270" y="275" width="210" height="22" fill="#fdfaf2" stroke="#b88a3c" stroke-width="1" stroke-dasharray="2,2"/>
+        <text x="375" y="288" text-anchor="middle" font-size="9" fill="#8b6a2a">③ HSMへ送信</text>
+
+        <path d="M 380 308 L 635 308" stroke="#18233a" stroke-width="2" marker-end="url(#as04)"/>
+        <text x="508" y="300" text-anchor="middle" font-size="9.5" fill="#18233a" font-weight="600" font-family="JetBrains Mono">REQ: aes_gcm_encrypt(key_id, iv, aad, plain)</text>
+        <text x="508" y="316" text-anchor="middle" font-size="8" fill="#a83a2b" font-style="italic">[TLS]</text>
+
+        <rect x="635" y="308" width="10" height="100" fill="#5e88a6" opacity="0.25"/>
+        <rect x="530" y="325" width="215" height="68" fill="#faf6ec" stroke="#5e88a6" stroke-width="1" stroke-dasharray="2,2"/>
+        <text x="638" y="342" text-anchor="middle" font-size="9" fill="#5e88a6" font-weight="700">④ HSM内部処理</text>
+        <text x="638" y="357" text-anchor="middle" font-size="8.5" fill="#3c4865">a. 鍵ロード → CTRモード暗号化</text>
+        <text x="638" y="370" text-anchor="middle" font-size="8.5" fill="#3c4865">b. AAD + 暗号文 を GHASH 計算</text>
+        <text x="638" y="383" text-anchor="middle" font-size="8.5" fill="#a83a2b">c. 認証タグ 16B を生成</text>
+
+        <path d="M 635 412 L 380 412" stroke="#18233a" stroke-width="2" marker-end="url(#as04)"/>
+        <text x="508" y="405" text-anchor="middle" font-size="9.5" fill="#18233a" font-weight="600" font-family="JetBrains Mono">RESP: ciphertext || tag (len+16 bytes)</text>
+
+        <rect x="270" y="425" width="210" height="22" fill="#fdfaf2" stroke="#b88a3c" stroke-width="1" stroke-dasharray="2,2"/>
+        <text x="375" y="438" text-anchor="middle" font-size="9" fill="#8b6a2a">⑤ outBuf に書込 / セッション状態リセット</text>
+
+        <path d="M 370 452 L 120 452" stroke="#18233a" stroke-width="2" marker-end="url(#as04)"/>
+        <text x="245" y="445" text-anchor="middle" font-size="9.5" fill="#18233a" font-weight="600" font-family="JetBrains Mono">return CKR_OK + outLen</text>
+
+        <text x="115" y="485" text-anchor="middle" font-size="9" fill="#6d7591">outBuf = 暗号文+タグ</text>
+        <text x="640" y="485" text-anchor="middle" font-size="9" fill="#6d7591">鍵は解放済</text>
+
+        <text x="20" y="300" font-size="8.5" fill="#6d7591" letter-spacing="2" transform="rotate(-90 20 300)">TIME →</text>
+      </svg>
+    </div>
+    <div class="diagram-caption">2-call convention（NULL渡し→サイズ取得→実暗号化）はSignと同じパターン</div>
+
+    <div class="card bordered-left">
+      <div class="card-title">GCMパラメータ構造体</div>
+      <div class="code-block c">
+<span class="code-lang">C / PKCS#11</span><pre><span class="ty">CK_GCM_PARAMS</span> gcm = {
+    .pIv       = iv_bytes,    <span class="com">/* C_GenerateRandom で取得した12B */</span>
+    .ulIvLen   = <span class="num">12</span>,
+    .pAAD      = aad_bytes,   <span class="com">/* NULL可（任意の追加認証データ）*/</span>
+    .ulAADLen  = aad_len,
+    .ulTagBits = <span class="num">128</span>,        <span class="com">/* 認証タグは16B(128bit)が推奨 */</span>
+};
+<span class="ty">CK_MECHANISM</span> mech = { <span class="ty">CKM_AES_GCM</span>, &amp;gcm, <span class="kw">sizeof</span>(gcm) };</pre>
+      </div>
+    </div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[1] PKCS#11 Spec v3.2 §5.14.1, §2.11.1</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 05: Decrypt + Code + Mode Comparison ====== -->
+<section class="slide" data-title="C_Decrypt + コード例 + モード比較">
+  <span class="slide-num">05 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag ch1">CHAPTER 1 · 復号 · コード例</span>
+    <h2><span class="num">05</span>C_Decrypt — コード例とモード比較</h2>
+    <p class="lead">復号は暗号化の逆順。GCMでは<strong>認証タグの検証に失敗すると <code>CKR_ENCRYPTED_DATA_INVALID</code> が返る</strong>。これが改ざん検知の要。</p>
+
+    <div class="cols-2">
+      <div>
+        <h3><span class="marker">▸</span>C 言語 — AES-GCM 復号</h3>
+        <div class="code-block c">
+<span class="code-lang">C</span><pre><span class="com">/* --- 復号 (AES-GCM) --- */</span>
+<span class="ty">CK_GCM_PARAMS</span> gcm = {
+    .pIv=iv, .ulIvLen=<span class="num">12</span>,
+    .pAAD=aad, .ulAADLen=aad_len,
+    .ulTagBits=<span class="num">128</span>
+};
+<span class="ty">CK_MECHANISM</span> mech = { <span class="ty">CKM_AES_GCM</span>, &amp;gcm, <span class="kw">sizeof</span>(gcm) };
+
+<span class="fn-name">C_DecryptInit</span>(sess, &amp;mech, hAesKey);
+
+<span class="com">/* ciphertext = 暗号文 + タグ(16B) */</span>
+<span class="ty">CK_ULONG</span> plainLen = cipher_len - <span class="num">16</span>;
+<span class="ty">CK_RV</span> rv = pF-&gt;<span class="fn-name">C_Decrypt</span>(
+    sess, cipher, cipher_len,
+    plain_buf, &amp;plainLen);
+
+<span class="kw">if</span> (rv == <span class="ty">CKR_ENCRYPTED_DATA_INVALID</span>) {
+    <span class="fn-name">puts</span>(<span class="str">"⚠ タグ不一致：改ざんを検知"</span>);
+} <span class="kw">else</span> <span class="kw">if</span> (rv == <span class="ty">CKR_OK</span>) {
+    <span class="com">/* plain_buf[0..plainLen] が復号結果 */</span>
+}</pre>
+        </div>
+      </div>
+      <div>
+        <h3><span class="marker">▸</span>Rust (cryptoki)</h3>
+        <div class="code-block rust">
+<span class="code-lang">Rust</span><pre><span class="kw">use</span> cryptoki::mechanism::{
+    Mechanism, aes::<span class="ty">GcmParams</span>
+};
+
+<span class="kw">let</span> gcm = <span class="ty">GcmParams</span>::<span class="fn-name">new</span>(
+    &amp;iv, &amp;aad, <span class="num">128</span>  <span class="com">// tag_bits</span>
+);
+<span class="kw">let</span> mech = <span class="ty">Mechanism</span>::<span class="ty">AesGcm</span>(&amp;gcm);
+
+<span class="kw">let</span> plain = session.<span class="fn-name">decrypt</span>(
+    &amp;mech, aes_key, &amp;ciphertext
+)?;
+<span class="com">// GCMタグ不一致 → Error::Pkcs11(CKR_ENCRYPTED_DATA_INVALID)</span></pre>
+        </div>
+
+        <div class="card warn" style="margin-top:0.8rem">
+          <div class="card-title">AES-CBC との手順差</div>
+          <p style="font-size:0.9rem">CBCでは <code>CKM_AES_CBC_PAD</code> を使い、<code>pParameter</code> に<strong>16バイトのIV</strong>だけを渡す。タグはない。GCMより単純だが改ざん検知がない。</p>
+          <div class="fn-sig"><span class="fn-name">CK_MECHANISM</span> mech = { <span class="fn-name">CKM_AES_CBC_PAD</span>, iv_16bytes, <span class="fn-arg">16</span> };</div>
+        </div>
+      </div>
+    </div>
+
+    <h3><span class="marker">▸</span>暗号操作の戻り値チートシート</h3>
+    <table class="tbl">
+      <tr><th>戻り値</th><th>場面</th><th>対処</th></tr>
+      <tr><td><code>CKR_OK</code></td><td>成功</td><td>—</td></tr>
+      <tr><td><code>CKR_ENCRYPTED_DATA_INVALID</code></td><td>GCMタグ不一致 / 改ざん</td><td>データを破棄</td></tr>
+      <tr><td><code>CKR_BUFFER_TOO_SMALL</code></td><td>出力バッファ不足</td><td>pulEncryptedDataLen で確認後リトライ</td></tr>
+      <tr><td><code>CKR_KEY_FUNCTION_NOT_PERMITTED</code></td><td>CKA_ENCRYPT=false の鍵</td><td>適切な鍵を選ぶ</td></tr>
+      <tr><td><code>CKR_MECHANISM_PARAM_INVALID</code></td><td>IV長など引数不正</td><td>GCM: IV=12B, Tag=128bitを確認</td></tr>
+    </table>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[1] PKCS#11 Spec v3.2 §5.15</a><a href="#slide-19">[11] NIST SP 800-38D (GCM)</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 06: Verify Sequence ====== -->
+<section class="slide" data-title="C_VerifyInit + C_Verify シーケンス">
+  <span class="slide-num">06 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag ch2">CHAPTER 2 · 署名検証 · シーケンス</span>
+    <h2><span class="num">06</span>署名検証 — C_VerifyInit + C_Verify</h2>
+    <p class="lead">検証は<strong>公開鍵操作</strong>。秘密鍵へのアクセスは不要なので、<em>ログイン不要</em>で実行できる場合も多い。HSM内部では「ハッシュ計算 → 公開鍵でデパディング → ハッシュ比較」を行う。</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 520" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+        <defs>
+          <marker id="as06" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto"><polygon points="0,0 9,3.5 0,7" fill="#18233a"/></marker>
+          <marker id="as06g" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto"><polygon points="0,0 9,3.5 0,7" fill="#6b8e5e"/></marker>
+          <marker id="as06r" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto"><polygon points="0,0 9,3.5 0,7" fill="#a83a2b"/></marker>
+        </defs>
+
+        <!-- Lane headers -->
+        <rect x="30" y="20" width="170" height="36" fill="#fdfaf2" stroke="#18233a" stroke-width="1.5"/>
+        <text x="115" y="44" text-anchor="middle" font-size="12" fill="#18233a" font-weight="700">アプリ</text>
+
+        <rect x="280" y="20" width="190" height="36" fill="#faf6ec" stroke="#b88a3c" stroke-width="1.5"/>
+        <text x="375" y="44" text-anchor="middle" font-size="12" fill="#8b6a2a" font-weight="700">PKCS#11ライブラリ</text>
+
+        <rect x="550" y="20" width="180" height="36" fill="#eaf5ea" stroke="#6b8e5e" stroke-width="2"/>
+        <text x="640" y="44" text-anchor="middle" font-size="12" fill="#6b8e5e" font-weight="700">HSM (公開鍵演算)</text>
+
+        <!-- Lifelines -->
+        <line x1="115" y1="56" x2="115" y2="500" stroke="#18233a" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="375" y1="56" x2="375" y2="500" stroke="#b88a3c" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="640" y1="56" x2="640" y2="500" stroke="#6b8e5e" stroke-width="1" stroke-dasharray="3,3"/>
+
+        <!-- C_VerifyInit -->
+        <path d="M 120 90 L 370 90" stroke="#18233a" stroke-width="2" marker-end="url(#as06)"/>
+        <text x="245" y="82" text-anchor="middle" font-size="9.5" fill="#18233a" font-weight="600" font-family="JetBrains Mono">C_VerifyInit(sess, &amp;pss_mech, hPubKey)</text>
+
+        <rect x="370" y="90" width="10" height="55" fill="#b88a3c" opacity="0.25"/>
+        <rect x="272" y="100" width="210" height="30" fill="#fdfaf2" stroke="#b88a3c" stroke-width="1" stroke-dasharray="2,2"/>
+        <text x="377" y="114" text-anchor="middle" font-size="8.5" fill="#8b6a2a" font-weight="700">① CKA_VERIFY=true か確認</text>
+        <text x="377" y="126" text-anchor="middle" font-size="8.5" fill="#6d7591">セッション状態を "検証待ち" に</text>
+
+        <path d="M 370 145 L 120 145" stroke="#18233a" stroke-width="2" marker-end="url(#as06)"/>
+        <text x="245" y="138" text-anchor="middle" font-size="9.5" fill="#18233a" font-weight="600" font-family="JetBrains Mono">return CKR_OK</text>
+
+        <text x="375" y="168" text-anchor="middle" font-size="8.5" fill="#6d7591" font-style="italic">— アプリは VerifyInit と Verify の間に別処理可 —</text>
+
+        <!-- C_Verify -->
+        <path d="M 120 195 L 370 195" stroke="#18233a" stroke-width="2" marker-end="url(#as06)"/>
+        <text x="245" y="187" text-anchor="middle" font-size="9.5" fill="#18233a" font-weight="600" font-family="JetBrains Mono">C_Verify(sess, data, dataLen, sig, sigLen)</text>
+
+        <rect x="370" y="195" width="10" height="220" fill="#b88a3c" opacity="0.25"/>
+        <rect x="272" y="205" width="210" height="22" fill="#fdfaf2" stroke="#b88a3c" stroke-width="1" stroke-dasharray="2,2"/>
+        <text x="377" y="218" text-anchor="middle" font-size="8.5" fill="#8b6a2a">② バッファ確認 → HSMへ送信</text>
+
+        <path d="M 380 240 L 635 240" stroke="#18233a" stroke-width="2" marker-end="url(#as06)"/>
+        <text x="508" y="232" text-anchor="middle" font-size="9.5" fill="#18233a" font-weight="600" font-family="JetBrains Mono">REQ: verify(pubkey_id, mech, data, sig)</text>
+
+        <rect x="635" y="240" width="10" height="120" fill="#6b8e5e" opacity="0.25"/>
+        <rect x="532" y="256" width="215" height="88" fill="#eaf5ea" stroke="#6b8e5e" stroke-width="1" stroke-dasharray="2,2"/>
+        <text x="640" y="273" text-anchor="middle" font-size="9" fill="#6b8e5e" font-weight="700">③ HSM内部処理</text>
+        <text x="640" y="290" text-anchor="middle" font-size="8.5" fill="#3c4865">a. 公開鍵ロード</text>
+        <text x="640" y="305" text-anchor="middle" font-size="8.5" fill="#3c4865">b. data の SHA-256 計算</text>
+        <text x="640" y="320" text-anchor="middle" font-size="8.5" fill="#3c4865">c. sig を RSA 公開鍵で復号</text>
+        <text x="640" y="335" text-anchor="middle" font-size="8.5" fill="#3c4865">d. ハッシュと比較 → 一致判定</text>
+
+        <!-- Two outcomes -->
+        <!-- Success path -->
+        <path d="M 635 365 L 380 365" stroke="#6b8e5e" stroke-width="2" marker-end="url(#as06g)"/>
+        <text x="508" y="358" text-anchor="middle" font-size="9.5" fill="#6b8e5e" font-weight="600" font-family="JetBrains Mono">RESP: OK (一致)</text>
+
+        <path d="M 370 390 L 120 390" stroke="#6b8e5e" stroke-width="2" marker-end="url(#as06g)"/>
+        <text x="245" y="383" text-anchor="middle" font-size="9.5" fill="#6b8e5e" font-weight="600" font-family="JetBrains Mono">return CKR_OK ✓ 署名有効</text>
+
+        <!-- Failure path -->
+        <text x="508" y="420" text-anchor="middle" font-size="8.5" fill="#a83a2b" font-style="italic">— または —</text>
+        <path d="M 635 435 L 380 435" stroke="#a83a2b" stroke-width="2" marker-end="url(#as06r)"/>
+        <text x="508" y="428" text-anchor="middle" font-size="9.5" fill="#a83a2b" font-weight="600" font-family="JetBrains Mono">RESP: NG (不一致)</text>
+        <path d="M 370 458 L 120 458" stroke="#a83a2b" stroke-width="2" marker-end="url(#as06r)"/>
+        <text x="245" y="451" text-anchor="middle" font-size="9.5" fill="#a83a2b" font-weight="600" font-family="JetBrains Mono">return CKR_SIGNATURE_INVALID ✗</text>
+
+        <text x="20" y="280" font-size="8.5" fill="#6d7591" letter-spacing="2" transform="rotate(-90 20 280)">TIME →</text>
+      </svg>
+    </div>
+    <div class="diagram-caption">Verify の HSM処理は公開鍵演算なのでSign（秘密鍵）より速い。ログイン不要のケースも多い。</div>
+
+    <div class="cols-2">
+      <div class="card bordered-left">
+        <div class="card-title">Sign vs Verify の違い</div>
+        <table class="param-table">
+          <tr><th></th><th>C_Sign</th><th>C_Verify</th></tr>
+          <tr><td>使う鍵</td><td>秘密鍵</td><td>公開鍵</td></tr>
+          <tr><td>ログイン</td><td>必須</td><td>多くは不要</td></tr>
+          <tr><td>HSM演算</td><td>重い（秘密鍵べき乗）</td><td>軽い（公開鍵）</td></tr>
+          <tr><td>戻り値</td><td>署名バイト列</td><td>CKR_OK / INVALID</td></tr>
+        </table>
+      </div>
+      <div class="card bordered-left">
+        <div class="card-title">マルチパート検証</div>
+        <div class="fn-sig">
+<span class="fn-name">C_VerifyUpdate</span>(<span class="fn-arg">sess, chunk, len</span>) <span class="fn-cmt">// データを分割して渡す</span>
+<span class="fn-name">C_VerifyFinal</span>(<span class="fn-arg">sess, sig, sigLen</span>)  <span class="fn-cmt">// 最後に署名を渡して判定</span>
+        </div>
+        <p style="font-size:0.88rem">大きなファイルの検証で使う。ネットワーク型HSMでは<strong>Updateごとに往復が発生する</strong>ため、ワンショットが推奨。</p>
+      </div>
+    </div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[1] PKCS#11 Spec v3.2 §5.16 Verify functions</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 07: VerifyRecover ====== -->
+<section class="slide" data-title="C_VerifyRecover の特殊ケース">
+  <span class="slide-num">07 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag ch2">CHAPTER 2 · 署名検証 · VerifyRecover</span>
+    <h2><span class="num">07</span>C_VerifyRecover — メッセージ復元型署名</h2>
+    <p class="lead"><code>C_VerifyRecover</code> は <strong>RSA-PKCS（パディング方式）限定の特殊操作</strong>。通常の署名は「データを渡して、署名を返す」だが、RSAの性質上<strong>署名からデータを「復元」できる</strong>。ISO 9796-2などで使われる。</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+        <defs>
+          <marker id="as07" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><polygon points="0,0 8,3 0,6" fill="#18233a"/></marker>
+          <marker id="as07g" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><polygon points="0,0 8,3 0,6" fill="#6b8e5e"/></marker>
+        </defs>
+
+        <!-- Normal verify -->
+        <text x="190" y="25" text-anchor="middle" font-size="11" fill="#18233a" font-weight="700">通常の C_Verify</text>
+
+        <rect x="30" y="40" width="130" height="36" fill="#fdfaf2" stroke="#18233a" stroke-width="1.2"/>
+        <text x="95" y="63" text-anchor="middle" font-size="10" fill="#18233a">平文データ (data)</text>
+
+        <rect x="30" y="100" width="130" height="36" fill="#fdfaf2" stroke="#18233a" stroke-width="1.2"/>
+        <text x="95" y="123" text-anchor="middle" font-size="10" fill="#18233a">署名バイト列 (sig)</text>
+
+        <path d="M 165 58 L 205 95" stroke="#18233a" stroke-width="1.3" marker-end="url(#as07)"/>
+        <path d="M 165 118 L 205 118" stroke="#18233a" stroke-width="1.3" marker-end="url(#as07)"/>
+
+        <rect x="210" y="80" width="140" height="60" fill="#faf6ec" stroke="#b88a3c" stroke-width="1.5"/>
+        <text x="280" y="105" text-anchor="middle" font-size="10" fill="#8b6a2a" font-weight="700">C_Verify</text>
+        <text x="280" y="122" text-anchor="middle" font-size="9" fill="#6d7591">ハッシュ比較</text>
+
+        <path d="M 355 110 L 390 110" stroke="#18233a" stroke-width="1.3" marker-end="url(#as07)"/>
+        <rect x="395" y="92" width="120" height="36" fill="#fdfaf2" stroke="#6b8e5e" stroke-width="1.5"/>
+        <text x="455" y="108" text-anchor="middle" font-size="10" fill="#6b8e5e" font-weight="700">CKR_OK</text>
+        <text x="455" y="121" text-anchor="middle" font-size="9" fill="#6d7591">or INVALID</text>
+
+        <!-- VerifyRecover -->
+        <text x="590" y="25" text-anchor="middle" font-size="11" fill="#6b8e5e" font-weight="700">C_VerifyRecover</text>
+
+        <rect x="530" y="40" width="130" height="36" fill="#fdfaf2" stroke="#18233a" stroke-width="1.2"/>
+        <text x="595" y="63" text-anchor="middle" font-size="10" fill="#18233a">署名バイト列のみ</text>
+
+        <path d="M 595 76 L 595 100" stroke="#18233a" stroke-width="1.3" marker-end="url(#as07)"/>
+
+        <rect x="525" y="100" width="140" height="60" fill="#eaf5ea" stroke="#6b8e5e" stroke-width="2"/>
+        <text x="595" y="125" text-anchor="middle" font-size="10" fill="#6b8e5e" font-weight="700">C_VerifyRecover</text>
+        <text x="595" y="140" text-anchor="middle" font-size="9" fill="#3c4865">公開鍵で復号</text>
+
+        <path d="M 595 162 L 595 190" stroke="#6b8e5e" stroke-width="1.3" marker-end="url(#as07g)"/>
+        <rect x="525" y="190" width="140" height="50" fill="#eaf5ea" stroke="#6b8e5e" stroke-width="1.5"/>
+        <text x="595" y="210" text-anchor="middle" font-size="10" fill="#6b8e5e" font-weight="700">平文を返す</text>
+        <text x="595" y="228" text-anchor="middle" font-size="9" fill="#3c4865">+ 埋め込みデータ</text>
+
+        <!-- divider line -->
+        <line x1="510" y1="20" x2="510" y2="280" stroke="#e6dcc4" stroke-width="1" stroke-dasharray="5,4"/>
+
+        <!-- Caption -->
+        <text x="380" y="275" text-anchor="middle" font-size="10" fill="#6d7591" font-style="italic">左：通常の検証（data + sig → OK/NG）　　右：メッセージ復元（sig だけで平文を取り出す）</text>
+      </svg>
+    </div>
+
+    <div class="cols-2">
+      <div class="card bordered-left">
+        <div class="card-title">C_VerifyRecoverInit + C_VerifyRecover</div>
+        <div class="fn-sig">
+<span class="fn-name">C_VerifyRecoverInit</span>(<span class="fn-arg">sess, &amp;mech, hPubKey</span>);
+
+<span class="fn-name">C_VerifyRecover</span>(
+  <span class="fn-arg">sess</span>,
+  <span class="fn-arg">pSignature, ulSigLen</span>,  <span class="fn-cmt">// 入力：署名</span>
+  <span class="fn-arg">pData, &amp;ulDataLen</span>       <span class="fn-cmt">// 出力：復元された平文</span>
+);
+        </div>
+        <p style="font-size:0.88rem">対応メカニズム：<code>CKM_RSA_PKCS</code>（PKCS#1 v1.5のみ）。PSSやECDSAは非対応。</p>
+      </div>
+      <div class="card warn">
+        <div class="card-title">C_SignRecover との対称関係</div>
+        <p style="font-size:0.9rem"><code>C_SignRecover</code> は秘密鍵で「平文を署名に埋め込む」操作。<code>C_VerifyRecover</code> がその逆（公開鍵で取り出す）。</p>
+        <table class="param-table">
+          <tr><th>操作</th><th>入力</th><th>出力</th></tr>
+          <tr><td>C_SignRecover</td><td>平文</td><td>署名（平文埋め込み）</td></tr>
+          <tr><td>C_VerifyRecover</td><td>署名</td><td>平文（復元）</td></tr>
+        </table>
+        <p style="font-size:0.85rem;color:var(--ink-muted)">実際の使用例は少ない。TLS/PKI実務ではほぼ不要。</p>
+      </div>
+    </div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[1] PKCS#11 Spec v3.2 §5.16.5 C_VerifyRecover</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 08: Digest ====== -->
+<section class="slide" data-title="DigestInit / Digest + DigestKey">
+  <span class="slide-num">08 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag ch3">CHAPTER 3 · ダイジェスト</span>
+    <h2><span class="num">08</span>ダイジェスト — ハッシュと <code>C_DigestKey</code></h2>
+    <p class="lead">PKCS#11のダイジェスト操作は<strong>データのハッシュ計算</strong>をHSM内で行う。特殊な <code>C_DigestKey</code> を使うと<strong>鍵の素材をハッシュ入力に含める</strong>ことができ、HMACの基礎操作に相当する。</p>
+
+    <div class="cols-2">
+      <div>
+        <h3><span class="marker">▸</span>基本フロー（3段ロケット）</h3>
+        <div class="diagram" style="margin:0.5rem 0">
+          <svg viewBox="0 0 340 240" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+            <defs><marker id="a08" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><polygon points="0,0 7,3 0,6" fill="#18233a"/></marker></defs>
+
+            <rect x="20" y="30" width="140" height="55" fill="#fdfaf2" stroke="#7b68a6" stroke-width="1.5"/>
+            <text x="90" y="52" text-anchor="middle" font-size="10" fill="#7b68a6" font-weight="700" font-family="JetBrains Mono">C_DigestInit</text>
+            <text x="90" y="68" text-anchor="middle" font-size="9" fill="#6d7591">Mechanism=CKM_SHA256</text>
+            <text x="90" y="80" text-anchor="middle" font-size="9" fill="#6d7591">（鍵は不要）</text>
+
+            <path d="M 160 57 L 185 57" stroke="#18233a" stroke-width="1.3" marker-end="url(#a08)"/>
+
+            <rect x="190" y="30" width="130" height="55" fill="#faf6ec" stroke="#7b68a6" stroke-width="2"/>
+            <text x="255" y="52" text-anchor="middle" font-size="10" fill="#7b68a6" font-weight="700" font-family="JetBrains Mono">C_Digest</text>
+            <text x="255" y="68" text-anchor="middle" font-size="9" fill="#6d7591">data → hash</text>
+            <text x="255" y="80" text-anchor="middle" font-size="9" fill="#7b68a6" font-weight="600">★ ここを測る</text>
+
+            <!-- DigestUpdate option -->
+            <text x="255" y="120" text-anchor="middle" font-size="9" fill="#6d7591" font-style="italic">分割時:</text>
+            <rect x="180" y="128" width="150" height="38" fill="#fdfaf2" stroke="#7b68a6" stroke-width="1" stroke-dasharray="3,2"/>
+            <text x="255" y="145" text-anchor="middle" font-size="9" fill="#7b68a6" font-family="JetBrains Mono">C_DigestUpdate</text>
+            <text x="255" y="159" text-anchor="middle" font-size="8.5" fill="#6d7591">チャンクごとに呼ぶ</text>
+
+            <rect x="180" y="175" width="150" height="38" fill="#fdfaf2" stroke="#7b68a6" stroke-width="1" stroke-dasharray="3,2"/>
+            <text x="255" y="192" text-anchor="middle" font-size="9" fill="#7b68a6" font-family="JetBrains Mono">C_DigestFinal</text>
+            <text x="255" y="206" text-anchor="middle" font-size="8.5" fill="#6d7591">最終ハッシュ取得</text>
+          </svg>
+        </div>
+
+        <div class="fn-sig">
+<span class="fn-cmt">// SHA-256 ハッシュの取得</span>
+<span class="ty">CK_MECHANISM</span> mech = { <span class="fn-name">CKM_SHA256</span>, <span class="ty">NULL_PTR</span>, <span class="fn-arg">0</span> };
+<span class="fn-name">C_DigestInit</span>(<span class="fn-arg">sess, &amp;mech</span>);
+<span class="ty">CK_BYTE</span> hash[<span class="fn-arg">32</span>]; <span class="ty">CK_ULONG</span> hLen = <span class="fn-arg">32</span>;
+<span class="fn-name">C_Digest</span>(<span class="fn-arg">sess, data, dataLen, hash, &amp;hLen</span>);
+        </div>
+      </div>
+
+      <div>
+        <h3><span class="marker">▸</span>C_DigestKey — 鍵をダイジェストに混ぜる</h3>
+        <div class="diagram" style="margin:0.5rem 0">
+          <svg viewBox="0 0 320 240" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+            <defs><marker id="a08k" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><polygon points="0,0 7,3 0,6" fill="#18233a"/></marker></defs>
+            <!-- DigestKey flow -->
+            <rect x="20" y="20" width="120" height="40" fill="#fdfaf2" stroke="#7b68a6" stroke-width="1.3"/>
+            <text x="80" y="38" text-anchor="middle" font-size="9.5" fill="#7b68a6" font-family="JetBrains Mono">C_DigestInit</text>
+            <text x="80" y="52" text-anchor="middle" font-size="8.5" fill="#6d7591">(CKM_SHA256)</text>
+
+            <path d="M 80 60 L 80 80" stroke="#18233a" stroke-width="1.2" marker-end="url(#a08k)"/>
+
+            <rect x="20" y="82" width="120" height="40" fill="#fdfaf2" stroke="#7b68a6" stroke-width="1.3"/>
+            <text x="80" y="100" text-anchor="middle" font-size="9.5" fill="#7b68a6" font-family="JetBrains Mono">C_DigestUpdate</text>
+            <text x="80" y="114" text-anchor="middle" font-size="8.5" fill="#6d7591">data chunk</text>
+
+            <path d="M 80 122 L 80 142" stroke="#18233a" stroke-width="1.2" marker-end="url(#a08k)"/>
+
+            <!-- DigestKey box -->
+            <rect x="20" y="144" width="120" height="44" fill="#faf6ec" stroke="#b88a3c" stroke-width="2"/>
+            <text x="80" y="162" text-anchor="middle" font-size="9.5" fill="#b88a3c" font-weight="700" font-family="JetBrains Mono">C_DigestKey</text>
+            <text x="80" y="177" text-anchor="middle" font-size="8.5" fill="#8b6a2a">(hKey) ★鍵素材を注入</text>
+
+            <path d="M 80 188 L 80 208" stroke="#18233a" stroke-width="1.2" marker-end="url(#a08k)"/>
+
+            <rect x="20" y="208" width="120" height="28" fill="#fdfaf2" stroke="#7b68a6" stroke-width="1.3"/>
+            <text x="80" y="226" text-anchor="middle" font-size="9.5" fill="#7b68a6" font-family="JetBrains Mono">C_DigestFinal</text>
+
+            <!-- Right side explanation -->
+            <rect x="165" y="100" width="145" height="130" fill="#faf6ec" stroke="#b88a3c" stroke-width="1"/>
+            <text x="238" y="120" text-anchor="middle" font-size="10" fill="#8b6a2a" font-weight="700">DigestKey の使途</text>
+            <text x="238" y="140" text-anchor="middle" font-size="8.5" fill="#3c4865">鍵の実体がアプリに</text>
+            <text x="238" y="154" text-anchor="middle" font-size="8.5" fill="#3c4865">出ることなく鍵素材を</text>
+            <text x="238" y="168" text-anchor="middle" font-size="8.5" fill="#3c4865">ハッシュに混ぜられる</text>
+            <text x="238" y="188" text-anchor="middle" font-size="8.5" fill="#a83a2b">→ HMAC の基礎操作</text>
+            <text x="238" y="204" text-anchor="middle" font-size="8.5" fill="#a83a2b">→ 鍵派生の検証</text>
+          </svg>
+        </div>
+
+        <div class="card warn" style="margin-top:0.5rem">
+          <div class="card-title">HMACとの違い</div>
+          <p style="font-size:0.88rem">PKCS#11には <code>CKM_SHA256_HMAC</code> という直接のHMACメカニズムもある（<code>C_SignInit</code>で使う）。<code>C_DigestKey</code> はより低レベルの操作。実用上はHMACメカニズムが推奨。</p>
+        </div>
+      </div>
+    </div>
+
+    <h3><span class="marker">▸</span>主なダイジェストメカニズム</h3>
+    <table class="tbl">
+      <tr><th>Mechanism</th><th>出力長</th><th>備考</th></tr>
+      <tr><td><code>CKM_SHA_1</code></td><td>20 bytes</td><td>非推奨（衝突脆弱性）</td></tr>
+      <tr><td><code>CKM_SHA256</code></td><td>32 bytes</td><td>現代の標準。TLS/PKIで最も使われる</td></tr>
+      <tr><td><code>CKM_SHA384</code></td><td>48 bytes</td><td>P-384/ECDSA-384とセット</td></tr>
+      <tr><td><code>CKM_SHA512</code></td><td>64 bytes</td><td>高セキュリティ要件</td></tr>
+      <tr><td><code>CKM_SHA3_256</code></td><td>32 bytes</td><td>SHA-3 (FIPS 202)。v2.40+</td></tr>
+    </table>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[1] PKCS#11 Spec v3.2 §5.17 Digest functions</a><a href="#slide-19">[12] FIPS 180-4</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 09: Combined Operations ====== -->
+<section class="slide" data-title="複合操作（DigestEncryptUpdate 等）">
+  <span class="slide-num">09 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag ch3">CHAPTER 3 · ダイジェスト · 複合操作</span>
+    <h2><span class="num">09</span>複合操作 — 1回の往復で2つの操作を実行</h2>
+    <p class="lead">PKCS#11 v3.2 には「ダイジェスト + 暗号化」「署名 + 暗号化」等を<strong>一度のHSM通信で実行する複合関数</strong>がある。ネットワーク型HSMでは往復回数がそのままレイテンシになるため、有用。</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 340" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+        <defs><marker id="a09" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><polygon points="0,0 7,3 0,6" fill="#18233a"/></marker></defs>
+
+        <text x="380" y="22" text-anchor="middle" font-size="11" fill="#18233a" font-weight="700" letter-spacing="1">4種類の複合操作とそのInit対 / 使用場面</text>
+
+        <!-- Row 1: DigestEncryptUpdate -->
+        <rect x="20" y="40" width="720" height="64" fill="#fdfaf2" stroke="#7b68a6" stroke-width="1.2"/>
+        <rect x="20" y="40" width="4" height="64" fill="#7b68a6"/>
+        <text x="40" y="62" font-size="10" fill="#7b68a6" font-weight="700" font-family="JetBrains Mono">C_DigestEncryptUpdate</text>
+        <text x="40" y="78" font-size="9.5" fill="#3c4865">前提：<code>C_DigestInit</code> + <code>C_EncryptInit</code> を両方完了済み。データを渡すと同時にハッシュ計算と暗号化を実行。</text>
+        <text x="40" y="96" font-size="9" fill="#6d7591" font-style="italic">用途例：ファイルを暗号化しながらSHA-256を計算 → 別途 C_DigestFinal / C_EncryptFinal で完了</text>
+        <text x="710" y="72" text-anchor="end" font-size="9" fill="#7b68a6" font-family="JetBrains Mono">Digest + Encrypt</text>
+
+        <!-- Row 2: DecryptDigestUpdate -->
+        <rect x="20" y="116" width="720" height="64" fill="#fdfaf2" stroke="#5e88a6" stroke-width="1.2"/>
+        <rect x="20" y="116" width="4" height="64" fill="#5e88a6"/>
+        <text x="40" y="138" font-size="10" fill="#5e88a6" font-weight="700" font-family="JetBrains Mono">C_DecryptDigestUpdate</text>
+        <text x="40" y="154" font-size="9.5" fill="#3c4865">前提：<code>C_DecryptInit</code> + <code>C_DigestInit</code> を両方完了済み。暗号文を渡すと同時に復号してハッシュ計算。</text>
+        <text x="40" y="172" font-size="9" fill="#6d7591" font-style="italic">用途例：暗号ファイルを復号しながら内容のハッシュを計算 → 内容の完全性を確認</text>
+        <text x="710" y="148" text-anchor="end" font-size="9" fill="#5e88a6" font-family="JetBrains Mono">Decrypt + Digest</text>
+
+        <!-- Row 3: SignEncryptUpdate -->
+        <rect x="20" y="192" width="720" height="64" fill="#fdfaf2" stroke="#b88a3c" stroke-width="1.2"/>
+        <rect x="20" y="192" width="4" height="64" fill="#b88a3c"/>
+        <text x="40" y="214" font-size="10" fill="#8b6a2a" font-weight="700" font-family="JetBrains Mono">C_SignEncryptUpdate</text>
+        <text x="40" y="230" font-size="9.5" fill="#3c4865">前提：<code>C_SignInit</code> + <code>C_EncryptInit</code> を両方完了済み。署名と暗号化を同時実行。</text>
+        <text x="40" y="248" font-size="9" fill="#6d7591" font-style="italic">用途例：メッセージを署名しながら暗号化（Sign-then-Encrypt）→ C_SignFinal / C_EncryptFinal で完了</text>
+        <text x="710" y="224" text-anchor="end" font-size="9" fill="#8b6a2a" font-family="JetBrains Mono">Sign + Encrypt</text>
+
+        <!-- Row 4: DecryptVerifyUpdate -->
+        <rect x="20" y="268" width="720" height="64" fill="#fdfaf2" stroke="#6b8e5e" stroke-width="1.2"/>
+        <rect x="20" y="268" width="4" height="64" fill="#6b8e5e"/>
+        <text x="40" y="290" font-size="10" fill="#6b8e5e" font-weight="700" font-family="JetBrains Mono">C_DecryptVerifyUpdate</text>
+        <text x="40" y="306" font-size="9.5" fill="#3c4865">前提：<code>C_DecryptInit</code> + <code>C_VerifyInit</code> を両方完了済み。復号しながら署名を検証。</text>
+        <text x="40" y="324" font-size="9" fill="#6d7591" font-style="italic">用途例：暗号化+署名されたメッセージを受け取り、復号と署名検証を同時に</text>
+        <text x="710" y="300" text-anchor="end" font-size="9" fill="#6b8e5e" font-family="JetBrains Mono">Decrypt + Verify</text>
+      </svg>
+    </div>
+
+    <div class="cols-2">
+      <div class="card bordered-left">
+        <div class="card-title">使用パターン</div>
+        <div class="fn-sig" style="font-size:0.75rem">
+<span class="fn-cmt">// DigestEncryptUpdate の使い方</span>
+<span class="fn-name">C_DigestInit</span>(<span class="fn-arg">sess, &amp;sha256Mech</span>);
+<span class="fn-name">C_EncryptInit</span>(<span class="fn-arg">sess, &amp;aesMech, hKey</span>);
+
+<span class="fn-name">C_DigestEncryptUpdate</span>(
+  <span class="fn-arg">sess, pPart, ulPartLen</span>,     <span class="fn-cmt">// 入力</span>
+  <span class="fn-arg">pEncPart, &amp;ulEncPartLen</span>   <span class="fn-cmt">// 暗号化済み出力</span>
+);
+
+<span class="fn-name">C_DigestFinal</span>(<span class="fn-arg">sess, hash, &amp;hashLen</span>);
+<span class="fn-name">C_EncryptFinal</span>(<span class="fn-arg">sess, final, &amp;finalLen</span>);
+        </div>
+      </div>
+      <div class="card warn">
+        <div class="card-title">ベンダー対応状況に注意</div>
+        <p style="font-size:0.9rem">複合操作は仕様に定義されているが、<strong>多くのHSMベンダーが未実装</strong>。SoftHSM2も一部未実装。</p>
+        <p style="font-size:0.9rem"><code>C_GetMechanismList</code> で確認するのはもちろん、<strong>実機で事前検証が必須</strong>。未対応の場合は個別に2回呼ぶ。</p>
+      </div>
+    </div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[1] PKCS#11 Spec v3.2 §5.17-5.18 Combined operations</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 10: FindObjects ====== -->
+<section class="slide" data-title="FindObjects — 属性フィルタで検索">
+  <span class="slide-num">10 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag ch4">CHAPTER 4 · オブジェクト管理 · 検索</span>
+    <h2><span class="num">10</span>オブジェクト検索 — C_FindObjects 3段ロケット</h2>
+    <p class="lead"><code>C_FindObjects</code> は署名や暗号化と同じく3段構造。<strong>属性テンプレートで絞り込み → ハンドル一覧を取得</strong>。鍵のラベルや用途で検索し、ハンドルを取り出す日常的な操作。</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 380" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+        <defs><marker id="a10" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><polygon points="0,0 8,3 0,6" fill="#18233a"/></marker></defs>
+
+        <!-- Phase 1: Init -->
+        <rect x="20" y="30" width="215" height="130" fill="#fdfaf2" stroke="#3d8a8a" stroke-width="2"/>
+        <text x="128" y="52" text-anchor="middle" font-size="11" fill="#3d8a8a" font-weight="700" font-family="JetBrains Mono">① C_FindObjectsInit</text>
+        <line x1="30" y1="62" x2="225" y2="62" stroke="#d6cdb7"/>
+        <text x="35" y="79" font-size="9.5" fill="#6d7591">検索テンプレートを渡す</text>
+
+        <rect x="35" y="88" width="190" height="58" fill="#faf6ec" stroke="#b88a3c" stroke-width="1"/>
+        <text x="40" y="103" font-size="8.5" fill="#6d7591" font-family="JetBrains Mono">CK_ATTRIBUTE tmpl[] = {</text>
+        <text x="48" y="118" font-size="8.5" fill="#18233a" font-family="JetBrains Mono">{ CKA_CLASS, PRIV_KEY },</text>
+        <text x="48" y="132" font-size="8.5" fill="#18233a" font-family="JetBrains Mono">{ CKA_LABEL, "sign-k" }</text>
+        <text x="40" y="146" font-size="8.5" fill="#6d7591" font-family="JetBrains Mono">};</text>
+
+        <path d="M 238 90 L 278 90" stroke="#18233a" stroke-width="1.5" marker-end="url(#a10)"/>
+
+        <!-- Phase 2: FindObjects -->
+        <rect x="280" y="30" width="200" height="130" fill="#faf6ec" stroke="#3d8a8a" stroke-width="2.5"/>
+        <text x="380" y="52" text-anchor="middle" font-size="11" fill="#3d8a8a" font-weight="700" font-family="JetBrains Mono">② C_FindObjects</text>
+        <line x1="290" y1="62" x2="470" y2="62" stroke="#d6cdb7"/>
+
+        <text x="295" y="80" font-size="9" fill="#6d7591">最大取得数を指定して呼ぶ</text>
+        <text x="295" y="96" font-size="9" fill="#18233a">返り値：ハンドル配列</text>
+
+        <!-- Token search -->
+        <rect x="295" y="105" width="170" height="46" fill="#fdf0e0" stroke="#3d8a8a" stroke-width="1" stroke-dasharray="2,2"/>
+        <text x="380" y="122" text-anchor="middle" font-size="8.5" fill="#3d8a8a" font-weight="700">Token内の対象オブジェクト</text>
+        <text x="350" y="140" font-size="8.5" fill="#8b6a2a">🔑 handle=47 "sign-k" OK</text>
+        <text x="350" y="153" font-size="8.5" fill="#6d7591">📄 cert=12  ←属性不一致</text>
+
+        <path d="M 483 90 L 520 90" stroke="#18233a" stroke-width="1.5" marker-end="url(#a10)"/>
+
+        <!-- Phase 3: Final -->
+        <rect x="522" y="30" width="215" height="130" fill="#fdfaf2" stroke="#3d8a8a" stroke-width="2"/>
+        <text x="630" y="52" text-anchor="middle" font-size="11" fill="#3d8a8a" font-weight="700" font-family="JetBrains Mono">③ C_FindObjectsFinal</text>
+        <line x1="532" y1="62" x2="728" y2="62" stroke="#d6cdb7"/>
+
+        <text x="538" y="80" font-size="9" fill="#6d7591">検索を終了してリソース解放</text>
+        <text x="538" y="97" font-size="9" fill="#18233a" font-weight="600">取得済みハンドルはそのまま有効</text>
+        <rect x="540" y="108" width="190" height="36" fill="#edf8f0" stroke="#6b8e5e" stroke-width="1"/>
+        <text x="635" y="125" text-anchor="middle" font-size="10" fill="#6b8e5e" font-weight="700">handles[] = { 47 }</text>
+        <text x="635" y="139" text-anchor="middle" font-size="9" fill="#3c4865">以降はこのハンドルで操作</text>
+
+        <!-- Result flow caption -->
+        <text x="380" y="185" text-anchor="middle" font-size="10" fill="#6d7591" font-style="italic">Init → 検索テンプレート渡し →  FindObjects → ハンドル取得 → Final で完了</text>
+
+        <!-- Code example -->
+        <rect x="20" y="200" width="720" height="160" fill="#1d2435" rx="2"/>
+        <text x="36" y="220" font-size="8.5" fill="#7e8aa6" font-style="italic" font-family="JetBrains Mono">// C言語 — 使用例</text>
+        <text x="36" y="238" font-size="8.5" fill="#c89bff" font-family="JetBrains Mono">CK_OBJECT_CLASS</text>
+        <text x="162" y="238" font-size="8.5" fill="#e8e3d5" font-family="JetBrains Mono"> cls = CKO_PRIVATE_KEY;</text>
+        <text x="36" y="254" font-size="8.5" fill="#7ab8e6" font-family="JetBrains Mono">CK_ATTRIBUTE</text>
+        <text x="113" y="254" font-size="8.5" fill="#e8e3d5" font-family="JetBrains Mono"> tmpl[] = {</text>
+        <text x="52" y="268" font-size="8.5" fill="#e8e3d5" font-family="JetBrains Mono">{ CKA_CLASS, &amp;cls, sizeof(cls) },</text>
+        <text x="52" y="282" font-size="8.5" fill="#e8e3d5" font-family="JetBrains Mono">{ CKA_LABEL, "signing-key-2024", 16 }</text>
+        <text x="36" y="296" font-size="8.5" fill="#e8e3d5" font-family="JetBrains Mono">};</text>
+        <text x="36" y="312" font-size="8.5" fill="#f5d97a" font-family="JetBrains Mono">C_FindObjectsInit</text>
+        <text x="152" y="312" font-size="8.5" fill="#e8e3d5" font-family="JetBrains Mono">(sess, tmpl, 2);</text>
+        <text x="36" y="326" font-size="8.5" fill="#7ab8e6" font-family="JetBrains Mono">CK_OBJECT_HANDLE</text>
+        <text x="164" y="326" font-size="8.5" fill="#e8e3d5" font-family="JetBrains Mono"> handles[8]; CK_ULONG cnt;</text>
+        <text x="36" y="342" font-size="8.5" fill="#f5d97a" font-family="JetBrains Mono">C_FindObjects</text>
+        <text x="126" y="342" font-size="8.5" fill="#e8e3d5" font-family="JetBrains Mono">(sess, handles, 8, &amp;cnt);</text>
+        <text x="36" y="356" font-size="8.5" fill="#f5d97a" font-family="JetBrains Mono">C_FindObjectsFinal</text>
+        <text x="174" y="356" font-size="8.5" fill="#e8e3d5" font-family="JetBrains Mono">(sess);  </text>
+        <text x="350" y="342" font-size="8.5" fill="#7e8aa6" font-style="italic" font-family="JetBrains Mono">// handles[0..cnt] にハンドルが入る</text>
+      </svg>
+    </div>
+
+    <div class="card warn">
+      <div class="card-title">FindObjectsの落とし穴</div>
+      <ul style="font-size:0.9rem">
+        <li><strong>ラベル検索は部分一致でない</strong> — 属性は完全一致。前後の空白も区別される。</li>
+        <li><strong>Init/Final のペア忘れ</strong> — <code>C_FindObjectsFinal</code> を呼ばないと「検索アクティブ」状態が残り、別の<code>C_FindObjectsInit</code>が <code>CKR_OPERATION_ACTIVE</code> を返す。</li>
+        <li><strong>maxCount を超えた場合</strong> — 複数回 <code>C_FindObjects</code> を呼べば残りを取れる（内部カーソルが進む）。</li>
+      </ul>
+    </div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[1] PKCS#11 Spec v3.2 §5.9 Object search functions</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 11: GetAttributeValue / SetAttributeValue ====== -->
+<section class="slide" data-title="GetAttributeValue / SetAttributeValue">
+  <span class="slide-num">11 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag ch4">CHAPTER 4 · オブジェクト管理 · 属性操作</span>
+    <h2><span class="num">11</span>属性の読み書き — Get / Set AttributeValue</h2>
+    <p class="lead">ハンドルを持っているオブジェクトから<strong>属性を読み出す</strong>、または<strong>書き換える</strong>。第1部で学んだ <code>CKA_*</code> 属性を実際に操作する関数。</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+        <defs><marker id="a11" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><polygon points="0,0 8,3 0,6" fill="#18233a"/></marker></defs>
+
+        <!-- GetAttributeValue flow -->
+        <text x="200" y="22" text-anchor="middle" font-size="11" fill="#3d8a8a" font-weight="700">C_GetAttributeValue（読み出し）</text>
+
+        <rect x="30" y="38" width="140" height="50" fill="#fdfaf2" stroke="#3d8a8a" stroke-width="1.5"/>
+        <text x="100" y="56" text-anchor="middle" font-size="10" fill="#3d8a8a" font-weight="600">テンプレート準備</text>
+        <text x="100" y="72" text-anchor="middle" font-size="8.5" fill="#6d7591">CKA_LABEL, CKA_KEY_TYPE</text>
+        <text x="100" y="82" text-anchor="middle" font-size="8.5" fill="#6d7591">pValue=NULL (サイズ問合)</text>
+
+        <path d="M 173 63 L 203 63" stroke="#18233a" stroke-width="1.3" marker-end="url(#a11)"/>
+
+        <rect x="205" y="38" width="150" height="50" fill="#faf6ec" stroke="#3d8a8a" stroke-width="2"/>
+        <text x="280" y="56" text-anchor="middle" font-size="10" fill="#3d8a8a" font-weight="700">1回目の呼出</text>
+        <text x="280" y="72" text-anchor="middle" font-size="8.5" fill="#6d7591">ulValueLen に必要サイズ</text>
+        <text x="280" y="82" text-anchor="middle" font-size="8.5" fill="#6d7591">が書き込まれる</text>
+
+        <path d="M 358 63 L 388 63" stroke="#18233a" stroke-width="1.3" marker-end="url(#a11)"/>
+
+        <rect x="390" y="38" width="140" height="50" fill="#fdfaf2" stroke="#18233a" stroke-width="1.2"/>
+        <text x="460" y="56" text-anchor="middle" font-size="10" fill="#18233a" font-weight="600">バッファ確保</text>
+        <text x="460" y="72" text-anchor="middle" font-size="8.5" fill="#6d7591">malloc(ulValueLen)</text>
+        <text x="460" y="82" text-anchor="middle" font-size="8.5" fill="#6d7591">pValue をセット</text>
+
+        <path d="M 533 63 L 563 63" stroke="#18233a" stroke-width="1.3" marker-end="url(#a11)"/>
+
+        <rect x="565" y="38" width="150" height="50" fill="#faf6ec" stroke="#3d8a8a" stroke-width="2"/>
+        <text x="640" y="56" text-anchor="middle" font-size="10" fill="#3d8a8a" font-weight="700">2回目の呼出</text>
+        <text x="640" y="72" text-anchor="middle" font-size="8.5" fill="#6d7591">実際の値がバッファに</text>
+        <text x="640" y="82" text-anchor="middle" font-size="8.5" fill="#6d7591">書き込まれる</text>
+
+        <text x="380" y="115" text-anchor="middle" font-size="9" fill="#3d8a8a" font-style="italic">2-call convention: C_Sign と同じパターン。まず NULL でサイズ取得 → バッファ確保 → 実呼出</text>
+
+        <!-- SetAttributeValue -->
+        <text x="200" y="145" text-anchor="middle" font-size="11" fill="#c47a35" font-weight="700">C_SetAttributeValue（書き換え）</text>
+
+        <rect x="30" y="160" width="330" height="50" fill="#fdfaf2" stroke="#c47a35" stroke-width="1.5"/>
+        <text x="195" y="180" text-anchor="middle" font-size="10" fill="#c47a35" font-weight="600">テンプレートに新しい値をセット</text>
+        <text x="195" y="196" text-anchor="middle" font-size="8.5" fill="#6d7591" font-family="JetBrains Mono">{ CKA_LABEL, "new-label", 9 }</text>
+
+        <path d="M 363 185 L 403 185" stroke="#18233a" stroke-width="1.3" marker-end="url(#a11)"/>
+
+        <rect x="405" y="160" width="200" height="50" fill="#faf6ec" stroke="#c47a35" stroke-width="2"/>
+        <text x="505" y="180" text-anchor="middle" font-size="10" fill="#c47a35" font-weight="700">C_SetAttributeValue</text>
+        <text x="505" y="196" text-anchor="middle" font-size="8.5" fill="#6d7591">(sess, hObj, tmpl, count)</text>
+
+        <path d="M 608 185 L 648 185" stroke="#18233a" stroke-width="1.3" marker-end="url(#a11)"/>
+
+        <rect x="650" y="168" width="70" height="30" fill="#edf8f0" stroke="#6b8e5e" stroke-width="1.5"/>
+        <text x="685" y="188" text-anchor="middle" font-size="10" fill="#6b8e5e" font-weight="700">CKR_OK</text>
+
+        <!-- Warning -->
+        <rect x="30" y="230" width="700" height="58" fill="rgba(168,58,43,0.04)" stroke="#a83a2b" stroke-width="1"/>
+        <text x="50" y="248" font-size="10" fill="#a83a2b" font-weight="700">⚠ 変更できない属性がある</text>
+        <text x="50" y="265" font-size="9" fill="#3c4865">CKA_CLASS / CKA_KEY_TYPE は生成時に固定。CKA_SENSITIVE は true→false に戻せない（一方向性）。</text>
+        <text x="50" y="280" font-size="9" fill="#3c4865">CKA_EXTRACTABLE も false に変えたら戻せない。違反すると CKR_ATTRIBUTE_READ_ONLY が返る。</text>
+      </svg>
+    </div>
+
+    <div class="cols-2">
+      <div>
+        <h3><span class="marker">▸</span>C 言語コード例</h3>
+        <div class="code-block c">
+<span class="code-lang">C</span><pre><span class="com">/* --- 属性読み出し（2段階） --- */</span>
+<span class="ty">CK_ATTRIBUTE</span> tmpl[] = {
+  { <span class="ty">CKA_LABEL</span>, <span class="kw">NULL</span>, <span class="num">0</span> },  <span class="com">/* 1回目: サイズだけ */</span>
+};
+pF-&gt;<span class="fn-name">C_GetAttributeValue</span>(sess, hKey, tmpl, <span class="num">1</span>);
+
+<span class="com">/* tmpl[0].ulValueLen にラベル長が入る */</span>
+<span class="ty">char</span> *label = <span class="fn-name">malloc</span>(tmpl[<span class="num">0</span>].ulValueLen);
+tmpl[<span class="num">0</span>].pValue = label;
+
+pF-&gt;<span class="fn-name">C_GetAttributeValue</span>(sess, hKey, tmpl, <span class="num">1</span>);
+<span class="com">/* label に値が入っている */</span></pre>
+        </div>
+      </div>
+      <div>
+        <h3><span class="marker">▸</span>属性の変更可否まとめ</h3>
+        <table class="param-table">
+          <tr><th>属性</th><th>読取</th><th>変更</th><th>備考</th></tr>
+          <tr><td class="p-name">CKA_LABEL</td><td>○</td><td>○</td><td>自由に変更可</td></tr>
+          <tr><td class="p-name">CKA_ID</td><td>○</td><td>○</td><td>識別子。変更可</td></tr>
+          <tr><td class="p-name">CKA_CLASS</td><td>○</td><td>×</td><td>生成時に固定</td></tr>
+          <tr><td class="p-name">CKA_KEY_TYPE</td><td>○</td><td>×</td><td>鍵種類は不変</td></tr>
+          <tr><td class="p-name">CKA_SENSITIVE</td><td>○</td><td>false→true のみ</td><td>一方向</td></tr>
+          <tr><td class="p-name">CKA_EXTRACTABLE</td><td>○</td><td>true→false のみ</td><td>一方向</td></tr>
+          <tr><td class="p-name">CKA_MODULUS</td><td>○(公開鍵)</td><td>×</td><td>鍵素材は不変</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[1] PKCS#11 Spec v3.2 §5.9 C_GetAttributeValue / §5.10 C_SetAttributeValue</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 12: Create / Copy / Destroy Object ====== -->
+<section class="slide" data-title="CreateObject / CopyObject / DestroyObject">
+  <span class="slide-num">12 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag ch4">CHAPTER 4 · オブジェクト管理 · 生成・複製・削除</span>
+    <h2><span class="num">12</span>オブジェクトの生成・複製・削除</h2>
+    <p class="lead"><code>C_GenerateKey</code>/<code>C_GenerateKeyPair</code>とは別に、<strong>属性テンプレートから直接オブジェクトを作る</strong> <code>C_CreateObject</code>、属性を変えて複製する <code>C_CopyObject</code>、削除する <code>C_DestroyObject</code>。</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+        <defs><marker id="a12" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><polygon points="0,0 8,3 0,6" fill="#18233a"/></marker></defs>
+
+        <!-- CreateObject -->
+        <rect x="20" y="20" width="220" height="110" fill="#fdfaf2" stroke="#3d8a8a" stroke-width="2"/>
+        <text x="130" y="42" text-anchor="middle" font-size="11" fill="#3d8a8a" font-weight="700" font-family="JetBrains Mono">C_CreateObject</text>
+        <line x1="30" y1="50" x2="230" y2="50" stroke="#d6cdb7"/>
+        <text x="35" y="68" font-size="9" fill="#3c4865">属性テンプレートから新規作成</text>
+        <text x="35" y="84" font-size="9" fill="#3c4865">• 証明書のインポート</text>
+        <text x="35" y="98" font-size="9" fill="#3c4865">• データオブジェクト保存</text>
+        <text x="35" y="112" font-size="9" fill="#a83a2b" font-weight="600">• 秘密鍵の作成は非推奨</text>
+        <text x="35" y="124" font-size="8" fill="#6d7591">（外から持ち込む = SENSITIVE でない）</text>
+
+        <!-- CopyObject -->
+        <rect x="270" y="20" width="220" height="110" fill="#fdfaf2" stroke="#3d8a8a" stroke-width="2"/>
+        <text x="380" y="42" text-anchor="middle" font-size="11" fill="#3d8a8a" font-weight="700" font-family="JetBrains Mono">C_CopyObject</text>
+        <line x1="280" y1="50" x2="480" y2="50" stroke="#d6cdb7"/>
+        <text x="285" y="68" font-size="9" fill="#3c4865">既存オブジェクトを複製</text>
+        <text x="285" y="84" font-size="9" fill="#3c4865">• 属性を変更しながらコピー</text>
+        <text x="285" y="98" font-size="9" fill="#3c4865">• CKA_TOKEN=true で永続化</text>
+        <text x="285" y="112" font-size="9" fill="#3c4865">• CKA_EXTRACTABLE を false に</text>
+        <text x="285" y="124" font-size="8" fill="#6d7591">（コピー元は変更されない）</text>
+
+        <!-- DestroyObject -->
+        <rect x="520" y="20" width="220" height="110" fill="#fdfaf2" stroke="#a83a2b" stroke-width="2"/>
+        <text x="630" y="42" text-anchor="middle" font-size="11" fill="#a83a2b" font-weight="700" font-family="JetBrains Mono">C_DestroyObject</text>
+        <line x1="530" y1="50" x2="730" y2="50" stroke="#d6cdb7"/>
+        <text x="535" y="68" font-size="9" fill="#3c4865">オブジェクトを永久削除</text>
+        <text x="535" y="84" font-size="9" fill="#a83a2b" font-weight="600">⚠ 元に戻せない</text>
+        <text x="535" y="98" font-size="9" fill="#3c4865">• セッションのみ → 自動消滅</text>
+        <text x="535" y="112" font-size="9" fill="#3c4865">• CKA_TOKEN=true の永続鍵</text>
+        <text x="535" y="124" font-size="8" fill="#a83a2b">→ 意図的にDestroyが必要</text>
+
+        <!-- Relationship arrows -->
+        <path d="M 130 135 L 130 175 L 375 175" stroke="#3d8a8a" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#a12)" fill="none"/>
+        <text x="253" y="170" text-anchor="middle" font-size="8.5" fill="#6d7591">新しいハンドル</text>
+
+        <path d="M 380 135 L 380 200 L 625 200" stroke="#3d8a8a" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#a12)" fill="none"/>
+        <text x="503" y="195" text-anchor="middle" font-size="8.5" fill="#6d7591">複製したハンドル</text>
+
+        <!-- GetObjectSize -->
+        <rect x="20" y="220" width="720" height="45" fill="#faf6ec" stroke="#b88a3c" stroke-width="1"/>
+        <text x="50" y="240" font-size="10" fill="#8b6a2a" font-weight="700" font-family="JetBrains Mono">C_GetObjectSize(sess, hObj, &amp;size)</text>
+        <text x="50" y="255" font-size="9" fill="#6d7591">オブジェクトが Token 内で占めるバイト数を取得。容量管理に使う。ベンダー依存で概算値の場合もある。</text>
+      </svg>
+    </div>
+
+    <div class="cols-2">
+      <div class="card bordered-left">
+        <div class="card-title">C_CreateObject の典型パターン</div>
+        <div class="code-block c">
+<span class="code-lang">C</span><pre><span class="com">/* 証明書をTokenにインポート */</span>
+<span class="ty">CK_OBJECT_CLASS</span> cls = <span class="ty">CKO_CERTIFICATE</span>;
+<span class="ty">CK_CERTIFICATE_TYPE</span> ctype = <span class="ty">CKC_X_509</span>;
+<span class="ty">CK_ATTRIBUTE</span> tmpl[] = {
+  { <span class="ty">CKA_CLASS</span>,            &amp;cls,   <span class="kw">sizeof</span>(cls)   },
+  { <span class="ty">CKA_CERTIFICATE_TYPE</span>, &amp;ctype, <span class="kw">sizeof</span>(ctype) },
+  { <span class="ty">CKA_TOKEN</span>,            &amp;true_val, <span class="num">1</span>          },
+  { <span class="ty">CKA_LABEL</span>,            <span class="str">"my-cert"</span>, <span class="num">7</span>          },
+  { <span class="ty">CKA_VALUE</span>,            cert_der, cert_len     },
+};
+<span class="ty">CK_OBJECT_HANDLE</span> hCert;
+pF-&gt;<span class="fn-name">C_CreateObject</span>(sess, tmpl, <span class="num">5</span>, &amp;hCert);</pre>
+        </div>
+      </div>
+      <div class="card warn">
+        <div class="card-title">DestroyObject の注意点</div>
+        <ul style="font-size:0.88rem;margin:0.3rem 0">
+          <li>R/Wセッションでログイン済みであること</li>
+          <li><code>CKA_DESTROYABLE=false</code> の鍵は削除不可（v3.0+）</li>
+          <li>削除前に <code>C_CopyObject</code> でバックアップすることを検討</li>
+          <li>HSMの監査ログには記録されるが、<strong>鍵の復元手段はない</strong></li>
+        </ul>
+      </div>
+    </div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[1] PKCS#11 Spec v3.2 §5.8 C_CreateObject / §5.8.3 C_DestroyObject</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 13: WrapKey / UnwrapKey ====== -->
+<section class="slide" data-title="WrapKey / UnwrapKey — 鍵の安全な移送">
+  <span class="slide-num">13 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag ch5">CHAPTER 5 · 鍵エスクロー · WrapKey / UnwrapKey</span>
+    <h2><span class="num">13</span>鍵の安全な移送 — WrapKey / UnwrapKey</h2>
+    <p class="lead"><strong>Wrap = 鍵を別の鍵で暗号化して外に出す</strong>。平文で鍵が出ないので安全。HSM間の鍵移行、鍵バックアップ、鍵配布プロトコルで必須の操作。</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 340" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+        <defs>
+          <marker id="a13" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><polygon points="0,0 8,3 0,6" fill="#18233a"/></marker>
+          <marker id="a13o" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><polygon points="0,0 8,3 0,6" fill="#c47a35"/></marker>
+        </defs>
+
+        <text x="380" y="22" text-anchor="middle" font-size="12" fill="#c47a35" font-weight="700" letter-spacing="2">鍵ラップの全体像</text>
+
+        <!-- HSM A -->
+        <rect x="20" y="50" width="240" height="120" fill="#faf6ec" stroke="#8b6a2a" stroke-width="2"/>
+        <text x="140" y="72" text-anchor="middle" font-size="11" fill="#8b6a2a" font-weight="700">HSM-A（送り元）</text>
+        <rect x="40" y="85" width="80" height="35" fill="#fdfaf2" stroke="#b88a3c" stroke-width="1.2"/>
+        <text x="80" y="100" text-anchor="middle" font-size="9" fill="#b88a3c">🔑 ラッピング鍵</text>
+        <text x="80" y="115" text-anchor="middle" font-size="8" fill="#6d7591">(AES-256)</text>
+        <rect x="140" y="85" width="100" height="35" fill="#fdfaf2" stroke="#a83a2b" stroke-width="1.2"/>
+        <text x="190" y="100" text-anchor="middle" font-size="9" fill="#a83a2b">🔑 対象秘密鍵</text>
+        <text x="190" y="115" text-anchor="middle" font-size="8" fill="#6d7591">(RSA-2048)</text>
+        <text x="140" y="155" text-anchor="middle" font-size="10" fill="#c47a35" font-weight="700" font-family="JetBrains Mono">C_WrapKey</text>
+
+        <!-- Wrapped key (middle) -->
+        <path d="M 265 110 L 310 110" stroke="#c47a35" stroke-width="2" marker-end="url(#a13o)"/>
+
+        <rect x="315" y="70" width="130" height="75" fill="#fdf0e0" stroke="#c47a35" stroke-width="2"/>
+        <text x="380" y="92" text-anchor="middle" font-size="10" fill="#c47a35" font-weight="700">ラップ済み鍵</text>
+        <text x="380" y="108" text-anchor="middle" font-size="9" fill="#3c4865">暗号化されたバイト列</text>
+        <text x="380" y="122" text-anchor="middle" font-size="8.5" fill="#6d7591">外に出しても安全</text>
+        <text x="380" y="136" text-anchor="middle" font-size="8.5" fill="#6d7591">（鍵素材は見えない）</text>
+
+        <!-- Transport -->
+        <path d="M 448 110 L 495 110" stroke="#c47a35" stroke-width="2" marker-end="url(#a13o)"/>
+        <text x="472" y="102" text-anchor="middle" font-size="8" fill="#6d7591">輸送</text>
+
+        <!-- HSM B -->
+        <rect x="500" y="50" width="240" height="120" fill="#faf6ec" stroke="#8b6a2a" stroke-width="2"/>
+        <text x="620" y="72" text-anchor="middle" font-size="11" fill="#8b6a2a" font-weight="700">HSM-B（受け先）</text>
+        <rect x="520" y="85" width="80" height="35" fill="#fdfaf2" stroke="#b88a3c" stroke-width="1.2"/>
+        <text x="560" y="100" text-anchor="middle" font-size="9" fill="#b88a3c">🔑 ラッピング鍵</text>
+        <text x="560" y="115" text-anchor="middle" font-size="8" fill="#6d7591">(同じAES-256)</text>
+        <rect x="620" y="85" width="100" height="35" fill="#edf8f0" stroke="#6b8e5e" stroke-width="1.5"/>
+        <text x="670" y="100" text-anchor="middle" font-size="9" fill="#6b8e5e">🔑 復元された鍵</text>
+        <text x="670" y="115" text-anchor="middle" font-size="8" fill="#6d7591">(RSA-2048)</text>
+        <text x="620" y="155" text-anchor="middle" font-size="10" fill="#c47a35" font-weight="700" font-family="JetBrains Mono">C_UnwrapKey</text>
+
+        <!-- Explanation -->
+        <rect x="20" y="200" width="720" height="126" fill="#fdfaf2" stroke="#c47a35" stroke-width="1"/>
+        <text x="380" y="222" text-anchor="middle" font-size="11" fill="#c47a35" font-weight="700">関数シグネチャ</text>
+        <text x="40" y="246" font-size="9" fill="#18233a" font-family="JetBrains Mono" font-weight="600">C_WrapKey(sess, &amp;mech, hWrappingKey, hTargetKey, pWrappedKey, &amp;wrappedKeyLen)</text>
+        <text x="40" y="262" font-size="8.5" fill="#6d7591">→ hWrappingKey で hTargetKey を暗号化し、pWrappedKey に書き出す。対象鍵は CKA_EXTRACTABLE=true が必須。</text>
+
+        <text x="40" y="286" font-size="9" fill="#18233a" font-family="JetBrains Mono" font-weight="600">C_UnwrapKey(sess, &amp;mech, hUnwrappingKey, pWrappedKey, wrappedLen, tmpl, tmplCnt, &amp;hNewKey)</text>
+        <text x="40" y="302" font-size="8.5" fill="#6d7591">→ pWrappedKey を hUnwrappingKey で復号し、tmpl の属性で新しい鍵オブジェクトとして作成。hNewKey が返る。</text>
+        <text x="40" y="318" font-size="8.5" fill="#a83a2b" font-weight="600">⚠ UnwrapKey は「復号 + CreateObject」の原子操作。平文の鍵素材はアプリに出ない。</text>
+      </svg>
+    </div>
+
+    <div class="cols-2">
+      <div class="card bordered-left">
+        <div class="card-title">ラップで使う主なメカニズム</div>
+        <table class="param-table">
+          <tr><th>Mechanism</th><th>用途</th></tr>
+          <tr><td class="p-name">CKM_AES_KEY_WRAP</td><td>RFC 3394 AES Key Wrap。鍵専用。</td></tr>
+          <tr><td class="p-name">CKM_AES_KEY_WRAP_PAD</td><td>パディング付き。任意長の鍵に対応。</td></tr>
+          <tr><td class="p-name">CKM_RSA_PKCS_OAEP</td><td>RSA公開鍵で対称鍵を包む。鍵配布向き。</td></tr>
+          <tr><td class="p-name">CKM_AES_GCM</td><td>汎用だがWrapに使えるかはベンダー依存。</td></tr>
+        </table>
+      </div>
+      <div class="card warn">
+        <div class="card-title">Wrap/Unwrap の前提条件</div>
+        <ul style="font-size:0.88rem;margin:0.3rem 0">
+          <li>対象鍵: <code>CKA_EXTRACTABLE=true</code> 必須</li>
+          <li>ラッピング鍵: <code>CKA_WRAP=true</code></li>
+          <li>アンラッピング鍵: <code>CKA_UNWRAP=true</code></li>
+          <li>R/Wセッション + ログイン済み</li>
+        </ul>
+      </div>
+    </div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[1] PKCS#11 Spec v3.2 §5.15 Key wrapping</a><a href="#slide-19">[13] NIST SP 800-38F (AES Key Wrap)</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 14: DeriveKey ====== -->
+<section class="slide" data-title="DeriveKey — ECDH鍵合意">
+  <span class="slide-num">14 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag ch5">CHAPTER 5 · 鍵エスクロー · DeriveKey</span>
+    <h2><span class="num">14</span>鍵導出 — C_DeriveKey と ECDH 鍵合意</h2>
+    <p class="lead"><code>C_DeriveKey</code> は<strong>既存の鍵から新しい鍵を導出する</strong>操作。最も重要な用途は<strong>ECDH鍵合意</strong>（Diffie-Hellman）。TLS 1.3 の鍵交換で中核となる操作。</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 360" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+        <defs><marker id="a14" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><polygon points="0,0 8,3 0,6" fill="#18233a"/></marker></defs>
+
+        <text x="380" y="22" text-anchor="middle" font-size="12" fill="#3d8a8a" font-weight="700" letter-spacing="2">ECDH 鍵合意の流れ</text>
+
+        <!-- Alice -->
+        <rect x="20" y="50" width="200" height="110" fill="#fdfaf2" stroke="#5e88a6" stroke-width="2"/>
+        <text x="120" y="72" text-anchor="middle" font-size="11" fill="#5e88a6" font-weight="700">Alice 側の HSM</text>
+        <text x="120" y="92" text-anchor="middle" font-size="9" fill="#3c4865">EC秘密鍵: hAlicePriv</text>
+        <text x="120" y="106" text-anchor="middle" font-size="9" fill="#3c4865">EC公開鍵: alicePub (送る)</text>
+        <rect x="40" y="115" width="160" height="30" fill="#edf8f0" stroke="#3d8a8a" stroke-width="1.5"/>
+        <text x="120" y="135" text-anchor="middle" font-size="9" fill="#3d8a8a" font-weight="600">C_DeriveKey(hAlicePriv, bobPub)</text>
+
+        <!-- Bob -->
+        <rect x="540" y="50" width="200" height="110" fill="#fdfaf2" stroke="#c47a35" stroke-width="2"/>
+        <text x="640" y="72" text-anchor="middle" font-size="11" fill="#c47a35" font-weight="700">Bob 側の HSM</text>
+        <text x="640" y="92" text-anchor="middle" font-size="9" fill="#3c4865">EC秘密鍵: hBobPriv</text>
+        <text x="640" y="106" text-anchor="middle" font-size="9" fill="#3c4865">EC公開鍵: bobPub (送る)</text>
+        <rect x="560" y="115" width="160" height="30" fill="#edf8f0" stroke="#3d8a8a" stroke-width="1.5"/>
+        <text x="640" y="135" text-anchor="middle" font-size="9" fill="#3d8a8a" font-weight="600">C_DeriveKey(hBobPriv, alicePub)</text>
+
+        <!-- Public key exchange arrows -->
+        <path d="M 220 80 L 538 80" stroke="#6d7591" stroke-width="1.3" stroke-dasharray="5,3" marker-end="url(#a14)"/>
+        <text x="380" y="73" text-anchor="middle" font-size="8.5" fill="#6d7591">公開鍵の交換（平文でOK）</text>
+        <path d="M 538 100 L 220 100" stroke="#6d7591" stroke-width="1.3" stroke-dasharray="5,3" marker-end="url(#a14)"/>
+
+        <!-- Shared secret (both sides) -->
+        <rect x="40" y="185" width="160" height="45" fill="#faf6ec" stroke="#6b8e5e" stroke-width="2"/>
+        <text x="120" y="205" text-anchor="middle" font-size="10" fill="#6b8e5e" font-weight="700">🔑 共有秘密 (AES鍵)</text>
+        <text x="120" y="220" text-anchor="middle" font-size="8" fill="#6d7591">hDerivedKey_Alice</text>
+
+        <rect x="560" y="185" width="160" height="45" fill="#faf6ec" stroke="#6b8e5e" stroke-width="2"/>
+        <text x="640" y="205" text-anchor="middle" font-size="10" fill="#6b8e5e" font-weight="700">🔑 共有秘密 (AES鍵)</text>
+        <text x="640" y="220" text-anchor="middle" font-size="8" fill="#6d7591">hDerivedKey_Bob</text>
+
+        <path d="M 120 160 L 120 183" stroke="#18233a" stroke-width="1.5" marker-end="url(#a14)"/>
+        <path d="M 640 160 L 640 183" stroke="#18233a" stroke-width="1.5" marker-end="url(#a14)"/>
+
+        <!-- Same key indicator -->
+        <line x1="200" y1="207" x2="560" y2="207" stroke="#6b8e5e" stroke-width="2" stroke-dasharray="8,4"/>
+        <text x="380" y="200" text-anchor="middle" font-size="10" fill="#6b8e5e" font-weight="700">＝ 同じ値（数学的に保証）</text>
+
+        <!-- Caption -->
+        <text x="380" y="260" text-anchor="middle" font-size="10" fill="#6d7591" font-style="italic">互いの秘密鍵は一度も外に出ない。公開鍵だけを交換して共有秘密を導出。</text>
+
+        <!-- DeriveKey params -->
+        <rect x="80" y="275" width="600" height="70" fill="#fdfaf2" stroke="#3d8a8a" stroke-width="1"/>
+        <text x="100" y="296" font-size="9.5" fill="#3d8a8a" font-weight="700" font-family="JetBrains Mono">CK_ECDH1_DERIVE_PARAMS</text>
+        <text x="100" y="314" font-size="8.5" fill="#6d7591" font-family="JetBrains Mono">kdf = CKD_NULL | CKD_SHA256_KDF    </text>
+        <text x="380" y="314" font-size="8.5" fill="#6d7591" font-family="JetBrains Mono">pSharedData = NULL (optional)</text>
+        <text x="100" y="330" font-size="8.5" fill="#6d7591" font-family="JetBrains Mono">pPublicData = 相手の EC 公開鍵  (DER エンコード)</text>
+        <text x="100" y="342" font-size="8.5" fill="#a83a2b">Mechanism: CKM_ECDH1_DERIVE → テンプレートに CKA_KEY_TYPE=AES, CKA_VALUE_LEN=32 で 256-bit AES鍵を導出</text>
+      </svg>
+    </div>
+
+    <div class="card bordered-left">
+      <div class="card-title">DeriveKey のその他の用途</div>
+      <ul style="font-size:0.9rem;margin:0.3rem 0">
+        <li><code>CKM_CONCATENATE_BASE_AND_KEY</code> — 2つの鍵素材を連結</li>
+        <li><code>CKM_XOR_BASE_AND_DATA</code> — 鍵とデータのXOR</li>
+        <li><code>CKM_EXTRACT_KEY_FROM_KEY</code> — 鍵の一部を切り出し</li>
+        <li><code>CKM_SP800_108_COUNTER_KDF</code> — NIST SP 800-108 KDF (v3.0+)</li>
+      </ul>
+    </div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[1] PKCS#11 Spec v3.2 §5.15 C_DeriveKey, §2.16 ECDH</a><a href="#slide-19">[14] NIST SP 800-56A (Key Agreement)</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 15: GetInfo / GetSlotInfo / GetTokenInfo ====== -->
+<section class="slide" data-title="GetInfo / GetSlotInfo / GetTokenInfo">
+  <span class="slide-num">15 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag ch6">CHAPTER 6 · 環境情報 · 基本情報取得</span>
+    <h2><span class="num">15</span>環境情報の取得 — ライブラリ・スロット・トークン</h2>
+    <p class="lead">HSMに接続した後、まず<strong>環境の基本情報を取得する3つの関数</strong>。ベンダー名、バージョン、利用可能なスロット数、トークンの容量などを確認する。</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 330" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+        <!-- C_GetInfo -->
+        <rect x="20" y="30" width="230" height="135" fill="#fdfaf2" stroke="#5a6a82" stroke-width="2"/>
+        <text x="135" y="52" text-anchor="middle" font-size="11" fill="#5a6a82" font-weight="700" font-family="JetBrains Mono">C_GetInfo</text>
+        <line x1="30" y1="60" x2="240" y2="60" stroke="#d6cdb7"/>
+        <text x="135" y="76" text-anchor="middle" font-size="9.5" fill="#3c4865">ライブラリ全体の情報</text>
+
+        <rect x="35" y="85" width="200" height="70" fill="#faf6ec" stroke="#b88a3c" stroke-width="1"/>
+        <text x="40" y="100" font-size="8.5" fill="#18233a" font-family="JetBrains Mono">.cryptokiVersion = 3.2</text>
+        <text x="40" y="114" font-size="8.5" fill="#18233a" font-family="JetBrains Mono">.manufacturer = "Thales"</text>
+        <text x="40" y="128" font-size="8.5" fill="#18233a" font-family="JetBrains Mono">.libraryDesc = "Luna..."</text>
+        <text x="40" y="142" font-size="8.5" fill="#18233a" font-family="JetBrains Mono">.libraryVersion = 10.4</text>
+
+        <!-- C_GetSlotInfo -->
+        <rect x="270" y="30" width="230" height="135" fill="#fdfaf2" stroke="#5a6a82" stroke-width="2"/>
+        <text x="385" y="52" text-anchor="middle" font-size="11" fill="#5a6a82" font-weight="700" font-family="JetBrains Mono">C_GetSlotInfo</text>
+        <line x1="280" y1="60" x2="490" y2="60" stroke="#d6cdb7"/>
+        <text x="385" y="76" text-anchor="middle" font-size="9.5" fill="#3c4865">スロット個別の情報</text>
+
+        <rect x="285" y="85" width="200" height="70" fill="#faf6ec" stroke="#b88a3c" stroke-width="1"/>
+        <text x="290" y="100" font-size="8.5" fill="#18233a" font-family="JetBrains Mono">.slotDescription</text>
+        <text x="290" y="114" font-size="8.5" fill="#18233a" font-family="JetBrains Mono">.manufacturer</text>
+        <text x="290" y="128" font-size="8.5" fill="#18233a" font-family="JetBrains Mono">.flags (TOKEN_PRESENT等)</text>
+        <text x="290" y="142" font-size="8.5" fill="#18233a" font-family="JetBrains Mono">.hardwareVersion</text>
+
+        <!-- C_GetTokenInfo -->
+        <rect x="520" y="30" width="220" height="135" fill="#fdfaf2" stroke="#5a6a82" stroke-width="2"/>
+        <text x="630" y="52" text-anchor="middle" font-size="11" fill="#5a6a82" font-weight="700" font-family="JetBrains Mono">C_GetTokenInfo</text>
+        <line x1="530" y1="60" x2="730" y2="60" stroke="#d6cdb7"/>
+        <text x="630" y="76" text-anchor="middle" font-size="9.5" fill="#3c4865">トークン（パーティション）情報</text>
+
+        <rect x="535" y="85" width="190" height="70" fill="#faf6ec" stroke="#b88a3c" stroke-width="1"/>
+        <text x="540" y="100" font-size="8.5" fill="#18233a" font-family="JetBrains Mono">.label = "prod-keys"</text>
+        <text x="540" y="114" font-size="8.5" fill="#18233a" font-family="JetBrains Mono">.model / .serialNumber</text>
+        <text x="540" y="128" font-size="8.5" fill="#18233a" font-family="JetBrains Mono">.ulFreePublicMemory</text>
+        <text x="540" y="142" font-size="8.5" fill="#a83a2b" font-family="JetBrains Mono">.ulMaxSessionCount ★</text>
+
+        <!-- Arrow: flow -->
+        <text x="380" y="188" text-anchor="middle" font-size="10" fill="#5a6a82">呼び出し順序: C_GetSlotList → C_GetSlotInfo → C_GetTokenInfo</text>
+
+        <!-- C_GetSlotList -->
+        <rect x="20" y="210" width="720" height="105" fill="#fdfaf2" stroke="#5a6a82" stroke-width="1.2"/>
+        <text x="40" y="232" font-size="10" fill="#5a6a82" font-weight="700" font-family="JetBrains Mono">C_GetSlotList(tokenPresent, pSlotList, &amp;count)</text>
+        <text x="40" y="250" font-size="9" fill="#3c4865">利用可能なスロットIDの一覧を取得。<code>tokenPresent=CK_TRUE</code> にすると Token が挿入されたスロットだけに絞る。</text>
+        <text x="40" y="268" font-size="9" fill="#3c4865">2-call convention: <code>pSlotList=NULL</code> で count を取得 → バッファ確保 → 再呼出し。</text>
+
+        <rect x="40" y="280" width="690" height="28" fill="#1d2435"/>
+        <text x="55" y="298" font-size="8.5" fill="#f5d97a" font-family="JetBrains Mono">CK_SLOT_ID</text>
+        <text x="120" y="298" font-size="8.5" fill="#e8e3d5" font-family="JetBrains Mono"> slots[16]; CK_ULONG cnt = 16;</text>
+        <text x="328" y="298" font-size="8.5" fill="#f5d97a" font-family="JetBrains Mono">C_GetSlotList</text>
+        <text x="405" y="298" font-size="8.5" fill="#e8e3d5" font-family="JetBrains Mono">(CK_TRUE, slots, &amp;cnt);  </text>
+        <text x="560" y="298" font-size="8.5" fill="#7e8aa6" font-style="italic" font-family="JetBrains Mono">// slots[0..cnt]</text>
+      </svg>
+    </div>
+
+    <div class="card bordered-left">
+      <div class="card-title">性能評価に使える情報</div>
+      <p style="font-size:0.9rem"><code>CK_TOKEN_INFO</code> の <code>ulMaxSessionCount</code> でHSMが同時に開けるセッション数の上限がわかる。これが並列ベンチマークの上限を決める。<code>ulFreePublicMemory / ulFreePrivateMemory</code> でToken内の残り容量も確認可能。</p>
+    </div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[1] PKCS#11 Spec v3.2 §5.5 Slot and token management</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 16: GetMechanismList / GetMechanismInfo ====== -->
+<section class="slide" data-title="GetMechanismList / GetMechanismInfo">
+  <span class="slide-num">16 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag ch6">CHAPTER 6 · 環境情報 · メカニズム照会</span>
+    <h2><span class="num">16</span>メカニズム照会 — 対応アルゴリズムの確認</h2>
+    <p class="lead"><strong>そのHSMが何に対応しているか</strong>を事前確認する関数。ベンダーごとの「方言」差をコードから検出する、性能評価の設計段階で必須の操作。</p>
+
+    <div class="cols-2">
+      <div>
+        <h3><span class="marker">▸</span>C_GetMechanismList — 一覧取得</h3>
+        <div class="code-block c">
+<span class="code-lang">C</span><pre><span class="com">/* 2-call convention */</span>
+<span class="ty">CK_ULONG</span> cnt = <span class="num">0</span>;
+pF-&gt;<span class="fn-name">C_GetMechanismList</span>(slotId, <span class="kw">NULL</span>, &amp;cnt);
+
+<span class="ty">CK_MECHANISM_TYPE</span> *mechs = <span class="fn-name">malloc</span>(
+    cnt * <span class="kw">sizeof</span>(<span class="ty">CK_MECHANISM_TYPE</span>));
+pF-&gt;<span class="fn-name">C_GetMechanismList</span>(slotId, mechs, &amp;cnt);
+
+<span class="kw">for</span> (<span class="ty">CK_ULONG</span> i = <span class="num">0</span>; i &lt; cnt; i++) {
+    <span class="fn-name">printf</span>(<span class="str">"  0x%08lx\n"</span>, mechs[i]);
+}</pre>
+        </div>
+        <p style="font-size:0.88rem;color:var(--ink-muted)">出力例: CKM_RSA_PKCS_KEY_PAIR_GEN, CKM_AES_GCM, CKM_SHA256, ...</p>
+      </div>
+      <div>
+        <h3><span class="marker">▸</span>C_GetMechanismInfo — 詳細照会</h3>
+        <div class="code-block c">
+<span class="code-lang">C</span><pre><span class="ty">CK_MECHANISM_INFO</span> info;
+pF-&gt;<span class="fn-name">C_GetMechanismInfo</span>(
+    slotId, <span class="ty">CKM_RSA_PKCS_KEY_PAIR_GEN</span>, &amp;info);
+
+<span class="fn-name">printf</span>(<span class="str">"min key: %lu\n"</span>, info.ulMinKeySize);
+<span class="fn-name">printf</span>(<span class="str">"max key: %lu\n"</span>, info.ulMaxKeySize);
+<span class="fn-name">printf</span>(<span class="str">"flags: 0x%lx\n"</span>, info.flags);</pre>
+        </div>
+
+        <h3><span class="marker">▸</span>CK_MECHANISM_INFO の中身</h3>
+        <table class="param-table">
+          <tr><th>フィールド</th><th>意味</th></tr>
+          <tr><td class="p-name">ulMinKeySize</td><td>最小鍵長（RSAなら 2048等）</td></tr>
+          <tr><td class="p-name">ulMaxKeySize</td><td>最大鍵長（RSAなら 4096等）</td></tr>
+          <tr><td class="p-name">flags</td><td>CKF_SIGN / CKF_ENCRYPT / CKF_WRAP 等</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="card warn">
+      <div class="card-title">フラグの読み方（CK_MECHANISM_INFO.flags）</div>
+      <table class="tbl">
+        <tr><th>フラグ</th><th>値</th><th>意味</th></tr>
+        <tr><td><code>CKF_ENCRYPT</code></td><td>0x00000100</td><td>このMechanismで暗号化可</td></tr>
+        <tr><td><code>CKF_DECRYPT</code></td><td>0x00000200</td><td>復号可</td></tr>
+        <tr><td><code>CKF_SIGN</code></td><td>0x00000800</td><td>署名可</td></tr>
+        <tr><td><code>CKF_VERIFY</code></td><td>0x00002000</td><td>検証可</td></tr>
+        <tr><td><code>CKF_GENERATE_KEY_PAIR</code></td><td>0x00010000</td><td>鍵ペア生成可</td></tr>
+        <tr><td><code>CKF_WRAP</code></td><td>0x00020000</td><td>鍵ラップ可</td></tr>
+        <tr><td><code>CKF_DERIVE</code></td><td>0x00080000</td><td>鍵導出可</td></tr>
+      </table>
+    </div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[1] PKCS#11 Spec v3.2 §5.5 C_GetMechanismList / C_GetMechanismInfo</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 17: GetSessionInfo / GetOperationState ====== -->
+<section class="slide" data-title="GetSessionInfo / GetOperationState">
+  <span class="slide-num">17 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag ch6">CHAPTER 6 · 環境情報 · セッション状態</span>
+    <h2><span class="num">17</span>セッション状態の照会と保存</h2>
+    <p class="lead"><code>C_GetSessionInfo</code> でセッションの現在状態を、<code>C_GetOperationState</code> / <code>C_SetOperationState</code> で<strong>進行中の操作をバイト列として保存・復元</strong>する。</p>
+
+    <div class="cols-2">
+      <div>
+        <h3><span class="marker">▸</span>C_GetSessionInfo</h3>
+        <div class="code-block c">
+<span class="code-lang">C</span><pre><span class="ty">CK_SESSION_INFO</span> info;
+pF-&gt;<span class="fn-name">C_GetSessionInfo</span>(sess, &amp;info);
+
+<span class="fn-name">printf</span>(<span class="str">"slot:  %lu\n"</span>, info.slotID);
+<span class="fn-name">printf</span>(<span class="str">"state: %lu\n"</span>, info.state);
+<span class="fn-name">printf</span>(<span class="str">"flags: 0x%lx\n"</span>, info.flags);
+<span class="fn-name">printf</span>(<span class="str">"error: %lu\n"</span>, info.ulDeviceError);</pre>
+        </div>
+
+        <h3><span class="marker">▸</span>セッション状態の種類</h3>
+        <table class="param-table">
+          <tr><th>状態</th><th>意味</th></tr>
+          <tr><td class="p-name">CKS_RO_PUBLIC_SESSION</td><td>読取り専用 / 未ログイン</td></tr>
+          <tr><td class="p-name">CKS_RO_USER_FUNCTIONS</td><td>読取り専用 / User ログイン済</td></tr>
+          <tr><td class="p-name">CKS_RW_PUBLIC_SESSION</td><td>読書き可 / 未ログイン</td></tr>
+          <tr><td class="p-name">CKS_RW_USER_FUNCTIONS</td><td>読書き可 / User ログイン済</td></tr>
+          <tr><td class="p-name">CKS_RW_SO_FUNCTIONS</td><td>読書き可 / SO ログイン済</td></tr>
+        </table>
+      </div>
+      <div>
+        <h3><span class="marker">▸</span>C_GetOperationState / C_SetOperationState</h3>
+        <p class="lead" style="font-size:0.95rem;margin-bottom:0.8rem">マルチパート操作（DigestUpdate中など）の<strong>途中状態をバイト列としてエクスポート</strong>し、後で復元できる。</p>
+
+        <div class="diagram" style="margin:0.5rem 0">
+          <svg viewBox="0 0 340 200" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+            <defs><marker id="a17" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><polygon points="0,0 7,3 0,6" fill="#18233a"/></marker></defs>
+
+            <rect x="10" y="10" width="130" height="40" fill="#faf6ec" stroke="#5a6a82" stroke-width="1.5"/>
+            <text x="75" y="28" text-anchor="middle" font-size="9.5" fill="#5a6a82" font-weight="700">Digest進行中</text>
+            <text x="75" y="43" text-anchor="middle" font-size="8.5" fill="#6d7591">Session A</text>
+
+            <path d="M 143 30 L 173 30" stroke="#18233a" stroke-width="1.3" marker-end="url(#a17)"/>
+            <text x="158" y="22" text-anchor="middle" font-size="8" fill="#5a6a82">Get</text>
+
+            <rect x="178" y="10" width="140" height="40" fill="#fdf0e0" stroke="#c47a35" stroke-width="1.5"/>
+            <text x="248" y="28" text-anchor="middle" font-size="9.5" fill="#c47a35" font-weight="700">操作状態バイト列</text>
+            <text x="248" y="43" text-anchor="middle" font-size="8.5" fill="#6d7591">opaque blob</text>
+
+            <path d="M 248 55 L 248 100" stroke="#c47a35" stroke-width="1.3" stroke-dasharray="4,3" marker-end="url(#a17)"/>
+            <text x="270" y="80" font-size="8" fill="#6d7591">保存/転送</text>
+
+            <rect x="178" y="105" width="140" height="40" fill="#fdf0e0" stroke="#c47a35" stroke-width="1.5"/>
+            <text x="248" y="123" text-anchor="middle" font-size="9.5" fill="#c47a35" font-weight="700">同じバイト列</text>
+
+            <path d="M 175 125 L 145 125" stroke="#18233a" stroke-width="1.3" marker-end="url(#a17)"/>
+            <text x="158" y="117" text-anchor="middle" font-size="8" fill="#5a6a82">Set</text>
+
+            <rect x="10" y="105" width="130" height="40" fill="#edf8f0" stroke="#6b8e5e" stroke-width="1.5"/>
+            <text x="75" y="123" text-anchor="middle" font-size="9.5" fill="#6b8e5e" font-weight="700">Digest再開</text>
+            <text x="75" y="138" text-anchor="middle" font-size="8.5" fill="#6d7591">Session B（別でもOK）</text>
+
+            <text x="170" y="168" text-anchor="middle" font-size="8.5" fill="#a83a2b" font-style="italic">暗号操作（Sign等）の途中状態はベンダー依存で非対応が多い</text>
+            <text x="170" y="185" text-anchor="middle" font-size="8.5" fill="#6d7591" font-style="italic">Digestの中間状態は多くのHSMで対応</text>
+          </svg>
+        </div>
+
+        <div class="card warn" style="margin-top:0.5rem">
+          <div class="card-title">ベンダー実装差</div>
+          <p style="font-size:0.88rem"><code>C_GetOperationState</code> が <code>CKR_STATE_UNSAVEABLE</code> を返す場合は「この操作の途中保存は非対応」。特に署名の途中状態は多くのHSMで非対応。</p>
+        </div>
+      </div>
+    </div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[1] PKCS#11 Spec v3.2 §5.6 C_GetSessionInfo, §5.7 C_GetOperationState</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 18: Token Management ====== -->
+<section class="slide" data-title="Token管理 — InitToken / InitPIN / SetPIN">
+  <span class="slide-num">18 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag">CLOSING · Token管理</span>
+    <h2><span class="num">18</span>Token管理 — InitToken / InitPIN / SetPIN</h2>
+    <p class="lead">Token の<strong>初期化・PIN設定</strong>は日常の暗号操作とは異なる管理系関数。HSMの初期セットアップやPIN変更で使う。</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 260" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
+        <defs><marker id="a18" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><polygon points="0,0 8,3 0,6" fill="#18233a"/></marker></defs>
+
+        <!-- InitToken -->
+        <rect x="20" y="30" width="220" height="100" fill="#fdfaf2" stroke="#a83a2b" stroke-width="2"/>
+        <text x="130" y="52" text-anchor="middle" font-size="11" fill="#a83a2b" font-weight="700" font-family="JetBrains Mono">C_InitToken</text>
+        <line x1="30" y1="60" x2="230" y2="60" stroke="#d6cdb7"/>
+        <text x="35" y="78" font-size="9" fill="#3c4865">(slotId, pPin, ulPinLen, pLabel)</text>
+        <text x="35" y="94" font-size="9" fill="#a83a2b" font-weight="600">⚠ 全オブジェクトが削除される</text>
+        <text x="35" y="110" font-size="9" fill="#6d7591">SO PIN でトークンを初期化</text>
+        <text x="35" y="124" font-size="9" fill="#6d7591">ラベルを設定（32バイト固定長）</text>
+
+        <path d="M 243 80 L 278 80" stroke="#18233a" stroke-width="1.5" marker-end="url(#a18)"/>
+
+        <!-- InitPIN -->
+        <rect x="280" y="30" width="220" height="100" fill="#fdfaf2" stroke="#b88a3c" stroke-width="2"/>
+        <text x="390" y="52" text-anchor="middle" font-size="11" fill="#8b6a2a" font-weight="700" font-family="JetBrains Mono">C_InitPIN</text>
+        <line x1="290" y1="60" x2="490" y2="60" stroke="#d6cdb7"/>
+        <text x="295" y="78" font-size="9" fill="#3c4865">(sess, pPin, ulPinLen)</text>
+        <text x="295" y="94" font-size="9" fill="#3c4865">User PIN の初期設定</text>
+        <text x="295" y="110" font-size="9" fill="#3c4865">SO がログインした R/W セッションで</text>
+        <text x="295" y="124" font-size="9" fill="#6d7591">InitToken の後に一度だけ実行</text>
+
+        <path d="M 503 80 L 538 80" stroke="#18233a" stroke-width="1.5" marker-end="url(#a18)"/>
+
+        <!-- SetPIN -->
+        <rect x="540" y="30" width="200" height="100" fill="#fdfaf2" stroke="#6b8e5e" stroke-width="2"/>
+        <text x="640" y="52" text-anchor="middle" font-size="11" fill="#6b8e5e" font-weight="700" font-family="JetBrains Mono">C_SetPIN</text>
+        <line x1="550" y1="60" x2="730" y2="60" stroke="#d6cdb7"/>
+        <text x="555" y="78" font-size="9" fill="#3c4865">(sess, pOldPin, oldLen,</text>
+        <text x="555" y="92" font-size="9" fill="#3c4865"> pNewPin, newLen)</text>
+        <text x="555" y="108" font-size="9" fill="#3c4865">自分の PIN を変更</text>
+        <text x="555" y="124" font-size="9" fill="#6d7591">User / SO どちらも可</text>
+
+        <!-- Usage flow -->
+        <rect x="20" y="150" width="720" height="95" fill="#fdfaf2" stroke="#18233a" stroke-width="1"/>
+        <text x="380" y="172" text-anchor="middle" font-size="11" fill="#18233a" font-weight="700">典型的なセットアップ手順</text>
+
+        <text x="40" y="195" font-size="10" fill="#a83a2b" font-weight="600">① C_InitToken(slot, soPIN, "prod-keys")</text>
+        <text x="350" y="195" font-size="9" fill="#6d7591">SO PINで初期化。⚠ 既存データ消失</text>
+
+        <text x="40" y="215" font-size="10" fill="#8b6a2a" font-weight="600">② C_Login(sess, CKU_SO, soPIN) → C_InitPIN(sess, userPIN)</text>
+        <text x="550" y="215" font-size="9" fill="#6d7591">User PIN を設定</text>
+
+        <text x="40" y="235" font-size="10" fill="#6b8e5e" font-weight="600">③ C_Login(sess, CKU_USER, userPIN) → 通常操作へ</text>
+        <text x="550" y="235" font-size="9" fill="#6d7591">以降は User でログイン</text>
+      </svg>
+    </div>
+
+    <div class="card warn">
+      <div class="card-title">SO (Security Officer) と User の違い</div>
+      <table class="param-table">
+        <tr><th></th><th>SO</th><th>User</th></tr>
+        <tr><td>役割</td><td>管理者（Token初期化・PIN設定）</td><td>利用者（暗号操作）</td></tr>
+        <tr><td>ログイン</td><td>CKU_SO</td><td>CKU_USER</td></tr>
+        <tr><td>暗号操作</td><td>× 不可</td><td>○ 可</td></tr>
+        <tr><td>InitToken</td><td>○</td><td>×</td></tr>
+        <tr><td>InitPIN</td><td>○（User PINを設定）</td><td>×</td></tr>
+        <tr><td>SetPIN</td><td>○（自身のPIN変更）</td><td>○（自身のPIN変更）</td></tr>
+      </table>
+    </div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[1] PKCS#11 Spec v3.2 §5.5 C_InitToken, §5.6 C_InitPIN / C_SetPIN</a></div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 19: Full Function Map ====== -->
+<section class="slide" data-title="全68関数マップ">
+  <span class="slide-num">19 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag">CLOSING · 全体図</span>
+    <h2><span class="num">19</span>全68関数マップ</h2>
+    <p class="lead">PKCS#11 v2.40 で定義されている<strong>全68関数</strong>をカテゴリ別に一覧化。<span style="color:var(--vault);font-weight:700">■ 太字</span> = このドキュメントシリーズで解説済み。</p>
+
+    <div class="fn-map">
+      <div class="fn-group" style="border-left:3px solid var(--ch6)">
+        <div class="fn-group-title" style="color:var(--ch6)">① 全体管理 (3)</div>
+        <ul>
+          <li class="hl">C_Initialize</li>
+          <li class="hl">C_Finalize</li>
+          <li class="hl">C_GetFunctionList</li>
+        </ul>
+      </div>
+      <div class="fn-group" style="border-left:3px solid var(--ch6)">
+        <div class="fn-group-title" style="color:var(--ch6)">② 環境情報 (7)</div>
+        <ul>
+          <li class="hl">C_GetInfo</li>
+          <li class="hl">C_GetSlotList</li>
+          <li class="hl">C_GetSlotInfo</li>
+          <li class="hl">C_GetTokenInfo</li>
+          <li class="hl">C_GetMechanismList</li>
+          <li class="hl">C_GetMechanismInfo</li>
+          <li>C_WaitForSlotEvent</li>
+        </ul>
+      </div>
+      <div class="fn-group" style="border-left:3px solid #b88a3c">
+        <div class="fn-group-title" style="color:#8b6a2a">③ セッション (8)</div>
+        <ul>
+          <li class="hl">C_OpenSession</li>
+          <li class="hl">C_CloseSession</li>
+          <li>C_CloseAllSessions</li>
+          <li class="hl">C_GetSessionInfo</li>
+          <li class="hl">C_GetOperationState</li>
+          <li class="hl">C_SetOperationState</li>
+          <li class="hl">C_Login</li>
+          <li class="hl">C_Logout</li>
+        </ul>
+      </div>
+      <div class="fn-group" style="border-left:3px solid var(--ch4)">
+        <div class="fn-group-title" style="color:var(--ch4)">④ オブジェクト (9)</div>
+        <ul>
+          <li class="hl">C_CreateObject</li>
+          <li class="hl">C_CopyObject</li>
+          <li class="hl">C_DestroyObject</li>
+          <li class="hl">C_GetObjectSize</li>
+          <li class="hl">C_GetAttributeValue</li>
+          <li class="hl">C_SetAttributeValue</li>
+          <li class="hl">C_FindObjectsInit</li>
+          <li class="hl">C_FindObjects</li>
+          <li class="hl">C_FindObjectsFinal</li>
+        </ul>
+      </div>
+      <div class="fn-group" style="border-left:3px solid var(--ch1)">
+        <div class="fn-group-title" style="color:var(--ch1)">⑤ 暗号化 (4)</div>
+        <ul>
+          <li class="hl">C_EncryptInit</li>
+          <li class="hl">C_Encrypt</li>
+          <li>C_EncryptUpdate</li>
+          <li>C_EncryptFinal</li>
+        </ul>
+      </div>
+      <div class="fn-group" style="border-left:3px solid var(--ch1)">
+        <div class="fn-group-title" style="color:var(--ch1)">⑥ 復号 (4)</div>
+        <ul>
+          <li class="hl">C_DecryptInit</li>
+          <li class="hl">C_Decrypt</li>
+          <li>C_DecryptUpdate</li>
+          <li>C_DecryptFinal</li>
+        </ul>
+      </div>
+      <div class="fn-group" style="border-left:3px solid var(--ch3)">
+        <div class="fn-group-title" style="color:var(--ch3)">⑦ ダイジェスト (5)</div>
+        <ul>
+          <li class="hl">C_DigestInit</li>
+          <li class="hl">C_Digest</li>
+          <li class="hl">C_DigestUpdate</li>
+          <li class="hl">C_DigestKey</li>
+          <li class="hl">C_DigestFinal</li>
+        </ul>
+      </div>
+      <div class="fn-group" style="border-left:3px solid var(--vault)">
+        <div class="fn-group-title" style="color:var(--vault)">⑧ 署名 (6)</div>
+        <ul>
+          <li class="hl">C_SignInit</li>
+          <li class="hl">C_Sign</li>
+          <li>C_SignUpdate</li>
+          <li>C_SignFinal</li>
+          <li class="hl">C_SignRecoverInit</li>
+          <li class="hl">C_SignRecover</li>
+        </ul>
+      </div>
+      <div class="fn-group" style="border-left:3px solid var(--ch2)">
+        <div class="fn-group-title" style="color:var(--ch2)">⑨ 検証 (6)</div>
+        <ul>
+          <li class="hl">C_VerifyInit</li>
+          <li class="hl">C_Verify</li>
+          <li>C_VerifyUpdate</li>
+          <li>C_VerifyFinal</li>
+          <li class="hl">C_VerifyRecoverInit</li>
+          <li class="hl">C_VerifyRecover</li>
+        </ul>
+      </div>
+      <div class="fn-group" style="border-left:3px solid var(--ch3)">
+        <div class="fn-group-title" style="color:var(--ch3)">⑩ 複合 (4)</div>
+        <ul>
+          <li class="hl">C_DigestEncryptUpdate</li>
+          <li class="hl">C_DecryptDigestUpdate</li>
+          <li class="hl">C_SignEncryptUpdate</li>
+          <li class="hl">C_DecryptVerifyUpdate</li>
+        </ul>
+      </div>
+      <div class="fn-group" style="border-left:3px solid var(--ch5)">
+        <div class="fn-group-title" style="color:var(--ch5)">⑪ 鍵管理 (7)</div>
+        <ul>
+          <li class="hl">C_GenerateKey</li>
+          <li class="hl">C_GenerateKeyPair</li>
+          <li class="hl">C_WrapKey</li>
+          <li class="hl">C_UnwrapKey</li>
+          <li class="hl">C_DeriveKey</li>
+          <li>C_SeedRandom</li>
+          <li class="hl">C_GenerateRandom</li>
+        </ul>
+      </div>
+      <div class="fn-group" style="border-left:3px solid var(--red)">
+        <div class="fn-group-title" style="color:var(--red)">⑫ Token管理 + 互換 (5)</div>
+        <ul>
+          <li class="hl">C_InitToken</li>
+          <li class="hl">C_InitPIN</li>
+          <li class="hl">C_SetPIN</li>
+          <li>C_GetFunctionStatus</li>
+          <li>C_CancelFunction</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card bordered-left">
+      <div class="card-title">カバレッジ</div>
+      <p style="font-size:0.92rem">全68関数のうち、このドキュメントシリーズ（第1部〜第4部）で<strong>57関数を解説</strong>。残りの11関数は Update / Final のバリエーション（概念は同一）や後方互換用のレガシー関数（<code>C_GetFunctionStatus</code>, <code>C_CancelFunction</code>）。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 20: References ====== -->
+<section class="slide" data-title="References">
+  <span class="slide-num">20 / 20</span>
+  <div class="slide-inner">
+    <span class="slide-tag">REFERENCES</span>
+    <h2><span class="num">20</span>References — 一次資料</h2>
+    <p class="lead">このドキュメントの記述はすべて以下の一次資料に基づく。実装時は<strong>仕様書と使用するHSMベンダーの資料の両方</strong>を参照すること。</p>
+
+    <div class="ref-section">
+      <div class="ref-section-title">▸ PKCS#11 / Cryptoki 仕様書（OASIS）</div>
+      <ul class="ref-list">
+        <li>
+          <span class="ref-num">[1]</span>
+          <span class="ref-title">PKCS #11 Cryptographic Token Interface Base Specification v3.2</span>
+          <span class="ref-meta">OASIS Standard. 2024. 全関数の定義・型・戻り値の正式定義</span>
+          <a class="ref-url" href="https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.2/pkcs11-spec-v3.2.html" target="_blank" rel="noopener">docs.oasis-open.org/pkcs11/pkcs11-spec/v3.2/</a>
+        </li>
+        <li>
+          <span class="ref-num">[2]</span>
+          <span class="ref-title">PKCS #11 Cryptographic Token Interface Profiles v3.2</span>
+          <span class="ref-meta">メカニズムプロファイル。AES-GCM / RSA-OAEP / ECDH パラメータの詳細定義</span>
+          <a class="ref-url" href="https://docs.oasis-open.org/pkcs11/pkcs11-profiles/v3.2/pkcs11-profiles-v3.2.html" target="_blank" rel="noopener">docs.oasis-open.org/pkcs11/pkcs11-profiles/v3.2/</a>
+        </li>
+        <li>
+          <span class="ref-num">[3]</span>
+          <span class="ref-title">PKCS #11 Cryptographic Token Interface Usage Guide v3.2</span>
+          <span class="ref-meta">使用ガイド。属性テンプレートの組み方、鍵ラップのベストプラクティス</span>
+          <a class="ref-url" href="https://docs.oasis-open.org/pkcs11/pkcs11-ug/v3.2/pkcs11-ug-v3.2.html" target="_blank" rel="noopener">docs.oasis-open.org/pkcs11/pkcs11-ug/v3.2/</a>
+        </li>
+      </ul>
+    </div>
+
+    <div class="ref-section">
+      <div class="ref-section-title">▸ NIST 暗号標準</div>
+      <ul class="ref-list">
+        <li>
+          <span class="ref-num">[11]</span>
+          <span class="ref-title">NIST SP 800-38D — Recommendation for GCM Mode</span>
+          <span class="ref-meta">AES-GCM の仕様と IV/Tag に関する要件</span>
+          <a class="ref-url" href="https://csrc.nist.gov/publications/detail/sp/800-38d/final" target="_blank" rel="noopener">csrc.nist.gov/publications/detail/sp/800-38d/final</a>
+        </li>
+        <li>
+          <span class="ref-num">[12]</span>
+          <span class="ref-title">FIPS 180-4 — Secure Hash Standard (SHS)</span>
+          <span class="ref-meta">SHA-1/SHA-256/SHA-384/SHA-512 の仕様</span>
+          <a class="ref-url" href="https://csrc.nist.gov/publications/detail/fips/180/4/final" target="_blank" rel="noopener">csrc.nist.gov/publications/detail/fips/180/4/final</a>
+        </li>
+        <li>
+          <span class="ref-num">[13]</span>
+          <span class="ref-title">NIST SP 800-38F — Recommendation for Key Wrap</span>
+          <span class="ref-meta">AES Key Wrap (KW/KWP) の仕様。C_WrapKey の基礎</span>
+          <a class="ref-url" href="https://csrc.nist.gov/publications/detail/sp/800-38f/final" target="_blank" rel="noopener">csrc.nist.gov/publications/detail/sp/800-38f/final</a>
+        </li>
+        <li>
+          <span class="ref-num">[14]</span>
+          <span class="ref-title">NIST SP 800-56A — Recommendation for Pair-Wise Key Establishment (ECDH)</span>
+          <span class="ref-meta">ECDH鍵合意スキーム。C_DeriveKey / CKM_ECDH1_DERIVE の基礎</span>
+          <a class="ref-url" href="https://csrc.nist.gov/publications/detail/sp/800-56a/rev-3/final" target="_blank" rel="noopener">csrc.nist.gov/publications/detail/sp/800-56a/rev-3/final</a>
+        </li>
+      </ul>
+    </div>
+
+    <div class="ref-section">
+      <div class="ref-section-title">▸ ベンダー資料 / ツール</div>
+      <ul class="ref-list">
+        <li>
+          <span class="ref-num">[21]</span>
+          <span class="ref-title">AWS CloudHSM User Guide — PKCS#11 library</span>
+          <span class="ref-meta">CloudHSM でサポートされる Mechanism / 属性 / 制約の一覧</span>
+          <a class="ref-url" href="https://docs.aws.amazon.com/cloudhsm/latest/userguide/pkcs11-library.html" target="_blank" rel="noopener">docs.aws.amazon.com/cloudhsm/.../pkcs11-library</a>
+        </li>
+        <li>
+          <span class="ref-num">[22]</span>
+          <span class="ref-title">SoftHSM2 — Software-only PKCS#11 implementation</span>
+          <span class="ref-meta">ローカル開発・テスト用のソフトウェアHSM</span>
+          <a class="ref-url" href="https://github.com/opendnssec/SoftHSMv2" target="_blank" rel="noopener">github.com/opendnssec/SoftHSMv2</a>
+        </li>
+        <li>
+          <span class="ref-num">[23]</span>
+          <span class="ref-title">cryptoki — Rust PKCS#11 crate</span>
+          <span class="ref-meta">本シリーズで使用した Rust ラッパー</span>
+          <a class="ref-url" href="https://docs.rs/cryptoki/" target="_blank" rel="noopener">docs.rs/cryptoki/</a>
+        </li>
+      </ul>
+    </div>
+
+    <div style="text-align:center;margin-top:2rem;padding-top:1.5rem;border-top:1px solid var(--line);">
+      <p style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--ink-muted);letter-spacing:0.15em;">
+        END OF DOCUMENT
+      </p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<nav class="nav-bottom" aria-label="スライドナビゲーション">
+  <button id="prevBtn" type="button" aria-label="前のスライドへ">← PREV</button>
+  <button id="nextBtn" type="button" aria-label="次のスライドへ">NEXT →</button>
+</nav>
+
+<script src="assets/deck.js"></script>
+</body>
+</html>

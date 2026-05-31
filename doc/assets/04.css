@@ -1,0 +1,241 @@
+/* =====================================================================
+ * 04.css — 「PKCS#11 関数詳解」固有スタイル
+ * common.css の後に読み込む。
+ *
+ * 設計方針
+ *   - 各章を色で識別（ch1〜ch6）
+ *   - 関数シグネチャ表示 (.fn-sig) をコンポーネント化
+ *   - パラメータ一覧 (.param-table) を再利用可能クラスとして定義
+ *   - 暗号操作の比較表示 (.op-badge) を導入
+ * ===================================================================== */
+
+/* ── チャプター別タグ色 ─────────────────────────────────────────────── */
+:root {
+  --ch1: #5e88a6;   /* 暗号化・復号  (青) */
+  --ch2: #6b8e5e;   /* 検証          (緑) */
+  --ch3: #7b68a6;   /* ダイジェスト  (紫) */
+  --ch4: #3d8a8a;   /* オブジェクト  (青緑) */
+  --ch5: #c47a35;   /* 鍵エスクロー  (橙) */
+  --ch6: #5a6a82;   /* 環境情報      (スレート) */
+}
+
+.slide-tag.ch1 { color: var(--ch1); border-color: var(--ch1); }
+.slide-tag.ch2 { color: var(--ch2); border-color: var(--ch2); }
+.slide-tag.ch3 { color: var(--ch3); border-color: var(--ch3); }
+.slide-tag.ch4 { color: var(--ch4); border-color: var(--ch4); }
+.slide-tag.ch5 { color: var(--ch5); border-color: var(--ch5); }
+.slide-tag.ch6 { color: var(--ch6); border-color: var(--ch6); }
+
+/* ── 関数シグネチャ表示 (.fn-sig) ─────────────────────────────────── */
+/* 関数名 + 引数リストをコンパクトに表示するコンポーネント。
+ * code-block より軽量で、インライン解説と組み合わせやすい。
+ * 使い方: <div class="fn-sig"><span class="fn-name">C_xxx</span>(<span class="fn-arg">...</span>)</div> */
+.fn-sig {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.82rem;
+  background: rgba(24, 35, 58, 0.04);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--gold);
+  padding: 0.7rem 1rem;
+  margin: 0.5rem 0;
+  line-height: 1.8;
+  overflow-x: auto;
+}
+.fn-sig .fn-name { color: #f5d97a; font-weight: 700; }
+.fn-sig .fn-arg  { color: #7ab8e6; }
+.fn-sig .fn-ret  { color: #a8d391; }
+.fn-sig .fn-cmt  { color: #7e8aa6; font-style: italic; }
+
+/* ── パラメータ一覧表 (.param-table) ──────────────────────────────── */
+/* 関数の引数・戻り値をまとめる軽量テーブル。
+ * 通常の .tbl より行高を下げてコンパクトに。 */
+.param-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+  margin: 0.6rem 0;
+}
+.param-table th, .param-table td {
+  padding: 0.5rem 0.9rem;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+  text-align: left;
+}
+.param-table th {
+  background: rgba(184, 138, 60, 0.07);
+  font-family: "Shippori Mincho", serif;
+  font-weight: 700;
+  color: var(--ink);
+  border-bottom-color: var(--line-strong);
+  font-size: 0.82rem;
+}
+.param-table td { color: var(--ink-soft); }
+.param-table .p-name {
+  font-family: "JetBrains Mono", monospace;
+  color: var(--vault);
+  font-weight: 600;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+.param-table .p-type {
+  font-family: "JetBrains Mono", monospace;
+  color: #5e88a6;
+  font-size: 0.78rem;
+}
+.param-table .p-dir {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+}
+.param-table .p-in  { color: #6b8e5e; }
+.param-table .p-out { color: #c47a35; }
+.param-table .p-io  { color: var(--vault); }
+
+/* ── 操作バッジ (.op-badge) ────────────────────────────────────────── */
+/* 操作の分類を小さなチップで示す。Sign/Verify/Encrypt 等の区別に使う。 */
+.op-badge {
+  display: inline-block;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 0.18em 0.55em;
+  border-radius: 2px;
+  margin: 0 0.2em;
+  vertical-align: middle;
+  text-transform: uppercase;
+}
+.op-badge.enc   { background: rgba(94, 136, 166, 0.15); color: var(--ch1); border: 1px solid rgba(94, 136, 166, 0.4); }
+.op-badge.dec   { background: rgba(94, 136, 166, 0.08); color: var(--ch1); border: 1px dashed rgba(94, 136, 166, 0.4); }
+.op-badge.sig   { background: rgba(139, 106, 42, 0.12); color: var(--vault); border: 1px solid rgba(139, 106, 42, 0.4); }
+.op-badge.vfy   { background: rgba(107, 142, 94, 0.12); color: var(--ch2); border: 1px solid rgba(107, 142, 94, 0.4); }
+.op-badge.dgst  { background: rgba(123, 104, 166, 0.12); color: var(--ch3); border: 1px solid rgba(123, 104, 166, 0.4); }
+.op-badge.wrap  { background: rgba(196, 122, 53, 0.12); color: var(--ch5); border: 1px solid rgba(196, 122, 53, 0.4); }
+.op-badge.drv   { background: rgba(61, 138, 138, 0.12); color: var(--ch4); border: 1px solid rgba(61, 138, 138, 0.4); }
+
+/* ── フェーズ表示 (02.css と同仕様) ──────────────────────────────── */
+.phase-box {
+  border: 1px solid var(--line);
+  padding: 1.2rem 1.5rem;
+  margin: 1rem 0;
+  background: var(--bg-card);
+  position: relative;
+}
+.phase-box.phase-prep   { border-left: 4px solid var(--ch1); }
+.phase-box.phase-exec   { border-left: 4px solid var(--gold); }
+.phase-box.phase-result { border-left: 4px solid var(--ch2); }
+.phase-label {
+  font-family: "Shippori Mincho", serif;
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  margin-bottom: 0.5rem;
+}
+.phase-prep   .phase-label { color: var(--ch1); }
+.phase-exec   .phase-label { color: var(--gold); }
+.phase-result .phase-label { color: var(--ch2); }
+.phase-box h4 {
+  font-family: "Shippori Mincho", serif;
+  font-size: 1.1rem;
+  color: var(--ink);
+  margin-bottom: 0.6rem;
+  font-weight: 700;
+}
+
+/* ── コードブロック言語別スタイル ─────────────────────────────────── */
+.code-block                 { font-size: 0.8rem; }
+.code-block pre             { white-space: pre-wrap; word-break: break-word; }
+.code-block.rust            { border-left-color: #d97757; }
+.code-block.c               { border-left-color: var(--ch1); }
+.code-block.shell           { border-left-color: var(--ch2); }
+.code-block.rust .code-lang { color: #d97757; }
+.code-block.c    .code-lang { color: var(--ch1); }
+.code-block.shell .code-lang{ color: var(--ch2); }
+.code-block .attr-c { color: #f5a363; }
+
+/* ── 操作ステップ一覧 (.op-steps) ─────────────────────────────────── */
+/* 3段ロケット等の手順を番号付きで表示する再利用コンポーネント。 */
+.op-steps { list-style: none; margin: 0.8rem 0; padding: 0; }
+.op-steps > li {
+  display: grid;
+  grid-template-columns: 2.2rem 1fr;
+  gap: 0.8rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px dotted var(--line);
+  align-items: start;
+  font-size: 0.93rem;
+}
+.op-steps > li::before { display: none; }
+.op-steps > li:last-child { border-bottom: none; }
+.op-steps .step-n {
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 700;
+  color: var(--gold);
+  font-size: 0.8rem;
+  margin-top: 0.1rem;
+}
+.op-steps .step-fn {
+  font-family: "JetBrains Mono", monospace;
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+.op-steps .step-desc {
+  color: var(--ink-soft);
+  font-size: 0.86rem;
+  margin-top: 0.15rem;
+}
+
+/* ── ファンクションマップ (.fn-map) ────────────────────────────────── */
+/* Slide 19 の全関数マップ専用。グリッドで関数をカテゴリ別に並べる。 */
+.fn-map {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.8rem;
+  margin: 1rem 0;
+}
+.fn-group {
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  padding: 0.8rem 1rem;
+}
+.fn-group-title {
+  font-family: "Shippori Mincho", serif;
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: var(--ink);
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--line);
+  letter-spacing: 0.03em;
+}
+.fn-group ul { margin: 0; padding: 0; }
+.fn-group ul li {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  padding: 0.1rem 0;
+  margin: 0;
+}
+.fn-group ul li::before { display: none; }
+.fn-group ul li.hl { color: var(--vault); font-weight: 600; }
+
+/* ── ダイアグラムキャプション ─────────────────────────────────────── */
+.diagram-caption {
+  font-family: "Shippori Mincho", serif;
+  font-size: 0.83rem;
+  color: var(--ink-muted);
+  text-align: center;
+  font-style: italic;
+  margin-top: -0.5rem;
+  margin-bottom: 1.2rem;
+}
+
+/* ── モバイル微調整 ──────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .code-block   { font-size: 0.74rem; }
+  .fn-map       { grid-template-columns: 1fr 1fr; }
+  .param-table  { font-size: 0.78rem; }
+  .op-steps > li { grid-template-columns: 1.8rem 1fr; gap: 0.5rem; }
+}
