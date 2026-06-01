@@ -178,7 +178,7 @@
 
         <!-- IV must be unique label -->
         <rect x="40" y="95" width="100" height="28" fill="rgba(168,58,43,0.06)" stroke="#a83a2b" stroke-width="0.8" stroke-dasharray="3,2"/>
-        <text x="90" y="108" text-anchor="middle" font-size="8.5" fill="#a83a2b" font-weight="600">⚠ 毎回ユニーク</text>
+        <text x="90" y="108" text-anchor="middle" font-size="8.5" fill="#a83a2b" font-weight="600">⚠ 使い回し禁止</text>
         <text x="90" y="119" text-anchor="middle" font-size="8" fill="#6d7591">C_GenerateRandom で生成</text>
       </svg>
     </div>
@@ -368,7 +368,7 @@
         </div>
 
         <div class="card warn" style="margin-top:0.8rem">
-          <div class="card-title">AES-CBC との手順差</div>
+          <div class="card-title">AES-CBC との手順の違い</div>
           <p style="font-size:0.9rem">CBCでは <code>CKM_AES_CBC_PAD</code> を使い、<code>pParameter</code> に<strong>16バイトのIV</strong>だけを渡す。タグはない。GCMより単純だが改ざん検知がない。</p>
           <div class="fn-sig"><span class="fn-name">CK_MECHANISM</span> mech = { <span class="fn-name">CKM_AES_CBC_PAD</span>, iv_16bytes, <span class="fn-arg">16</span> };</div>
         </div>
@@ -394,7 +394,7 @@
   <div class="slide-inner">
     <span class="slide-tag ch2">CHAPTER 2 · 署名検証 · シーケンス</span>
     <h2><span class="num">06</span>署名検証 — C_VerifyInit + C_Verify</h2>
-    <p class="lead">検証は<strong>公開鍵操作</strong>。秘密鍵へのアクセスは不要なので、<em>ログイン不要</em>で実行できる場合も多い。HSM内部では「ハッシュ計算 → 公開鍵でデパディング → ハッシュ比較」を行う。</p>
+    <p class="lead">検証は<strong>公開鍵操作</strong>。秘密鍵へのアクセスは不要なので、<em>ログイン不要</em>で実行できる場合も多い。HSM内部では「ハッシュ計算 → 公開鍵でパディング除去 → ハッシュ比較」を行う。</p>
 
     <div class="diagram">
       <svg viewBox="0 0 760 520" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
@@ -592,7 +592,7 @@
   <div class="slide-inner">
     <span class="slide-tag ch3">CHAPTER 3 · ダイジェスト</span>
     <h2><span class="num">08</span>ダイジェスト — ハッシュと <code>C_DigestKey</code></h2>
-    <p class="lead">PKCS#11のダイジェスト操作は<strong>データのハッシュ計算</strong>をHSM内で行う。特殊な <code>C_DigestKey</code> を使うと<strong>鍵の素材をハッシュ入力に含める</strong>ことができ、HMACの基礎操作に相当する。</p>
+    <p class="lead">PKCS#11のダイジェスト操作は<strong>データのハッシュ計算</strong>をHSM内で行う。特殊な <code>C_DigestKey</code> を使うと<strong>鍵素材をハッシュ入力に含める</strong>ことができ、HMACの基礎操作に相当する。</p>
 
     <div class="cols-2">
       <div>
@@ -1387,7 +1387,7 @@ pF-&gt;<span class="fn-name">C_GetSessionInfo</span>(sess, &amp;info);
       </div>
       <div>
         <h3><span class="marker">▸</span>C_GetOperationState / C_SetOperationState</h3>
-        <p class="lead" style="font-size:0.95rem;margin-bottom:0.8rem">マルチパート操作（DigestUpdate中など）の<strong>途中状態をバイト列としてエクスポート</strong>し、後で復元できる。</p>
+        <p class="lead" style="font-size:0.95rem;margin-bottom:0.8rem">マルチパート操作（DigestUpdate中など）の<strong>途中状態をバイト列として取り出し</strong>、後で復元できる。</p>
 
         <div class="diagram" style="margin:0.5rem 0">
           <svg viewBox="0 0 340 200" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
