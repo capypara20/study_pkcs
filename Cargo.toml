@@ -3,6 +3,15 @@ name = "study_pkcs"
 version = "0.1.0"
 edition = "2024"
 
+# デフォルトの実行バイナリ（既存の「生 FFI 学習」コード）
+#   cargo run            … src/main.rs が動く
+# cryptoki セットプログラム:
+#   cargo run --bin hsm -- <サブコマンド>   … src/bin/hsm.rs が動く
+
 [dependencies]
-object="0.32"
-libloading="0.9"
+# --- 生 FFI 学習用（src/main.rs） ---
+object = "0.32"
+libloading = "0.9"
+
+# --- cryptoki セットプログラム用（src/lib.rs, src/bin/hsm.rs） ---
+cryptoki = "0.10"
