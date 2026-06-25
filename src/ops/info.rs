@@ -39,6 +39,32 @@ pub fn show(pkcs11: &Pkcs11) -> Result<()> {
         println!("  token 型番    : {}", ti.model());
         println!("  token シリアル: {}", ti.serial_number());
 
+        // --- トークンの状態・容量・PIN まわり（C_GetTokenInfo の各フィールド）---
+        println!("  初期化済み    : {}", ti.token_initialized());
+        println!("  ログイン要否  : {}", ti.login_required());
+        println!("  書込保護      : {}", ti.write_protected());
+        println!("  乱数生成器    : {}", ti.rng());
+        println!(
+            "  PIN 長        : {}..={}",
+            ti.min_pin_length(),
+            ti.max_pin_length()
+        );
+        println!(
+            "  User PIN      : 設定済み={} / ロック={}",
+            ti.user_pin_initialized(),
+            ti.user_pin_locked()
+        );
+        println!(
+            "  メモリ(public): 空き={:?} / 合計={:?}",
+            ti.free_public_memory(),
+            ti.total_public_memory()
+        );
+        println!(
+            "  セッション数  : 現在={:?} / 上限={:?}",
+            ti.session_count(),
+            ti.max_session_count()
+        );
+
         // --- ③ 対応メカニズム一覧（C_GetMechanismList）+ 各詳細（C_GetMechanismInfo）---
         let mechs = pkcs11.get_mechanism_list(slot)?;
         println!("  対応メカニズム: {} 種", mechs.len());
