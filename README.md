@@ -16,16 +16,18 @@ cargo run --bin hsm -- help     # cryptoki セットプログラム
 
 ## ドキュメント
 
+🌐 **Web 版（GitHub Pages）**: <https://capypara20.github.io/study_pkcs/>
+
 | ファイル | 内容 |
 |---|---|
-| [doc/01.PKCS11-HSM入門.html](doc/01.PKCS11-HSM入門.html) | 基礎概念（Slot/Token/Session/Object/Attribute/Mechanism） |
-| [doc/02.PKCS11-操作フロー詳解.html](doc/02.PKCS11-操作フロー詳解.html) | 乱数・署名・鍵生成の 3 段ロケット |
-| [doc/03.PKCS11-Rust生FFI実装.html](doc/03.PKCS11-Rust生FFI実装.html) | 生 FFI 実装・型マッピング |
-| [doc/04.cryptoki-セットプログラム解説.html](doc/04.cryptoki-セットプログラム解説.html) | cryptoki 版の設計・C API 対応・使い方 |
-| [doc/05.PKCS11-関数リファレンス.html](doc/05.PKCS11-関数リファレンス.html) | **全関数の早見表**（2.40 の 68 関数 ＋ 3.0/3.2 追加分・実装状況つき） |
-| [doc/06.鍵生成の詳解.html](doc/06.鍵生成の詳解.html) | **鍵生成の深掘り**（属性の意味・RSA/EC/Ed25519/X25519/AES/HMAC の作り方・鍵→署名の対応） |
-| [doc/07.ユーザ認証と情報取得.html](doc/07.ユーザ認証と情報取得.html) | **User/SO・PIN・RO/RW・セッション状態**と**情報取得系**（各フィールドの意味） |
-| [doc/08.用語・略語集.html](doc/08.用語・略語集.html) | **略語・用語の早見表**（HSM/OID/DER/ECDH/RO/RW/CK* 接頭辞 など） |
+| [docs/01.PKCS11-HSM入門.html](docs/01.PKCS11-HSM入門.html) | 基礎概念（Slot/Token/Session/Object/Attribute/Mechanism） |
+| [docs/02.PKCS11-操作フロー詳解.html](docs/02.PKCS11-操作フロー詳解.html) | 乱数・署名・鍵生成の 3 段ロケット |
+| [docs/03.PKCS11-Rust生FFI実装.html](docs/03.PKCS11-Rust生FFI実装.html) | 生 FFI 実装・型マッピング |
+| [docs/04.cryptoki-セットプログラム解説.html](docs/04.cryptoki-セットプログラム解説.html) | cryptoki 版の設計・C API 対応・使い方 |
+| [docs/05.PKCS11-関数リファレンス.html](docs/05.PKCS11-関数リファレンス.html) | **全関数の早見表**（2.40 の 68 関数 ＋ 3.0/3.2 追加分・実装状況つき） |
+| [docs/06.鍵生成の詳解.html](docs/06.鍵生成の詳解.html) | **鍵生成の深掘り**（属性の意味・RSA/EC/Ed25519/X25519/AES/HMAC の作り方・鍵→署名の対応） |
+| [docs/07.ユーザ認証と情報取得.html](docs/07.ユーザ認証と情報取得.html) | **User/SO・PIN・RO/RW・セッション状態**と**情報取得系**（各フィールドの意味） |
+| [docs/08.用語・略語集.html](docs/08.用語・略語集.html) | **略語・用語の早見表**（HSM/OID/DER/ECDH/RO/RW/CK* 接頭辞 など） |
 
 ---
 
@@ -53,7 +55,7 @@ cargo run --bin hsm -- help     # cryptoki セットプログラム
 # 取得系（ログイン不要・最初の疎通確認に最適）
 cargo run --bin hsm -- info
 
-# 鍵生成（アルゴリズム別。詳しくは doc/06）
+# 鍵生成（アルゴリズム別。詳しくは docs/06）
 cargo run --bin hsm -- gen-rsa 2048 mykey
 cargo run --bin hsm -- gen-ec  p256 myec       # 曲線 p256/p384/p521/secp256k1
 cargo run --bin hsm -- gen-ed25519 myed
@@ -113,7 +115,7 @@ softhsm2-util --init-token --slot 0 --label "test" --so-pin 1234 --pin 1234
 
 **`cryptoki` 0.10 がラッパーを提供する関数はほぼ全て実装済み。**
 未実装で残るのは「cryptoki がそもそも安全ラッパーを用意していない関数」だけ（＝生 FFI でしか呼べない）。
-関数ごとの詳細は [doc/05](doc/05.PKCS11-関数リファレンス.html) を参照。
+関数ごとの詳細は [docs/05](docs/05.PKCS11-関数リファレンス.html) を参照。
 
 | カテゴリ | 実装済み | 未実装（cryptoki 0.10 にラッパー無し） |
 |---|---|---|

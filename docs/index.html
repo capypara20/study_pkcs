@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HSM × PKCS#11 ドキュメント</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/common.css">
+<link rel="stylesheet" href="assets/doc.css">
+<style>
+  :root { --accent: var(--vault); }
+  .home { max-width: 980px; margin: 0 auto; padding: 5rem 2rem 6rem; position: relative; z-index: 1; }
+  .home-head { margin-bottom: 2.5rem; padding-bottom: 1.6rem; border-bottom: 1px solid var(--line); }
+  .home-head .title-mark { font-family:"JetBrains Mono",monospace; font-size:0.72rem; letter-spacing:0.3em; color:var(--accent); text-transform:uppercase; margin-bottom:1rem; }
+  .home-head h1 { font-family:"Shippori Mincho",serif; font-weight:800; font-size:clamp(2rem,5vw,3.2rem); line-height:1.18; color:var(--ink); margin-bottom:0.8rem; }
+  .home-head h1 .accent { color:var(--accent); }
+  .home-head p { font-size:1rem; }
+  .sec-label { font-family:"JetBrains Mono",monospace; font-size:0.72rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--accent); margin:2.2rem 0 1rem; border-bottom:1px solid var(--gold); padding-bottom:0.3rem; }
+  .doc-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+  @media (max-width:680px){ .doc-grid{ grid-template-columns:1fr; } .home{ padding:4rem 1.2rem 5rem; } }
+  a.doc-card { display:block; text-decoration:none; background:var(--bg-card); border:1px solid var(--line); border-left:3px solid var(--accent); padding:1.1rem 1.3rem; box-shadow:var(--shadow); transition:transform 0.12s, border-color 0.12s; }
+  a.doc-card:hover { transform:translateY(-2px); border-left-color:var(--red); }
+  a.doc-card .n { font-family:"JetBrains Mono",monospace; font-size:0.72rem; color:var(--ink-muted); letter-spacing:0.1em; }
+  a.doc-card .t { font-family:"Shippori Mincho",serif; font-weight:700; font-size:1.05rem; color:var(--ink); margin:0.2rem 0 0.35rem; }
+  a.doc-card .d { font-size:0.85rem; color:var(--ink-soft); margin:0; }
+</style>
+</head>
+<body>
+
+<div class="home">
+  <div class="home-head">
+    <div class="title-mark">HSM × PKCS#11 · Documentation</div>
+    <h1>HSM と <span class="accent">PKCS#11</span> 学習ドキュメント</h1>
+    <p>ネットワーク型 HSM の性能評価と、cryptoki / 生 FFI による実装を、銀行金庫のたとえで段階的に学ぶ資料集。
+    概念 → 操作フロー → 実装 → リファレンスの順に読める。</p>
+  </div>
+
+  <div class="sec-label">Part 1 — 概念と性能評価（スライド）</div>
+  <div class="doc-grid">
+    <a class="doc-card" href="01.PKCS11-HSM入門.html"><div class="n">01</div><div class="t">PKCS#11 / HSM 入門</div><p class="d">Slot/Token/Session/Object/Attribute/Mechanism の基礎概念とライブラリ内部・性能評価の地図</p></a>
+    <a class="doc-card" href="02.PKCS11-操作フロー詳解.html"><div class="n">02</div><div class="t">操作フロー詳解</div><p class="d">乱数・署名・鍵生成を「準備→実行→結果→性能評価」の5フェーズで深掘り</p></a>
+    <a class="doc-card" href="03.PKCS11-Rust生FFI実装.html"><div class="n">03</div><div class="t">Rust 生 FFI 実装</div><p class="d">libloading で .so を動的ロードし、C_GetFunctionList から関数ポインタを叩く</p></a>
+  </div>
+
+  <div class="sec-label">Part 2 — 実装とリファレンス</div>
+  <div class="doc-grid">
+    <a class="doc-card" href="04.cryptoki-セットプログラム解説.html"><div class="n">04</div><div class="t">cryptoki セットプログラム解説</div><p class="d">cryptoki 版の設計・C API 対応・ファイル構成・使い方</p></a>
+    <a class="doc-card" href="05.PKCS11-関数リファレンス.html"><div class="n">05</div><div class="t">関数リファレンス</div><p class="d">2.40 の 68 関数 ＋ 3.0/3.2 追加分の早見表（実装状況つき）</p></a>
+    <a class="doc-card" href="06.鍵生成の詳解.html"><div class="n">06</div><div class="t">鍵生成の詳解</div><p class="d">属性の意味と RSA/EC/Ed25519/X25519/AES/HMAC の作り方・鍵→署名の対応</p></a>
+    <a class="doc-card" href="07.ユーザ認証と情報取得.html"><div class="n">07</div><div class="t">ユーザ認証と情報取得</div><p class="d">User/SO・PIN・RO/RW・セッション5状態と情報取得系の各フィールド</p></a>
+    <a class="doc-card" href="08.用語・略語集.html"><div class="n">08</div><div class="t">用語・略語集</div><p class="d">HSM/OID/DER/ECDH/RO/RW/CK* 接頭辞などの早見表</p></a>
+  </div>
+
+  <div style="text-align:center; margin-top:3rem; padding-top:1.5rem; border-top:1px solid var(--line);">
+    <p style="font-family:'JetBrains Mono',monospace; font-size:0.72rem; color:var(--ink-muted); letter-spacing:0.15em;">PKCS#11 v3.2 (OASIS, 2025-11-14) · cryptoki 0.10</p>
+  </div>
+</div>
+
+</body>
+</html>
