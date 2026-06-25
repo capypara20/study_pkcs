@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PKCS#11 関数リファレンス</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/common.css">
+<link rel="stylesheet" href="assets/doc.css">
+<style>
+  :root { --blue: #5e88a6; --accent: var(--blue); }
+  body::before {
+    background-image:
+      radial-gradient(circle at 20% 30%, rgba(94, 136, 166, 0.05) 0%, transparent 50%),
+      radial-gradient(circle at 80% 70%, rgba(184, 138, 60, 0.04) 0%, transparent 50%);
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="dot"></span>PKCS#11 関数リファレンス</div>
+  <div style="display: flex; gap: 1rem; align-items: center;">
+    <div class="progress"><span class="cur" id="curNum">01</span><span class="total"> / <span id="totalNum">00</span></span></div>
+    <button class="toc-btn" id="tocBtn" type="button" aria-label="目次を開く" aria-haspopup="dialog">INDEX</button>
+  </div>
+</header>
+
+<div class="toc-modal" id="tocModal" role="dialog" aria-modal="true" aria-label="目次">
+  <div class="toc-content">
+    <h3>目次 — INDEX</h3>
+    <ul class="toc-list" id="tocList"></ul>
+  </div>
+</div>
+
+<main class="article">
+
+  <div class="article-head">
+    <div class="title-mark">Function Reference · 早見表</div>
+    <h1>PKCS#11 <span class="accent">関数リファレンス</span></h1>
+    <p class="lead">公式仕様（OASIS PKCS#11）は英語で量も多く読みにくいので、<strong>全関数を日本語1行で</strong>整理した早見表。
+    本体の表 A〜J は <code>example_fnList.txt</code>（SoftHSM2 が公開する PKCS#11 <strong>2.40 の 68 関数</strong>）に対応する。
+    末尾の §K に <strong>3.0／3.2 で追加された関数</strong>（メッセージAPI・KEM・新検証系・インターフェース系）をまとめた。</p>
+    <p>現行の最新仕様は <strong>v3.2（OASIS CS01, 2025-11-14）</strong>で、関数総数は概算で <strong>2.40: 68 ＋ 3.0: +24 ＋ 3.2: +6 ≒ 98</strong>。
+    本プログラム（cryptoki 0.10）が主に扱うのは 2.40 の範囲。</p>
+
+    <div class="article-toc">
+      <div class="toc-h">この記事の節</div>
+      <ul>
+        <li><a href="#naming">命名規則</a></li>
+        <li><a href="#oneshot">「一発」と「分割」</a></li>
+        <li><a href="#args">cryptoki の引数の読み方</a></li>
+        <li><a href="#cat-a">A. 初期化・全体</a></li>
+        <li><a href="#cat-b">B. スロット・トークン管理</a></li>
+        <li><a href="#cat-c">C. セッション管理</a></li>
+        <li><a href="#cat-d">D. オブジェクト管理</a></li>
+        <li><a href="#cat-e">E. 暗号化 / 復号</a></li>
+        <li><a href="#cat-f">F. ダイジェスト</a></li>
+        <li><a href="#cat-g">G. 署名 / 検証</a></li>
+        <li><a href="#cat-h">H. 鍵管理</a></li>
+        <li><a href="#cat-i">I. 乱数</a></li>
+        <li><a href="#cat-j">J. 複合操作</a></li>
+        <li><a href="#cat-k">K. 3.0／3.2 追加関数</a></li>
+        <li><a href="#rest">残り(◯/✕)を足すなら</a></li>
+        <li><a href="#refs">参考</a></li>
+      </ul>
+    </div>
+
+    <div class="subhead">凡例（<strong>実装</strong>列）</div>
+    <div class="legend">
+      <span class="item"><span class="mk ok">✅</span> <code>hsm</code> プログラムで実際に使用</span>
+      <span class="item"><span class="mk au">△</span> cryptoki が内部で自動実行（自分で呼ばない）</span>
+      <span class="item"><span class="mk wip">◯</span> cryptoki 0.10 にラッパーあり・未配線（すぐ足せる）</span>
+      <span class="item"><span class="mk no">✕</span> cryptoki 0.10 に安全ラッパー無し（生 FFI のみ）</span>
+    </div>
+    <p><strong>cryptoki</strong> 列 … <code>cryptoki</code> クレート(0.10)での対応メソッド。</p>
+  </div>
+
+  <!-- ====== 命名規則 ====== -->
+  <h2 id="naming">命名規則（これだけ覚えれば読める）</h2>
+  <p>PKCS#11 の関数は <strong>すべて <code>C_</code> で始まり</strong>、処理系は <strong>3 段ロケット</strong>で命名される。</p>
+  <table class="tbl">
+    <thead><tr><th>接尾辞</th><th>意味</th><th>例</th></tr></thead>
+    <tbody>
+      <tr><td><code>...Init</code></td><td>操作の開始。メカニズムと鍵を指定</td><td><code>C_SignInit</code></td></tr>
+      <tr><td>（無印）</td><td>一発で完了（小さいデータ向け）</td><td><code>C_Sign</code></td></tr>
+      <tr><td><code>...Update</code></td><td>データを少しずつ投入（大きいデータ向け）</td><td><code>C_SignUpdate</code></td></tr>
+      <tr><td><code>...Final</code></td><td>分割投入の締め。結果を取り出す</td><td><code>C_SignFinal</code></td></tr>
+    </tbody>
+  </table>
+  <p>cryptoki は <code>Init</code> + 無印を <strong>1 メソッドに合体</strong>して隠す（例: <code>C_SignInit</code>+<code>C_Sign</code> → <code>session.sign()</code>）。</p>
+
+  <!-- ====== 一発と分割 ====== -->
+  <h2 id="oneshot">「一発」と「分割」の違い</h2>
+  <p>署名・暗号化・ハッシュなどの処理には、<strong>同じことをやる2つのやり方</strong>がある。結果は全く同じで、<strong>データの渡し方だけが違う</strong>。</p>
+  <ul>
+    <li><strong>一発(one-shot)</strong> = 荷物を<strong>全部まとめて1回で</strong>積んで運ぶ。メモリに収まる普通のサイズならこれでよい。</li>
+    <li><strong>分割(multi-part / ストリーム)</strong> = 大きすぎて1回で積めないとき、<strong>何回かに分けて</strong>積み込み、最後に「もう全部積んだ、出発」と合図する。</li>
+  </ul>
+  <p>つまり「分割」とは “処理を分けて違うことをする” ではなく、<strong>“1つの処理に、データを何回かに分けて流し込む”</strong> という意味。</p>
+  <table class="tbl">
+    <thead><tr><th></th><th>一発</th><th>分割</th></tr></thead>
+    <tbody>
+      <tr><td>呼ぶ回数</td><td>1 回</td><td>開始 1 + 投入 N + 締め 1</td></tr>
+      <tr><td>C API</td><td><code>C_Sign</code></td><td><code>C_SignInit</code> → <code>C_SignUpdate</code>×N → <code>C_SignFinal</code></td></tr>
+      <tr><td>cryptoki</td><td><code>session.sign(...)</code></td><td><code>sign_init()</code> → <code>sign_update()</code>×N → <code>sign_final()</code></td></tr>
+      <tr><td>向いている場面</td><td>小さいデータ</td><td>巨大データ（GB 級。全部メモリに載せたくない）</td></tr>
+      <tr><td>結果</td><td><strong>完全に同じ</strong></td><td><strong>完全に同じ</strong></td></tr>
+    </tbody>
+  </table>
+  <div class="code-block rust"><span class="code-lang">rust</span><pre>// 【一発】データ全部を1回で渡す
+let sig = session.sign(&amp;mech, key, b"hello world")?;
+
+// 【分割】同じ署名を、データを小分けにして渡す
+session.sign_init(&amp;mech, key)?;     // ① 開始（メカニズムと鍵をセット）
+session.sign_update(b"hello ")?;    // ② データ前半を投入
+session.sign_update(b"world")?;     // ②' データ後半を投入（何回でもOK）
+let sig = session.sign_final()?;    // ③ 締めて署名を受け取る</pre></div>
+  <p><code>ops/stream.rs</code> ではわざと 16 バイトずつに区切って、この仕組みを見せている。
+  <strong>迷ったら一発でよい。</strong>「分割」は “巨大データをメモリに全部載せずに処理したい” ときの上級テク。</p>
+
+  <!-- ====== 引数 ====== -->
+  <h2 id="args">cryptoki の引数の読み方</h2>
+  <p>処理系メソッドの引数は、だいたい <strong>「①手順」「②鍵」「③データ」</strong> の3点セット。「金庫の窓口に出す注文書」と同じ構成。</p>
+  <table class="tbl">
+    <thead><tr><th>メソッド</th><th>①手順</th><th>②鍵</th><th>③データ</th><th>戻り値</th></tr></thead>
+    <tbody>
+      <tr><td><code>session.sign(&amp;mech, key, data)</code></td><td><code>&amp;mech</code></td><td>秘密鍵ハンドル</td><td>署名対象</td><td>署名 <code>Vec&lt;u8&gt;</code></td></tr>
+      <tr><td><code>session.verify(&amp;mech, key, data, sig)</code></td><td><code>&amp;mech</code></td><td>公開鍵ハンドル</td><td>元データ</td><td><code>()</code>（OK/NG）</td></tr>
+      <tr><td><code>session.encrypt(&amp;mech, key, data)</code></td><td><code>&amp;mech</code></td><td>鍵ハンドル</td><td>平文</td><td>暗号文 <code>Vec&lt;u8&gt;</code></td></tr>
+      <tr><td><code>session.decrypt(&amp;mech, key, data)</code></td><td><code>&amp;mech</code></td><td>鍵ハンドル</td><td>暗号文</td><td>平文 <code>Vec&lt;u8&gt;</code></td></tr>
+      <tr><td><code>session.digest(&amp;mech, data)</code></td><td><code>&amp;mech</code></td><td>（鍵不要）</td><td>対象</td><td>ハッシュ <code>Vec&lt;u8&gt;</code></td></tr>
+    </tbody>
+  </table>
+  <div class="card accent-left">
+    <p style="margin:0;"><strong>②の <code>key</code> は鍵の実体ではなく「ハンドル(整理番号)」</strong>。これが「秘密鍵は金庫から出さず、番号で指定して処理だけ頼む」という HSM の核心。
+    <code>&amp;</code> は Rust の「借用」の印で、PKCS#11 の意味とは無関係。</p>
+  </div>
+
+  <!-- ====== A ====== -->
+  <h2 id="cat-a">A. 初期化・全体（General Purpose）</h2>
+  <table class="tbl">
+    <thead><tr><th>関数</th><th>説明</th><th class="c">実装</th><th>cryptoki</th></tr></thead>
+    <tbody>
+      <tr><td><code>C_Initialize</code></td><td>ライブラリを初期化（最初に1回）</td><td class="c"><span class="au">△</span></td><td><code>pkcs11.initialize(CInitializeArgs::OsThreads)</code></td></tr>
+      <tr><td><code>C_Finalize</code></td><td>ライブラリ後始末（最後に1回）</td><td class="c"><span class="au">△</span></td><td><code>Pkcs11</code> の Drop で自動</td></tr>
+      <tr><td><code>C_GetInfo</code></td><td>ライブラリ全体の情報（版・ベンダー）</td><td class="c"><span class="ok">✅</span></td><td><code>get_library_info()</code></td></tr>
+      <tr><td><code>C_GetFunctionList</code></td><td>関数ポインタ表を取得（2.40 系の入口）</td><td class="c"><span class="au">△</span></td><td><code>Pkcs11::new()</code> 内部で自動</td></tr>
+      <tr><td><code>C_GetFunctionStatus</code></td><td>（旧式）並行関数の状態。今は非対応を返すだけ</td><td class="c"><span class="no">✕</span></td><td>—</td></tr>
+      <tr><td><code>C_CancelFunction</code></td><td>（旧式）並行関数のキャンセル。今はほぼ無効</td><td class="c"><span class="no">✕</span></td><td>—</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ====== B ====== -->
+  <h2 id="cat-b">B. スロット・トークン管理（Slot and Token）</h2>
+  <table class="tbl">
+    <thead><tr><th>関数</th><th>説明</th><th class="c">実装</th><th>cryptoki</th></tr></thead>
+    <tbody>
+      <tr><td><code>C_GetSlotList</code></td><td>使えるスロット一覧を取得</td><td class="c"><span class="ok">✅</span></td><td><code>get_slots_with_token()</code> / <code>get_all_slots()</code></td></tr>
+      <tr><td><code>C_GetSlotInfo</code></td><td>スロット情報（説明・HW/FW版・トークン有無）</td><td class="c"><span class="ok">✅</span></td><td><code>get_slot_info(slot)</code></td></tr>
+      <tr><td><code>C_GetTokenInfo</code></td><td>トークン情報（ラベル・型番・シリアル・空き容量）</td><td class="c"><span class="ok">✅</span></td><td><code>get_token_info(slot)</code></td></tr>
+      <tr><td><code>C_GetMechanismList</code></td><td>そのトークンが対応するアルゴリズム一覧</td><td class="c"><span class="ok">✅</span></td><td><code>get_mechanism_list(slot)</code></td></tr>
+      <tr><td><code>C_GetMechanismInfo</code></td><td>あるメカニズムの詳細（鍵長上下限・用途フラグ）</td><td class="c"><span class="ok">✅</span></td><td><code>get_mechanism_info(slot, ty)</code></td></tr>
+      <tr><td><code>C_InitToken</code></td><td>トークンを初期化（SO-PIN 設定。中身が消える）</td><td class="c"><span class="ok">✅</span></td><td><code>init_token(slot, pin, label)</code></td></tr>
+      <tr><td><code>C_InitPIN</code></td><td>ユーザ PIN を初期設定（SO がログイン後に実行）</td><td class="c"><span class="ok">✅</span></td><td><code>session.init_pin(pin)</code></td></tr>
+      <tr><td><code>C_SetPIN</code></td><td>PIN を変更</td><td class="c"><span class="ok">✅</span></td><td><code>session.set_pin(old, new)</code></td></tr>
+      <tr><td><code>C_WaitForSlotEvent</code></td><td>スロットイベント（カード抜き差し等）を待つ</td><td class="c"><span class="wip">◯</span></td><td><code>wait_for_slot_event()</code>（未配線）</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ====== C ====== -->
+  <h2 id="cat-c">C. セッション管理（Session）</h2>
+  <table class="tbl">
+    <thead><tr><th>関数</th><th>説明</th><th class="c">実装</th><th>cryptoki</th></tr></thead>
+    <tbody>
+      <tr><td><code>C_OpenSession</code></td><td>セッションを開く（RO/RW を選ぶ）</td><td class="c"><span class="ok">✅</span></td><td><code>open_rw_session(slot)</code> / <code>open_ro_session(slot)</code></td></tr>
+      <tr><td><code>C_CloseSession</code></td><td>セッションを閉じる</td><td class="c"><span class="au">△</span></td><td><code>Session</code> の Drop で自動</td></tr>
+      <tr><td><code>C_CloseAllSessions</code></td><td>あるスロットの全セッションを閉じる</td><td class="c"><span class="no">✕</span></td><td>ラッパー無し</td></tr>
+      <tr><td><code>C_GetSessionInfo</code></td><td>セッション状態（RO/RW・ログイン有無）</td><td class="c"><span class="ok">✅</span></td><td><code>session.get_session_info()</code></td></tr>
+      <tr><td><code>C_GetOperationState</code></td><td>進行中の操作状態を取り出す（退避用）</td><td class="c"><span class="no">✕</span></td><td>ラッパー無し</td></tr>
+      <tr><td><code>C_SetOperationState</code></td><td>退避した操作状態を復元</td><td class="c"><span class="no">✕</span></td><td>ラッパー無し</td></tr>
+      <tr><td><code>C_Login</code></td><td>PIN でログイン（秘密操作にはほぼ必須）</td><td class="c"><span class="ok">✅</span></td><td><code>session.login(UserType::User, Some(&amp;pin))</code></td></tr>
+      <tr><td><code>C_Logout</code></td><td>ログアウト</td><td class="c"><span class="au">△</span></td><td><code>Session</code> Drop / <code>session.logout()</code></td></tr>
+    </tbody>
+  </table>
+  <div class="card accent-left"><p style="margin:0;"><strong>User と SO</strong>: <code>C_Login</code> の種別は 2 つ。<strong>User</strong>=日常の鍵操作、<strong>SO</strong>(Security Officer)=トークン初期化や User PIN 設定など管理用。</p></div>
+
+  <!-- ====== D ====== -->
+  <h2 id="cat-d">D. オブジェクト管理（Object）</h2>
+  <table class="tbl">
+    <thead><tr><th>関数</th><th>説明</th><th class="c">実装</th><th>cryptoki</th></tr></thead>
+    <tbody>
+      <tr><td><code>C_CreateObject</code></td><td>既存データから新オブジェクトを作る（鍵の取込等）</td><td class="c"><span class="wip">◯</span></td><td><code>session.create_object(&amp;template)</code>（未配線）</td></tr>
+      <tr><td><code>C_CopyObject</code></td><td>オブジェクトを属性を変えて複製</td><td class="c"><span class="ok">✅</span></td><td><code>session.copy_object(handle, &amp;template)</code></td></tr>
+      <tr><td><code>C_DestroyObject</code></td><td>オブジェクトを削除</td><td class="c"><span class="ok">✅</span></td><td><code>session.destroy_object(handle)</code></td></tr>
+      <tr><td><code>C_GetObjectSize</code></td><td>オブジェクトのバイトサイズを取得</td><td class="c"><span class="no">✕</span></td><td>ラッパー無し</td></tr>
+      <tr><td><code>C_GetAttributeValue</code></td><td>オブジェクトの属性値を読む</td><td class="c"><span class="ok">✅</span></td><td><code>session.get_attributes(handle, &amp;types)</code></td></tr>
+      <tr><td><code>C_SetAttributeValue</code></td><td>オブジェクトの属性値を書き換える</td><td class="c"><span class="wip">◯</span></td><td><code>session.update_attributes(...)</code>（未配線）</td></tr>
+      <tr><td><code>C_FindObjectsInit</code></td><td>検索条件（テンプレート）をセット</td><td class="c"><span class="ok">✅</span></td><td><code>find_objects()</code> に内包</td></tr>
+      <tr><td><code>C_FindObjects</code></td><td>条件に合うオブジェクトを取得</td><td class="c"><span class="ok">✅</span></td><td><code>session.find_objects(&amp;template)</code></td></tr>
+      <tr><td><code>C_FindObjectsFinal</code></td><td>検索終了</td><td class="c"><span class="ok">✅</span></td><td><code>find_objects()</code> に内包</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ====== E ====== -->
+  <h2 id="cat-e">E. 暗号化 / 復号（Encrypt / Decrypt）</h2>
+  <table class="tbl">
+    <thead><tr><th>関数</th><th>説明</th><th class="c">実装</th><th>cryptoki</th></tr></thead>
+    <tbody>
+      <tr><td><code>C_EncryptInit</code></td><td>暗号化開始（メカニズム＋鍵）</td><td class="c"><span class="ok">✅</span></td><td><code>encrypt()</code> に内包</td></tr>
+      <tr><td><code>C_Encrypt</code></td><td>一発で暗号化</td><td class="c"><span class="ok">✅</span></td><td><code>session.encrypt(&amp;mech, key, data)</code></td></tr>
+      <tr><td><code>C_EncryptUpdate</code></td><td>分割暗号化（投入）</td><td class="c"><span class="wip">◯</span></td><td><code>session.encrypt_update()</code>（未配線）</td></tr>
+      <tr><td><code>C_EncryptFinal</code></td><td>分割暗号化（締め）</td><td class="c"><span class="wip">◯</span></td><td><code>session.encrypt_final()</code>（未配線）</td></tr>
+      <tr><td><code>C_DecryptInit</code></td><td>復号開始</td><td class="c"><span class="ok">✅</span></td><td><code>decrypt()</code> に内包</td></tr>
+      <tr><td><code>C_Decrypt</code></td><td>一発で復号</td><td class="c"><span class="ok">✅</span></td><td><code>session.decrypt(&amp;mech, key, data)</code></td></tr>
+      <tr><td><code>C_DecryptUpdate</code></td><td>分割復号（投入）</td><td class="c"><span class="wip">◯</span></td><td><code>session.decrypt_update()</code>（未配線）</td></tr>
+      <tr><td><code>C_DecryptFinal</code></td><td>分割復号（締め）</td><td class="c"><span class="wip">◯</span></td><td><code>session.decrypt_final()</code>（未配線）</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ====== F ====== -->
+  <h2 id="cat-f">F. ダイジェスト（Digest = ハッシュ）</h2>
+  <table class="tbl">
+    <thead><tr><th>関数</th><th>説明</th><th class="c">実装</th><th>cryptoki</th></tr></thead>
+    <tbody>
+      <tr><td><code>C_DigestInit</code></td><td>ハッシュ開始（SHA256 等）</td><td class="c"><span class="ok">✅</span></td><td><code>digest()</code> / <code>digest_init()</code></td></tr>
+      <tr><td><code>C_Digest</code></td><td>一発でハッシュ</td><td class="c"><span class="ok">✅</span></td><td><code>session.digest(&amp;mech, data)</code></td></tr>
+      <tr><td><code>C_DigestUpdate</code></td><td>分割ハッシュ（投入）</td><td class="c"><span class="ok">✅</span></td><td><code>session.digest_update(data)</code></td></tr>
+      <tr><td><code>C_DigestKey</code></td><td>鍵オブジェクトをハッシュに混ぜる</td><td class="c"><span class="wip">◯</span></td><td><code>session.digest_key()</code>（未配線）</td></tr>
+      <tr><td><code>C_DigestFinal</code></td><td>分割ハッシュ（締め）</td><td class="c"><span class="ok">✅</span></td><td><code>session.digest_final()</code></td></tr>
+    </tbody>
+  </table>
+
+  <!-- ====== G ====== -->
+  <h2 id="cat-g">G. 署名 / 検証（Sign / Verify）</h2>
+  <table class="tbl">
+    <thead><tr><th>関数</th><th>説明</th><th class="c">実装</th><th>cryptoki</th></tr></thead>
+    <tbody>
+      <tr><td><code>C_SignInit</code></td><td>署名開始（メカニズム＋秘密鍵）</td><td class="c"><span class="ok">✅</span></td><td><code>sign()</code> に内包</td></tr>
+      <tr><td><code>C_Sign</code></td><td>一発で署名</td><td class="c"><span class="ok">✅</span></td><td><code>session.sign(&amp;mech, key, data)</code></td></tr>
+      <tr><td><code>C_SignUpdate</code></td><td>分割署名（投入）</td><td class="c"><span class="ok">✅</span></td><td><code>session.sign_update(data)</code></td></tr>
+      <tr><td><code>C_SignFinal</code></td><td>分割署名（締め）</td><td class="c"><span class="ok">✅</span></td><td><code>session.sign_final()</code></td></tr>
+      <tr><td><code>C_SignRecoverInit</code></td><td>復元可能署名の開始</td><td class="c"><span class="no">✕</span></td><td>ラッパー無し</td></tr>
+      <tr><td><code>C_SignRecover</code></td><td>データを署名内に埋め込む方式</td><td class="c"><span class="no">✕</span></td><td>ラッパー無し</td></tr>
+      <tr><td><code>C_VerifyInit</code></td><td>検証開始（メカニズム＋公開鍵）</td><td class="c"><span class="ok">✅</span></td><td><code>verify()</code> に内包</td></tr>
+      <tr><td><code>C_Verify</code></td><td>一発で検証</td><td class="c"><span class="ok">✅</span></td><td><code>session.verify(&amp;mech, key, data, sig)</code></td></tr>
+      <tr><td><code>C_VerifyUpdate</code></td><td>分割検証（投入）</td><td class="c"><span class="ok">✅</span></td><td><code>session.verify_update(data)</code></td></tr>
+      <tr><td><code>C_VerifyFinal</code></td><td>分割検証（締め）</td><td class="c"><span class="ok">✅</span></td><td><code>session.verify_final(sig)</code></td></tr>
+      <tr><td><code>C_VerifyRecoverInit</code></td><td>復元検証の開始</td><td class="c"><span class="no">✕</span></td><td>ラッパー無し</td></tr>
+      <tr><td><code>C_VerifyRecover</code></td><td>署名から元データを取り出して検証</td><td class="c"><span class="no">✕</span></td><td>ラッパー無し</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ====== H ====== -->
+  <h2 id="cat-h">H. 鍵管理（Key Management）</h2>
+  <table class="tbl">
+    <thead><tr><th>関数</th><th>説明</th><th class="c">実装</th><th>cryptoki</th></tr></thead>
+    <tbody>
+      <tr><td><code>C_GenerateKey</code></td><td>対称鍵を生成（AES 等。テンプレ1つ）</td><td class="c"><span class="ok">✅</span></td><td><code>session.generate_key(&amp;mech, &amp;template)</code></td></tr>
+      <tr><td><code>C_GenerateKeyPair</code></td><td>非対称鍵ペアを生成（RSA/EC。テンプレ2つ）</td><td class="c"><span class="ok">✅</span></td><td><code>session.generate_key_pair(&amp;mech, &amp;pub_t, &amp;priv_t)</code></td></tr>
+      <tr><td><code>C_WrapKey</code></td><td>鍵を別の鍵で暗号化して取り出す（安全な持ち出し）</td><td class="c"><span class="ok">✅</span></td><td><code>session.wrap_key(...)</code></td></tr>
+      <tr><td><code>C_UnwrapKey</code></td><td>ラップされた鍵を取り込む</td><td class="c"><span class="ok">✅</span></td><td><code>session.unwrap_key(...)</code></td></tr>
+      <tr><td><code>C_DeriveKey</code></td><td>既存鍵から新しい鍵を導出（ECDH 等）</td><td class="c"><span class="ok">✅</span></td><td><code>session.derive_key(...)</code></td></tr>
+    </tbody>
+  </table>
+
+  <!-- ====== I ====== -->
+  <h2 id="cat-i">I. 乱数（Random）</h2>
+  <table class="tbl">
+    <thead><tr><th>関数</th><th>説明</th><th class="c">実装</th><th>cryptoki</th></tr></thead>
+    <tbody>
+      <tr><td><code>C_SeedRandom</code></td><td>乱数生成器に種を追加</td><td class="c"><span class="ok">✅</span></td><td><code>session.seed_random(&amp;seed)</code></td></tr>
+      <tr><td><code>C_GenerateRandom</code></td><td>乱数を生成（HSM の RNG を使う）</td><td class="c"><span class="ok">✅</span></td><td><code>session.generate_random_vec(len)</code></td></tr>
+    </tbody>
+  </table>
+  <div class="card accent-left"><p style="margin:0;"><span class="ok">✅</span> <code>C_GenerateRandom</code> は <strong>ログイン不要・Init/Final 無し</strong>で一番簡単。疎通確認の練習に最適。</p></div>
+
+  <!-- ====== J ====== -->
+  <h2 id="cat-j">J. 複合操作（Dual-function：性能最適化用）</h2>
+  <p>2 つの処理を1パスでまとめて行う上級者向け関数。通常は使わない。</p>
+  <table class="tbl">
+    <thead><tr><th>関数</th><th>説明</th><th class="c">実装</th></tr></thead>
+    <tbody>
+      <tr><td><code>C_DigestEncryptUpdate</code></td><td>ハッシュしつつ暗号化</td><td class="c"><span class="no">✕</span>（ラッパー無し）</td></tr>
+      <tr><td><code>C_DecryptDigestUpdate</code></td><td>復号しつつハッシュ</td><td class="c"><span class="no">✕</span>（ラッパー無し）</td></tr>
+      <tr><td><code>C_SignEncryptUpdate</code></td><td>署名しつつ暗号化</td><td class="c"><span class="no">✕</span>（ラッパー無し）</td></tr>
+      <tr><td><code>C_DecryptVerifyUpdate</code></td><td>復号しつつ検証</td><td class="c"><span class="no">✕</span>（ラッパー無し）</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ====== K (NEW) ====== -->
+  <h2 id="cat-k">K. PKCS#11 3.0／3.2 で追加された関数</h2>
+  <p>ここまでの A〜J は 2.40 の 68 関数。v3.0 以降では <strong>インターフェース取得・複数ユーザ・メッセージベース暗号(AEAD)・耐量子の鍵カプセル化・新しい検証系</strong>が加わった。
+  本プログラムが使う cryptoki 0.10 はこれらの安全ラッパーをほぼ持たない（生 FFI / 新しめのバインディングが必要）。「最新仕様には何があるか」を把握するための一覧。</p>
+
+  <div class="subhead">K-1. インターフェース・全体（3.0）</div>
+  <table class="tbl">
+    <thead><tr><th>関数</th><th>説明</th><th class="c">実装</th></tr></thead>
+    <tbody>
+      <tr><td><code>C_GetInterfaceList</code></td><td>ライブラリが提供する<strong>インターフェース一覧</strong>を取得</td><td class="c"><span class="no">✕</span></td></tr>
+      <tr><td><code>C_GetInterface</code></td><td>名前/版でインターフェースを取得。<strong>v3.0 以降の推奨エントリポイント</strong>（<code>C_GetFunctionList</code> の後継。3.x の新関数はこちら経由で得る）</td><td class="c"><span class="no">✕</span></td></tr>
+    </tbody>
+  </table>
+
+  <div class="subhead">K-2. セッション・認証（3.0）</div>
+  <table class="tbl">
+    <thead><tr><th>関数</th><th>説明</th><th class="c">実装</th></tr></thead>
+    <tbody>
+      <tr><td><code>C_LoginUser</code></td><td>ユーザ名付きログイン。複数ユーザ／3.0 の細かい認証モデルに対応</td><td class="c"><span class="no">✕</span></td></tr>
+      <tr><td><code>C_SessionCancel</code></td><td>セッションで進行中の操作を明示的にキャンセル</td><td class="c"><span class="no">✕</span></td></tr>
+    </tbody>
+  </table>
+
+  <div class="subhead">K-3. メッセージベース暗号 / 復号（3.0・主に AEAD 向け）</div>
+  <p>1 回の <code>...Init</code> で、IV/AAD を都度変えながら<strong>複数メッセージ</strong>を処理できる。GCM などで「メッセージごとに Init し直す無駄」を省くための系統。</p>
+  <table class="tbl">
+    <thead><tr><th>関数</th><th>説明</th></tr></thead>
+    <tbody>
+      <tr><td><code>C_MessageEncryptInit</code></td><td>メッセージ暗号化の開始（鍵＋メカニズム）</td></tr>
+      <tr><td><code>C_EncryptMessage</code></td><td>1 メッセージを一発で暗号化</td></tr>
+      <tr><td><code>C_EncryptMessageBegin</code> / <code>C_EncryptMessageNext</code></td><td>1 メッセージを分割で暗号化（開始 / 投入・締め）</td></tr>
+      <tr><td><code>C_MessageEncryptFinal</code></td><td>メッセージ暗号化の終了</td></tr>
+      <tr><td><code>C_MessageDecryptInit</code> / <code>C_DecryptMessage</code></td><td>メッセージ復号の開始 / 一発復号</td></tr>
+      <tr><td><code>C_DecryptMessageBegin</code> / <code>C_DecryptMessageNext</code></td><td>メッセージ復号の分割（開始 / 投入・締め）</td></tr>
+      <tr><td><code>C_MessageDecryptFinal</code></td><td>メッセージ復号の終了</td></tr>
+    </tbody>
+  </table>
+
+  <div class="subhead">K-4. メッセージベース署名 / 検証（3.0）</div>
+  <table class="tbl">
+    <thead><tr><th>関数</th><th>説明</th></tr></thead>
+    <tbody>
+      <tr><td><code>C_MessageSignInit</code> / <code>C_SignMessage</code></td><td>メッセージ署名の開始 / 一発署名</td></tr>
+      <tr><td><code>C_SignMessageBegin</code> / <code>C_SignMessageNext</code></td><td>メッセージ署名の分割（開始 / 投入・締め）</td></tr>
+      <tr><td><code>C_MessageSignFinal</code></td><td>メッセージ署名の終了</td></tr>
+      <tr><td><code>C_MessageVerifyInit</code> / <code>C_VerifyMessage</code></td><td>メッセージ検証の開始 / 一発検証</td></tr>
+      <tr><td><code>C_VerifyMessageBegin</code> / <code>C_VerifyMessageNext</code></td><td>メッセージ検証の分割（開始 / 投入・締め）</td></tr>
+      <tr><td><code>C_MessageVerifyFinal</code></td><td>メッセージ検証の終了</td></tr>
+    </tbody>
+  </table>
+
+  <div class="subhead">K-5. 鍵カプセル化 KEM（3.2・耐量子対応）</div>
+  <table class="tbl">
+    <thead><tr><th>関数</th><th>説明</th></tr></thead>
+    <tbody>
+      <tr><td><code>C_EncapsulateKey</code></td><td>公開鍵から<strong>共有鍵</strong>と暗号文を生成（ML-KEM 等。FIPS 203）</td></tr>
+      <tr><td><code>C_DecapsulateKey</code></td><td>秘密鍵と暗号文から、相手と同一の共有鍵を復元</td></tr>
+    </tbody>
+  </table>
+
+  <div class="subhead">K-6. 署名検証の新系統（3.2）</div>
+  <p>従来の <code>C_Verify</code> は「データ＋署名」を渡して OK/NG を得る。3.2 では <strong>署名値を先にセットしてからデータを流し込む</strong>新しい検証系が追加された（ストリーミング検証に向く）。</p>
+  <table class="tbl">
+    <thead><tr><th>関数</th><th>説明</th></tr></thead>
+    <tbody>
+      <tr><td><code>C_VerifySignatureInit</code></td><td>検証開始（メカニズム＋公開鍵＋<strong>検証する署名値</strong>）</td></tr>
+      <tr><td><code>C_VerifySignature</code></td><td>一発でデータを渡して検証</td></tr>
+      <tr><td><code>C_VerifySignatureUpdate</code> / <code>C_VerifySignatureFinal</code></td><td>分割でデータを投入 / 締めて検証結果を得る</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ====== 残り ====== -->
+  <h2 id="rest">残り（◯/✕）を足すなら</h2>
+  <ul>
+    <li><strong><span class="wip">◯</span> 未配線</strong>（cryptoki 0.10 にラッパーあり、<code>ops/</code> に関数を足すだけ）:
+      <code>C_CreateObject</code> / <code>C_SetAttributeValue</code> / <code>C_Encrypt|DecryptUpdate/Final</code> / <code>C_DigestKey</code> / <code>C_WaitForSlotEvent</code></li>
+    <li><strong><span class="no">✕</span> ラッパー無し</strong>（生 FFI で <code>src/main.rs</code> 方式が必要）:
+      <code>C_*Recover*</code> / <code>C_Get|SetOperationState</code> / 複合操作 4 種 /
+      <code>C_GetFunctionStatus</code> / <code>C_CancelFunction</code> / <code>C_GetObjectSize</code> / <code>C_CloseAllSessions</code>、
+      および §K の 3.0／3.2 追加関数（メッセージAPI・KEM・新検証系・インターフェース系）</li>
+  </ul>
+
+  <!-- ====== 参考 ====== -->
+  <h2 id="refs">参考</h2>
+  <div class="ref-section">
+    <ul class="ref-list">
+      <li><span class="ref-num">[1]</span><span class="ref-title">PKCS #11 Specification Version 3.2 (OASIS)</span><span class="ref-meta">「Cryptographic Token Interface Base Specification」。CS01, 2025-11-14。データ型・関数・Mechanism 全部入り</span><a class="ref-url" href="https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.2/pkcs11-spec-v3.2.html" target="_blank" rel="noopener">docs.oasis-open.org/pkcs11/pkcs11-spec/v3.2/</a></li>
+      <li><span class="ref-num">[2]</span><span class="ref-title">PKCS #11 Base Specification Version 3.0 / 2.40 (OASIS)</span><span class="ref-meta">3.0 でメッセージAPI・インターフェース系が追加。2.40 が SoftHSM2 の 68 関数の基準</span><a class="ref-url" href="https://docs.oasis-open.org/pkcs11/pkcs11-base/v3.0/os/pkcs11-base-v3.0-os.html" target="_blank" rel="noopener">docs.oasis-open.org/pkcs11/pkcs11-base/v3.0/</a></li>
+      <li><span class="ref-num">[3]</span><span class="ref-title">cryptoki クレート (0.10)</span><span class="ref-meta">本プログラムが使う高レベル API</span><a class="ref-url" href="https://docs.rs/cryptoki/0.10.0/cryptoki/" target="_blank" rel="noopener">docs.rs/cryptoki/0.10.0/</a></li>
+      <li><span class="ref-num">[4]</span><span class="ref-title">全関数の生リスト</span><span class="ref-meta">SoftHSM2 が公開する 2.40 の 68 関数</span><a class="ref-url" href="../example_fnList.txt">../example_fnList.txt</a></li>
+    </ul>
+  </div>
+  <div class="card bordered-left">
+    <div class="card-title">関連ドキュメント</div>
+    <p style="margin:0;">設計と C API 対応: <a class="ref-url" href="04.cryptoki-セットプログラム解説.html">04 cryptoki 解説</a> ／
+    鍵生成: <a class="ref-url" href="06.鍵生成の詳解.html">06 鍵生成の詳解</a> ／
+    認証と情報: <a class="ref-url" href="07.ユーザ認証と情報取得.html">07 ユーザ認証と情報取得</a></p>
+  </div>
+
+  <div style="text-align: center; margin-top: 2.5rem; padding-top: 1.5rem; border-top: 1px solid var(--line);">
+    <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--ink-muted); letter-spacing: 0.15em;">END OF DOCUMENT</p>
+  </div>
+
+</main>
+
+<script src="assets/article.js"></script>
+
+</body>
+</html>

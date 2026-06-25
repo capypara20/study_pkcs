@@ -167,7 +167,7 @@
     <div class="cols-2">
       <div class="card bordered-left">
         <div class="card-title">なぜこの設計なのか</div>
-        <p style="font-size:0.92rem">PKCS#11仕様が「<code>C_GetFunctionList</code> だけは必ずエクスポートせよ。他はオプション」と定めているため。バージョン差や関数の有無をこの構造体1つで吸収できる。</p>
+        <p style="font-size:0.92rem">PKCS#11仕様が「<code>C_GetFunctionList</code> だけは必ずエクスポートせよ。他はオプション」と定めているため。バージョン差や関数の有無をこの構造体1つで吸収できる。<br><strong>※ v3.0 以降</strong>は <code>C_GetInterface</code> / <code>C_GetInterfaceList</code> が推奨エントリポイントとして追加され、3.x の新関数（メッセージAPI 等）はこちら経由で取得する。本書は 2.40 互換の <code>C_GetFunctionList</code> 経路を題材にする。</p>
       </div>
       <div class="card warn">
         <div class="card-title">cryptoki はこれを隠している</div>
@@ -459,8 +459,8 @@ libloading = <span class="str">"0.8"</span></pre>
         <div class="code-block shell">
 <span class="code-lang">Shell</span><pre><span class="com"># SoftHSM2 を入れて動作確認用トークン作成</span>
 <span class="fn-name">sudo</span> apt install libsofthsm2
-<span class="fn-name">softhsm2-util</span> --init-token --slot <span class="num">0</span> \
-  --label <span class="str">"test"</span> --pin <span class="num">1234</span> --so-pin <span class="num">5678</span>
+<span class="fn-name">softhsm2-util</span> --init-token --free \
+  --label <span class="str">"test"</span> --so-pin <span class="num">5678</span> --pin <span class="num">1234</span>
 
 <span class="com"># 実行（.so のパスを環境変数で渡す）</span>
 <span class="kw">export</span> PKCS11_MODULE=<span class="str">/usr/lib/softhsm/libsofthsm2.so</span>
@@ -1267,8 +1267,8 @@ signature: <span class="num">256</span> bytes</pre>
             <li>
               <span class="ref-num">[2]</span>
               <span class="ref-title">cryptoki — Rust idiomatic wrapper</span>
-              <span class="ref-meta">crates.io · v0.12.0 (2026-01-22) · 高レベルAPI設計の参考</span>
-              <a class="ref-url" href="https://crates.io/crates/cryptoki">crates.io/crates/cryptoki</a>
+              <span class="ref-meta">本リポジトリの依存は v0.10 · 高レベルAPI設計の参考</span>
+              <a class="ref-url" href="https://docs.rs/cryptoki/0.10.0/cryptoki/">docs.rs/cryptoki/0.10.0/</a>
             </li>
           </ul>
         </div>

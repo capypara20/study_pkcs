@@ -357,11 +357,10 @@
         <div class="code-block rust">
 <span class="code-lang">Rust</span><pre><span class="kw">use</span> cryptoki::session::Session;
 
-<span class="com">// 32バイトの乱数を取得</span>
-<span class="kw">let</span> <span class="kw">mut</span> buf = [<span class="num">0u8</span>; <span class="num">32</span>];
-session.<span class="fn-name">generate_random_slice</span>(<span class="kw">&amp;mut</span> buf)?;
+<span class="com">// 32バイトの乱数を取得（本プログラムと同じ generate_random_vec）</span>
+<span class="kw">let</span> buf = session.<span class="fn-name">generate_random_vec</span>(<span class="num">32</span>)?;
 
-<span class="com">// buf[..] に乱数が入る</span>
+<span class="com">// buf: Vec&lt;u8&gt; に乱数が入る</span>
 <span class="fn-name">println!</span>(<span class="str">"{:02x?}"</span>, buf);</pre>
         </div>
       </div>

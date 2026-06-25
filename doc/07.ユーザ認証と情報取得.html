@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ユーザ認証と情報取得の詳解</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/common.css">
+<link rel="stylesheet" href="assets/doc.css">
+<style>
+  :root { --purple: #7a5ea6; --accent: var(--purple); }
+  body::before {
+    background-image:
+      radial-gradient(circle at 20% 30%, rgba(122, 94, 166, 0.05) 0%, transparent 50%),
+      radial-gradient(circle at 80% 70%, rgba(184, 138, 60, 0.04) 0%, transparent 50%);
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="dot"></span>ユーザ認証と情報取得</div>
+  <div style="display: flex; gap: 1rem; align-items: center;">
+    <div class="progress"><span class="cur" id="curNum">01</span><span class="total"> / <span id="totalNum">14</span></span></div>
+    <button class="toc-btn" id="tocBtn" type="button" aria-label="目次を開く" aria-haspopup="dialog">INDEX</button>
+  </div>
+</header>
+
+<div class="toc-modal" id="tocModal" role="dialog" aria-modal="true" aria-label="目次">
+  <div class="toc-content">
+    <h3>目次 — INDEX</h3>
+    <ul class="toc-list" id="tocList"></ul>
+  </div>
+</div>
+
+<main class="deck" id="deck">
+
+<!-- TITLE -->
+<section class="slide title-slide" data-title="タイトル">
+  <span class="slide-num">01</span>
+  <div class="slide-inner">
+    <div class="title-mark">Authentication &amp; Information · 2本立て</div>
+    <h1 class="title">ユーザ認証と<br><span class="accent">情報取得</span>の詳解</h1>
+    <div class="title-line"></div>
+    <p class="subtitle">誰が・どの状態で・何をできるか（Part A）<br>ライブラリ→スロット→トークン→セッション→メカニズム（Part B）</p>
+    <div class="title-meta">
+      <strong>たとえ</strong> : トークン=金庫, PIN=暗証番号, セッション=面談, ログイン=本人確認<br>
+      <strong>対応コード</strong> : <code>src/ops/info.rs</code> / <code>src/ops/admin.rs</code> / <code>src/session.rs</code>
+    </div>
+  </div>
+</section>
+
+<!-- TOC -->
+<section class="slide" data-title="このドキュメントの構成">
+  <span class="slide-num">02</span>
+  <div class="slide-inner">
+    <span class="slide-tag s0">CONTENTS</span>
+    <h2>このドキュメントの構成</h2>
+    <div class="cols-2">
+      <div class="kv">
+        <div class="kv-row"><div class="k">PART A</div><div class="v">ユーザと認証</div></div>
+        <div class="kv-row"><div class="k">03</div><div class="v">User と SO</div></div>
+        <div class="kv-row"><div class="k">04</div><div class="v">public / private オブジェクト</div></div>
+        <div class="kv-row"><div class="k">05</div><div class="v">PIN のライフサイクル / 状態フラグ</div></div>
+        <div class="kv-row"><div class="k">06</div><div class="v">ログイン状態はアプリ単位で共有</div></div>
+      </div>
+      <div class="kv">
+        <div class="kv-row"><div class="k">PART B</div><div class="v">情報取得</div></div>
+        <div class="kv-row"><div class="k">07</div><div class="v">情報の5階層</div></div>
+        <div class="kv-row"><div class="k">08–09</div><div class="v">ライブラリ/スロット/トークン情報</div></div>
+        <div class="kv-row"><div class="k">10</div><div class="v">RO と RW の違い</div></div>
+        <div class="kv-row"><div class="k">11</div><div class="v">セッションの5状態</div></div>
+        <div class="kv-row"><div class="k">12</div><div class="v">メカニズム情報</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- A-1 -->
+<section class="slide" data-title="User と SO">
+  <span class="slide-num">03</span>
+  <div class="slide-inner">
+    <span class="slide-tag partA">PART A · 認証</span>
+    <h2><span class="num">A-1</span>2人の登場人物：User と SO</h2>
+    <table class="tbl">
+      <thead><tr><th>役割</th><th>cryptoki</th><th>何をする人か</th><th>できること</th></tr></thead>
+      <tbody>
+        <tr><td><strong>User</strong></td><td><code>UserType::User</code></td><td>日常の利用者</td><td>署名/暗号/復号, 鍵生成, private 読み書き</td></tr>
+        <tr><td><strong>SO</strong></td><td><code>UserType::So</code></td><td>管理者(Security Officer)</td><td>トークン初期化, <strong>User PIN 初期設定</strong>。暗号操作は<strong>不可</strong></td></tr>
+        <tr><td>Context-Specific</td><td><code>UserType::ContextSpecific</code></td><td>特殊</td><td><code>AlwaysAuthenticate</code> な鍵の直前再認証など</td></tr>
+      </tbody>
+    </table>
+    <div class="card warn">
+      <p style="margin:0;"><strong>SO は「鍵を使う人」ではなく「User の面倒をみる管理者」</strong>。SO でログインしても、ユーザの秘密鍵で署名したりはできない。</p>
+    </div>
+    <div class="code-block rust"><span class="code-lang">rust</span><pre>session.login(UserType::User, Some(&amp;AuthPin::new("1234".into())))?; // 利用者として
+session.login(UserType::So,   Some(&amp;AuthPin::new("5678".into())))?; // 管理者として</pre></div>
+  </div>
+</section>
+
+<!-- A-2 -->
+<section class="slide" data-title="public と private オブジェクト">
+  <span class="slide-num">04</span>
+  <div class="slide-inner">
+    <span class="slide-tag partA">PART A · 認証</span>
+    <h2><span class="num">A-2</span>public と private オブジェクト</h2>
+    <p>オブジェクトには「ログイン不要で見えるもの」と「User ログインが要るもの」がある。これを決めるのが鍵生成時の <strong><code>Private</code> 属性</strong>。</p>
+    <table class="tbl">
+      <thead><tr><th></th><th><code>Private(false)</code> = public</th><th><code>Private(true)</code> = private</th></tr></thead>
+      <tbody>
+        <tr><td>例</td><td>公開鍵、公開証明書</td><td>秘密鍵、共通鍵</td></tr>
+        <tr><td>見るのに</td><td>ログイン不要</td><td><strong>User ログインが必要</strong></td></tr>
+      </tbody>
+    </table>
+    <div class="card accent-left">
+      <p style="margin:0;">「<code>info</code> は動くのに、鍵を使う操作はログインしないと失敗する」のはこのため。（<code>session.rs::login_rw</code> が <code>C_Login</code> を呼ぶ）</p>
+    </div>
+  </div>
+</section>
+
+<!-- A-3 + A-4 -->
+<section class="slide" data-title="PIN のライフサイクルと状態フラグ">
+  <span class="slide-num">05</span>
+  <div class="slide-inner">
+    <span class="slide-tag partA">PART A · 認証</span>
+    <h2><span class="num">A-3/4</span>PIN のライフサイクルと状態フラグ</h2>
+    <div class="code-block"><span class="code-lang">pin lifecycle</span><pre>SO が C_InitToken     → トークン初期化し SO-PIN を決める（中身は全消去）
+SO が C_Login(SO)     → 管理者としてログイン
+SO が C_InitPIN       → User PIN を初期設定する          ← User PIN はここで誕生
+User が C_Login(User) → 以後、利用者として鍵を使える
+User/SO が C_SetPIN   → 自分の PIN を変更する</pre></div>
+    <div class="code-block shell"><span class="code-lang">shell</span><pre>cargo run --bin hsm -- init-token &lt;so-pin&gt; &lt;label&gt;   # ⚠️全消去
+cargo run --bin hsm -- init-pin   &lt;new-user-pin&gt;     # SO ログイン下で
+cargo run --bin hsm -- set-pin    &lt;old&gt; &lt;new&gt;        # PIN 変更</pre></div>
+    <p>SoftHSM では <code>softhsm2-util --init-token --free --label test --so-pin 5678 --pin 1234</code> で InitToken+InitPIN をまとめて実行できる。</p>
+    <table class="tbl">
+      <thead><tr><th>TokenInfo ゲッター</th><th>意味</th></tr></thead>
+      <tbody>
+        <tr><td><code>user_pin_initialized()</code></td><td>User PIN が設定済みか</td></tr>
+        <tr><td><code>user_pin_locked()</code></td><td>連続失敗で<strong>ロック</strong>されたか</td></tr>
+        <tr><td><code>user_pin_final_try()</code> / <code>user_pin_count_low()</code></td><td>あと1回でロック / 失敗が増えてきた</td></tr>
+        <tr><td><code>user_pin_to_be_changed()</code></td><td>次回ログイン時に変更が必要か</td></tr>
+        <tr><td><code>so_pin_*()</code></td><td>上記の SO 版</td></tr>
+        <tr><td><code>login_required()</code> / <code>protected_authentication_path()</code></td><td>ログインが要るか / PINパッド方式か</td></tr>
+      </tbody>
+    </table>
+    <div class="card warn"><p style="margin:0;"><code>user_pin_locked()</code> が true なら、正しい PIN でも <code>C_Login</code> は失敗。SO が再設定するまで使えない。「PIN 合ってるのに入れない」原因はこれが多い。</p></div>
+  </div>
+</section>
+
+<!-- A-5 -->
+<section class="slide" data-title="ログイン状態はアプリ単位で共有">
+  <span class="slide-num">06</span>
+  <div class="slide-inner">
+    <span class="slide-tag partA">PART A · 認証</span>
+    <h2><span class="num">A-5</span>ログイン状態は「アプリ単位」で共有される</h2>
+    <p class="lead">PKCS#11 の独特な点: <strong>ログイン状態は1つのセッションではなく、そのアプリがそのトークンに対して開いている全セッションで共有</strong>される。</p>
+    <ul>
+      <li>どれか1つのセッションで User ログインすると、同じトークンの<strong>他のセッションもログイン状態</strong>になる。</li>
+      <li>どれか1つで <code>C_Logout</code> すると、<strong>全部ログアウト</strong>になる。</li>
+      <li>cryptoki では <code>Session</code> を drop すると自動 logout/close されるので、ログイン中の鍵操作はその <code>Session</code> が生きている間に済ませる。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- B intro -->
+<section class="slide" data-title="情報取得の5階層">
+  <span class="slide-num">07</span>
+  <div class="slide-inner">
+    <span class="slide-tag partB">PART B · 情報</span>
+    <h2><span class="num">B</span>情報取得の詳解 — 5階層</h2>
+    <p>上から下へ「ライブラリ → スロット → トークン → セッション → メカニズム」。</p>
+    <div class="code-block"><span class="code-lang">hierarchy</span><pre>get_library_info()         ライブラリ全体     (C_GetInfo)
+ └ get_slot_info(slot)      差込口            (C_GetSlotInfo)
+    └ get_token_info(slot)  金庫本体          (C_GetTokenInfo)
+       └ session.get_session_info()  面談状態 (C_GetSessionInfo)
+get_mechanism_list/info()   対応アルゴリズム  (C_GetMechanismList/Info)</pre></div>
+  </div>
+</section>
+
+<!-- B-1,B-2 -->
+<section class="slide" data-title="ライブラリ情報 / スロット情報">
+  <span class="slide-num">08</span>
+  <div class="slide-inner">
+    <span class="slide-tag partB">PART B · 情報</span>
+    <h2><span class="num">B-1/2</span>ライブラリ情報 / スロット情報</h2>
+    <h3>ライブラリ情報（C_GetInfo / <code>Info</code>）</h3>
+    <table class="tbl">
+      <tbody>
+        <tr><td><code>cryptoki_version()</code></td><td><strong>仕様(API)</strong> のバージョン（例 2.40 / 3.0 / 3.2）</td></tr>
+        <tr><td><code>library_version()</code></td><td><strong>実装</strong> のバージョン（例 SoftHSM 2.6）</td></tr>
+        <tr><td><code>manufacturer_id()</code> / <code>library_description()</code></td><td>ベンダー名 / 説明文字列</td></tr>
+      </tbody>
+    </table>
+    <h3>スロット情報（C_GetSlotInfo / <code>SlotInfo</code>）</h3>
+    <table class="tbl">
+      <tbody>
+        <tr><td><code>slot_description()</code> / <code>manufacturer_id()</code></td><td>差込口の説明 / ベンダー</td></tr>
+        <tr><td><code>hardware_version()</code> / <code>firmware_version()</code></td><td>スロット側の HW/FW バージョン</td></tr>
+        <tr><td><code>token_present()</code></td><td>トークンが刺さっているか</td></tr>
+        <tr><td><code>removable_device()</code> / <code>hardware_slot()</code></td><td>抜き差し可 / 物理スロットか</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- B-3 -->
+<section class="slide" data-title="トークン情報">
+  <span class="slide-num">09</span>
+  <div class="slide-inner">
+    <span class="slide-tag partB">PART B · 情報</span>
+    <h2><span class="num">B-3</span>トークン情報（一番情報が多い）</h2>
+    <p><strong>(a) 識別</strong>: <code>label()</code> / <code>model()</code> / <code>manufacturer_id()</code> / <code>serial_number()</code></p>
+    <h3>(b) 状態</h3>
+    <table class="tbl">
+      <tbody>
+        <tr><td><code>token_initialized()</code> / <code>write_protected()</code></td><td>初期化済みか / 書込禁止か</td></tr>
+        <tr><td><code>login_required()</code> / <code>rng()</code></td><td>ログイン要否 / 乱数生成器を持つか</td></tr>
+        <tr><td><code>clock_on_token()</code> / <code>dual_crypto_operations()</code></td><td>時計内蔵 / 複合操作(C_*Update系)対応か</td></tr>
+      </tbody>
+    </table>
+    <h3>(c) 容量・規模</h3>
+    <table class="tbl">
+      <tbody>
+        <tr><td><code>total/free_public_memory()</code>, <code>*_private_memory()</code></td><td>public/private 領域のメモリ（<code>Option</code>：不明なら <code>None</code>）</td></tr>
+        <tr><td><code>max_session_count()</code> / <code>session_count()</code> ほか RW 版</td><td>セッション数の上限/現在</td></tr>
+        <tr><td><code>min_pin_length()</code> / <code>max_pin_length()</code></td><td>PIN 長の下限/上限</td></tr>
+      </tbody>
+    </table>
+    <p><strong>(d) PIN 状態</strong>: A-3/4 の表（<code>user_pin_*</code> / <code>so_pin_*</code>）がここに含まれる。<code>info</code> は (a)(b)(c) と User PIN 状態を抜粋表示する。</p>
+  </div>
+</section>
+
+<!-- B-4 RO/RW -->
+<section class="slide" data-title="RO と RW の違い">
+  <span class="slide-num">10</span>
+  <div class="slide-inner">
+    <span class="slide-tag partB">PART B · 情報</span>
+    <h2><span class="num">B-4</span>RO と RW の違い</h2>
+    <p>セッションを開くとき最初に決めるのが <strong>RO(Read-Only) か RW(Read-Write) か</strong>。「<strong>トークンに永続的な変更を加えられるか</strong>」の違い。ログイン(User/SO)とは<strong>別の軸</strong>。</p>
+    <table class="tbl">
+      <thead><tr><th>操作</th><th class="c">RO</th><th class="c">RW</th></tr></thead>
+      <tbody>
+        <tr><td>既存鍵で署名/検証/暗号/復号</td><td class="c"><span class="ok">✅</span></td><td class="c"><span class="ok">✅</span></td></tr>
+        <tr><td>乱数生成・ハッシュ・検索・属性読み取り</td><td class="c"><span class="ok">✅</span></td><td class="c"><span class="ok">✅</span></td></tr>
+        <tr><td>User ログイン</td><td class="c"><span class="ok">✅</span></td><td class="c"><span class="ok">✅</span></td></tr>
+        <tr><td><strong>SO ログイン</strong></td><td class="c"><span class="no">❌</span></td><td class="c"><span class="ok">✅</span></td></tr>
+        <tr><td><strong><code>Token(true)</code> 鍵の生成・作成</strong></td><td class="c"><span class="no">❌</span></td><td class="c"><span class="ok">✅</span></td></tr>
+        <tr><td><strong>オブジェクトの削除・属性変更</strong></td><td class="c"><span class="no">❌</span></td><td class="c"><span class="ok">✅</span></td></tr>
+        <tr><td>PIN 変更・InitPIN</td><td class="c"><span class="no">❌</span></td><td class="c"><span class="ok">✅</span></td></tr>
+      </tbody>
+    </table>
+    <div class="card accent-left">
+      <p style="margin:0;"><strong>RO でできないのは「永続オブジェクトをいじること」と「SO ログイン」だけ</strong>。鍵を“使う”操作は RO でも全部できる。本プログラムは鍵生成までやるので <code>open_rw_session</code> を使う。</p>
+    </div>
+    <div class="card warn"><p style="margin:0;">RO で <code>gen-rsa</code> 等をやると <code>CKR_SESSION_READ_ONLY</code> で弾かれる。「鍵が作れない」ときはまずセッション種別を疑う。</p></div>
+  </div>
+</section>
+
+<!-- B-5 5states -->
+<section class="slide" data-title="セッションの5状態">
+  <span class="slide-num">11</span>
+  <div class="slide-inner">
+    <span class="slide-tag partB">PART B · 情報</span>
+    <h2><span class="num">B-5</span>セッションの5状態（状態機械）</h2>
+    <table class="tbl">
+      <thead><tr><th>状態 (<code>SessionState</code>)</th><th>RO/RW</th><th>ログイン</th><th>できる事</th></tr></thead>
+      <tbody>
+        <tr><td><code>RoPublic</code></td><td>RO</td><td>無し</td><td>public のみ・読み取り中心</td></tr>
+        <tr><td><code>RoUser</code></td><td>RO</td><td>User</td><td>private も見える・<strong>token(永続)作成は不可</strong></td></tr>
+        <tr><td><code>RwPublic</code></td><td>RW</td><td>無し</td><td>public の作成・変更可</td></tr>
+        <tr><td><code>RwUser</code></td><td>RW</td><td>User</td><td><strong>フル機能</strong>（鍵生成・署名・private 永続作成）</td></tr>
+        <tr><td><code>RwSecurityOfficer</code></td><td>RW</td><td>SO</td><td>管理操作（InitPIN 等）。暗号操作は不可</td></tr>
+      </tbody>
+    </table>
+    <div class="code-block"><span class="code-lang">state machine</span><pre>            login(User)              login(User)
+ RoPublic ───────────────► RoUser   RwPublic ──────────► RwUser
+    ▲          logout         │         ▲      logout       │
+    └──────────────────────────         └──────────────────┘
+ RwPublic ── login(SO) ──► RwSecurityOfficer</pre></div>
+    <p><code>cargo run --bin hsm -- session-info</code> で今の状態(<code>RwUser</code> 等)を確認できる。<strong>SO は RW でしかログインできない</strong>。</p>
+  </div>
+</section>
+
+<!-- B-6 mechanism -->
+<section class="slide" data-title="メカニズム情報">
+  <span class="slide-num">12</span>
+  <div class="slide-inner">
+    <span class="slide-tag partB">PART B · 情報</span>
+    <h2><span class="num">B-6</span>メカニズム情報</h2>
+    <ul>
+      <li><code>get_mechanism_list(slot)</code> … トークンが対応する<strong>アルゴリズム一覧</strong></li>
+      <li><code>get_mechanism_info(slot, ty)</code> … 各アルゴリズムの詳細</li>
+    </ul>
+    <table class="tbl">
+      <thead><tr><th>MechanismInfo ゲッター</th><th>意味</th></tr></thead>
+      <tbody>
+        <tr><td><code>min_key_size()</code> / <code>max_key_size()</code></td><td>使える鍵長の下限/上限</td></tr>
+        <tr><td><code>sign()</code>/<code>verify()</code>/<code>encrypt()</code>/<code>decrypt()</code>/<code>digest()</code></td><td>その用途に使えるか</td></tr>
+        <tr><td><code>generate_key_pair()</code> / <code>generate()</code></td><td>鍵(ペア)生成に使えるか</td></tr>
+        <tr><td><code>wrap()</code> / <code>unwrap()</code> / <code>derive()</code></td><td>ラップ/アンラップ/導出に使えるか</td></tr>
+        <tr><td><code>hardware()</code></td><td>ハードウェアで処理されるか</td></tr>
+      </tbody>
+    </table>
+    <p>実機 HSM 評価では「<strong>RSA-4096 を本当にサポートするか</strong>」等をここで確認: <code>cargo run --bin hsm -- mech-info RsaPkcsKeyPairGen</code></p>
+  </div>
+</section>
+
+<!-- まとめ -->
+<section class="slide" data-title="まとめ：認証と情報の関係">
+  <span class="slide-num">13</span>
+  <div class="slide-inner">
+    <span class="slide-tag closing">CLOSING</span>
+    <h2>まとめ：認証と情報の関係</h2>
+    <ul>
+      <li>まず <code>info</code>（ログイン不要）で<strong>繋がるか・対応機能・PIN 状態</strong>を確認する。</li>
+      <li>private な鍵を触るには <strong>User ログイン</strong>（<code>Private(true)</code> のため）。</li>
+      <li>永続鍵を作るには <strong>RW セッション</strong>（RO では token オブジェクト作成不可）。</li>
+      <li>管理(PIN設定)は <strong>SO ＋ RW</strong>。</li>
+      <li>困ったら <code>session-info</code> で今の状態(<code>RwUser</code> 等)を確認し、想定と照合する。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- References -->
+<section class="slide" data-title="References">
+  <span class="slide-num">14</span>
+  <div class="slide-inner">
+    <span class="slide-tag refs">REFERENCES</span>
+    <h2>参考</h2>
+    <div class="ref-section">
+      <ul class="ref-list">
+        <li><span class="ref-num">[1]</span><span class="ref-title">PKCS #11 Specification Version 3.2 (OASIS)</span><span class="ref-meta">§5.5–5.6 セッション/ログイン, §5.18 トークン/スロット。CS01, 2025-11-14</span><a class="ref-url" href="https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.2/pkcs11-spec-v3.2.html" target="_blank" rel="noopener">docs.oasis-open.org/pkcs11/pkcs11-spec/v3.2/</a></li>
+        <li><span class="ref-num">[2]</span><span class="ref-title">cryptoki 0.10 — docs.rs</span><span class="ref-meta"><code>UserType</code> / <code>SessionState</code> / <code>TokenInfo</code> ほか</span><a class="ref-url" href="https://docs.rs/cryptoki/0.10.0/cryptoki/" target="_blank" rel="noopener">docs.rs/cryptoki/0.10.0/</a></li>
+      </ul>
+    </div>
+    <div class="card bordered-left">
+      <div class="card-title">関連ドキュメント</div>
+      <p style="margin:0;">関数の全体像: <a class="ref-url" href="05.PKCS11-関数リファレンス.html">05 関数リファレンス</a> ／ 実装: <code>../src/ops/info.rs</code> / <code>../src/ops/admin.rs</code> / <code>../src/session.rs</code></p>
+    </div>
+    <div style="text-align: center; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--line);">
+      <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--ink-muted); letter-spacing: 0.15em;">END OF DOCUMENT</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<nav class="nav-bottom" aria-label="スライドナビゲーション">
+  <button id="prevBtn" type="button" aria-label="前のスライドへ">← PREV</button>
+  <button id="nextBtn" type="button" aria-label="次のスライドへ">NEXT →</button>
+</nav>
+
+<script src="assets/deck.js"></script>
+
+</body>
+</html>

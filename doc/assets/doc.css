@@ -1,0 +1,154 @@
+/* =====================================================================
+ * doc.css — Markdown から HTML 化した解説ドキュメント(04〜08)の共通追加
+ *
+ * common.css の後に読み込む。01/02/03.css と同じ流儀で、
+ *   - 章タグ(.slide-tag)の色分け
+ *   - ディレクトリツリー / ファイル名ラベル / バッジ
+ *   - コードブロックの言語別アクセント
+ *   - 関数リファレンス(05)用の「記事型(長尺スクロール)」レイアウト
+ * をまとめる。ページ固有のアクセント色は各 HTML の <style> で上書きする。
+ * ===================================================================== */
+
+/* ---- 章タグの色分け（汎用） --------------------------------------- */
+.slide-tag.ch1     { color: #5e88a6; border-color: #5e88a6; }
+.slide-tag.ch2     { color: var(--vault); border-color: var(--vault); }
+.slide-tag.ch3     { color: #2f8f83; border-color: #2f8f83; }
+.slide-tag.partA   { color: #7a5ea6; border-color: #7a5ea6; }
+.slide-tag.partB   { color: #5e88a6; border-color: #5e88a6; }
+.slide-tag.closing { color: var(--vault); border-color: var(--vault); }
+.slide-tag.refs    { color: var(--red); border-color: var(--red); }
+
+/* ---- カードの色違い ------------------------------------------------ */
+.card.accent-left { border-left: 3px solid var(--accent); background: rgba(184, 138, 60, 0.03); }
+
+/* ---- 表（やや詰め） ------------------------------------------------ */
+.tbl { font-size: 0.9rem; }
+.tbl th, .tbl td { padding: 0.6rem 0.85rem; }
+.tbl code { font-size: 0.82em; }
+/* 実装フラグ列などを中央寄せしたいとき */
+.tbl td.c, .tbl th.c { text-align: center; }
+
+/* ---- コードブロック言語別アクセント -------------------------------- */
+.code-block.toml  { border-left-color: var(--gold); }
+.code-block.shell,
+.code-block.bash  { border-left-color: #6b8e5e; }
+.code-block.rust  { border-left-color: #d97757; }
+.code-block.c     { border-left-color: #5e88a6; }
+.code-block pre   { white-space: pre; }
+
+/* ---- ディレクトリツリー -------------------------------------------- */
+.tree {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.82rem;
+  line-height: 1.85;
+  background: var(--code-bg);
+  color: var(--code-fg);
+  padding: 1.4rem 1.6rem;
+  border-left: 3px solid #5e88a6;
+  overflow-x: auto;
+  white-space: pre;
+  margin: 1rem 0;
+}
+.tree .dir  { color: #7ab8e6; font-weight: 700; }
+.tree .file { color: var(--code-fg); }
+.tree .note { color: #7e8aa6; font-style: italic; }
+.tree .hl   { color: #f5d97a; font-weight: 700; }
+
+/* ---- ファイル名ラベル ---------------------------------------------- */
+.filename {
+  display: inline-block;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--accent);
+  background: rgba(184, 138, 60, 0.1);
+  border: 1px solid rgba(184, 138, 60, 0.3);
+  padding: 0.2rem 0.7rem;
+  margin-bottom: 0.5rem;
+}
+
+/* ---- 凡例バッジ（✅ △ ◯ ✕ など） --------------------------------- */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1.4rem;
+  margin: 1rem 0 1.2rem;
+  font-size: 0.86rem;
+  color: var(--ink-soft);
+}
+.legend .item { display: inline-flex; align-items: baseline; gap: 0.4rem; }
+.legend .mk { font-weight: 700; }
+
+/* 状態記号の色 */
+.ok  { color: #2f8f6f; font-weight: 700; }
+.au  { color: #6d7591; font-weight: 700; }
+.wip { color: #b88a3c; font-weight: 700; }
+.no  { color: #a83a2b; font-weight: 700; }
+
+/* ---- 注記の小見出し ------------------------------------------------ */
+.subhead {
+  font-family: "Shippori Mincho", serif;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--ink);
+  margin: 1.2rem 0 0.4rem;
+}
+
+/* =====================================================================
+ * 記事型レイアウト（05 関数リファレンス専用）
+ * .slide ではなく長尺スクロール。topbar / INDEX モーダルは deck と共通。
+ * ===================================================================== */
+.article {
+  position: relative;
+  z-index: 1;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 6rem 2rem 7rem;
+}
+.article h2 {
+  scroll-margin-top: 5rem;
+  margin-top: 3rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 2px solid var(--accent);
+}
+.article h2:first-of-type { margin-top: 1rem; }
+.article h3 { scroll-margin-top: 5rem; }
+.article .lead { margin-bottom: 1.4rem; }
+
+/* 記事冒頭のタイトル塊 */
+.article-head { margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--line); }
+.article-head .title-mark {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.7rem; letter-spacing: 0.3em; color: var(--accent);
+  text-transform: uppercase; margin-bottom: 1rem;
+}
+.article-head h1 {
+  font-family: "Shippori Mincho", serif;
+  font-weight: 800;
+  font-size: clamp(1.9rem, 4.5vw, 3rem);
+  line-height: 1.2;
+  color: var(--ink);
+  margin-bottom: 1rem;
+}
+.article-head h1 .accent { color: var(--accent); }
+
+/* 記事内の簡易 TOC（先頭に置く） */
+.article-toc {
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  padding: 1.2rem 1.5rem;
+  margin: 1.5rem 0 2.5rem;
+  box-shadow: var(--shadow);
+}
+.article-toc .toc-h {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.7rem; letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 0.8rem;
+}
+.article-toc ul { columns: 2; margin: 0; }
+.article-toc li { padding-left: 0; margin-bottom: 0.35rem; }
+.article-toc li::before { display: none; }
+.article-toc a { color: var(--ink-soft); text-decoration: none; font-size: 0.9rem; }
+.article-toc a:hover { color: var(--accent); text-decoration: underline; }
+@media (max-width: 640px) { .article-toc ul { columns: 1; } .article { padding: 5rem 1.2rem 6rem; } }

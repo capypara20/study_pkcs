@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>用語・略語集（Glossary）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/common.css">
+<link rel="stylesheet" href="assets/doc.css">
+<style>
+  :root { --accent: var(--gold); }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="dot"></span>用語・略語集</div>
+  <div style="display: flex; gap: 1rem; align-items: center;">
+    <div class="progress"><span class="cur" id="curNum">01</span><span class="total"> / <span id="totalNum">09</span></span></div>
+    <button class="toc-btn" id="tocBtn" type="button" aria-label="目次を開く" aria-haspopup="dialog">INDEX</button>
+  </div>
+</header>
+
+<div class="toc-modal" id="tocModal" role="dialog" aria-modal="true" aria-label="目次">
+  <div class="toc-content">
+    <h3>目次 — INDEX</h3>
+    <ul class="toc-list" id="tocList"></ul>
+  </div>
+</div>
+
+<main class="deck" id="deck">
+
+<!-- TITLE -->
+<section class="slide title-slide" data-title="タイトル">
+  <span class="slide-num">01</span>
+  <div class="slide-inner">
+    <div class="title-mark">Glossary · 略語・用語の早見表</div>
+    <h1 class="title">用語・<span class="accent">略語集</span></h1>
+    <div class="title-line"></div>
+    <p class="subtitle">このリポジトリのドキュメント／コードに出てくる略語・用語の早見表<br>「これ何の略？」となったらここを引く</p>
+  </div>
+</section>
+
+<!-- TOC -->
+<section class="slide" data-title="このドキュメントの構成">
+  <span class="slide-num">02</span>
+  <div class="slide-inner">
+    <span class="slide-tag s0">CONTENTS</span>
+    <h2>このドキュメントの構成</h2>
+    <div class="kv">
+      <div class="kv-row"><div class="k">A</div><div class="v">規格・基盤まわり</div></div>
+      <div class="kv-row"><div class="k">B</div><div class="v">PKCS#11 の構造・認証 ＋ <code>CK*</code> プレフィックス</div></div>
+      <div class="kv-row"><div class="k">C</div><div class="v">暗号アルゴリズム</div></div>
+      <div class="kv-row"><div class="k">D</div><div class="v">暗号モード・パラメータ</div></div>
+      <div class="kv-row"><div class="k">E</div><div class="v">鍵のエンコード・データ表現</div></div>
+      <div class="kv-row"><div class="k">F</div><div class="v">バージョン・その他</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- A -->
+<section class="slide" data-title="A. 規格・基盤まわり">
+  <span class="slide-num">03</span>
+  <div class="slide-inner">
+    <span class="slide-tag gA">A · 規格・基盤</span>
+    <h2><span class="num">A</span>規格・基盤まわり</h2>
+    <table class="tbl">
+      <thead><tr><th>略語</th><th>正式</th><th>意味</th></tr></thead>
+      <tbody>
+        <tr><td><strong>HSM</strong></td><td>Hardware Security Module</td><td>鍵を保管し暗号処理を“中で”行う専用ハードウェア</td></tr>
+        <tr><td><strong>PKCS</strong></td><td>Public-Key Cryptography Standards</td><td>RSA 社が作った公開鍵暗号の標準仕様群。#11 はその11番目</td></tr>
+        <tr><td><strong>PKCS#11</strong></td><td>—</td><td>暗号デバイスを操作する C 言語 API 標準。別名 Cryptoki。最新は v3.2</td></tr>
+        <tr><td><strong>Cryptoki</strong></td><td>Cryptographic Token Interface</td><td>PKCS#11 の別名。<code>cryptoki</code> クレートの名の由来</td></tr>
+        <tr><td><strong>API</strong></td><td>Application Programming Interface</td><td>プログラムから機能を呼ぶための窓口仕様</td></tr>
+        <tr><td><strong>FFI</strong></td><td>Foreign Function Interface</td><td>他言語(C)の関数を Rust から呼ぶ仕組み</td></tr>
+        <tr><td><strong>ABI</strong></td><td>Application Binary Interface</td><td>バイナリレベルの呼び出し規約（構造体の並び順など）</td></tr>
+        <tr><td><strong>OASIS</strong></td><td>Org. for the Advancement of Structured Information Standards</td><td>現在 PKCS#11 を管理する標準化団体</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- B -->
+<section class="slide" data-title="B. 構造・認証まわり">
+  <span class="slide-num">04</span>
+  <div class="slide-inner">
+    <span class="slide-tag gB">B · 構造・認証</span>
+    <h2><span class="num">B</span>PKCS#11 の構造・認証まわり</h2>
+    <table class="tbl">
+      <tbody>
+        <tr><td><strong>Slot</strong></td><td>トークンを挿す「差込口」。論理/物理の接続点</td></tr>
+        <tr><td><strong>Token</strong></td><td>鍵やデータが入る実体（=金庫）。HSM 本体</td></tr>
+        <tr><td><strong>Session</strong></td><td>トークンと会話する接続。開く→使う→閉じる</td></tr>
+        <tr><td><strong>Object</strong> / <strong>Handle</strong></td><td>トークン内の中身（鍵・証明書） / その整理番号（中身そのものではない）</td></tr>
+        <tr><td><strong>Mechanism</strong></td><td>アルゴリズム指定（手順）。例 <code>CKM_RSA_PKCS</code></td></tr>
+        <tr><td><strong>Attribute</strong></td><td>オブジェクトに貼るラベル/属性。例 <code>CKA_SIGN</code></td></tr>
+        <tr><td><strong>PIN</strong></td><td>Personal Identification Number。暗証番号</td></tr>
+        <tr><td><strong>SO</strong> / <strong>User</strong></td><td>管理者ロール（初期化・PIN設定） / 利用者ロール（署名・暗号）</td></tr>
+        <tr><td><strong>RO</strong> / <strong>RW</strong></td><td>読み取り専用 / 読み書き（鍵生成・削除・PIN 管理が可能）</td></tr>
+        <tr><td><strong>RNG</strong></td><td>Random Number Generator。乱数生成器（<code>C_GenerateRandom</code> が使う）</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- B prefixes -->
+<section class="slide" data-title="CK* プレフィックス">
+  <span class="slide-num">05</span>
+  <div class="slide-inner">
+    <span class="slide-tag gB">B · 構造・認証</span>
+    <h2>PKCS#11 の定数プレフィックス（<code>CK*</code>）</h2>
+    <p>PKCS#11 の識別子は接頭辞で種類が分かる。<strong>CK = Cryptoki</strong>。</p>
+    <table class="tbl">
+      <thead><tr><th>接頭辞</th><th>正式</th><th>例</th><th>意味</th></tr></thead>
+      <tbody>
+        <tr><td><code>C_</code></td><td>Cryptoki function</td><td><code>C_Sign</code></td><td>関数</td></tr>
+        <tr><td><code>CK_</code></td><td>Cryptoki type</td><td><code>CK_ULONG</code></td><td>型</td></tr>
+        <tr><td><code>CKR_</code></td><td>…Return value</td><td><code>CKR_OK</code></td><td>戻り値（エラーコード）。<code>CKR_OK</code>=0=成功</td></tr>
+        <tr><td><code>CKO_</code></td><td>…Object class</td><td><code>CKO_PRIVATE_KEY</code></td><td>オブジェクト種別</td></tr>
+        <tr><td><code>CKK_</code></td><td>…Key type</td><td><code>CKK_RSA</code></td><td>鍵アルゴリズム種別</td></tr>
+        <tr><td><code>CKM_</code></td><td>…Mechanism</td><td><code>CKM_AES_CBC</code></td><td>メカニズム（アルゴリズム）</td></tr>
+        <tr><td><code>CKA_</code></td><td>…Attribute</td><td><code>CKA_SIGN</code></td><td>属性</td></tr>
+        <tr><td><code>CKF_</code></td><td>…Flag</td><td><code>CKF_OS_LOCKING_OK</code></td><td>フラグ（ビット）</td></tr>
+        <tr><td><code>CKU_</code></td><td>…User type</td><td><code>CKU_SO</code></td><td>ユーザ種別</td></tr>
+      </tbody>
+    </table>
+    <div class="card accent-left"><p style="margin:0;"><code>CK_RV</code> = Cryptoki <strong>R</strong>eturn <strong>V</strong>alue（関数の戻り値型。<code>0</code>=<code>CKR_OK</code>=成功）。</p></div>
+  </div>
+</section>
+
+<!-- C -->
+<section class="slide" data-title="C. 暗号アルゴリズム">
+  <span class="slide-num">06</span>
+  <div class="slide-inner">
+    <span class="slide-tag gC">C · アルゴリズム</span>
+    <h2><span class="num">C</span>暗号アルゴリズム</h2>
+    <table class="tbl">
+      <thead><tr><th>略語</th><th>正式</th><th>種別</th><th>用途</th></tr></thead>
+      <tbody>
+        <tr><td><strong>RSA</strong></td><td>Rivest–Shamir–Adleman</td><td>非対称</td><td>署名・暗号</td></tr>
+        <tr><td><strong>EC / ECC</strong></td><td>Elliptic Curve (Cryptography)</td><td>非対称</td><td>短い鍵で強い。署名・鍵共有</td></tr>
+        <tr><td><strong>ECDSA</strong></td><td>Elliptic Curve Digital Signature Algorithm</td><td>署名</td><td>EC 鍵での署名</td></tr>
+        <tr><td><strong>EdDSA</strong> / <strong>Ed25519</strong></td><td>Edwards-curve DSA</td><td>署名</td><td>高速・安全。Ed25519 は曲線25519版</td></tr>
+        <tr><td><strong>X25519</strong> / <strong>ECDH</strong></td><td>—  / EC Diffie–Hellman</td><td>鍵共有</td><td>2者で共有鍵を作る</td></tr>
+        <tr><td><strong>AES</strong></td><td>Advanced Encryption Standard</td><td>対称</td><td>共通鍵暗号の標準</td></tr>
+        <tr><td><strong>DES / 3DES</strong></td><td>Data Encryption Standard</td><td>対称</td><td>旧式の共通鍵暗号（3DES は3重DES）</td></tr>
+        <tr><td><strong>HMAC</strong></td><td>Hash-based Message Auth. Code</td><td>認証</td><td>共通鍵＋ハッシュでメッセージ認証</td></tr>
+        <tr><td><strong>SHA</strong></td><td>Secure Hash Algorithm</td><td>ハッシュ</td><td>SHA-256 等。データの要約値を作る</td></tr>
+        <tr><td><strong>ML-KEM</strong></td><td>Module-Lattice KEM (FIPS 203)</td><td>耐量子(KEM)</td><td>v3.2 で追加。鍵カプセル化（<code>C_EncapsulateKey</code> 等）</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- D -->
+<section class="slide" data-title="D. 暗号モード・パラメータ">
+  <span class="slide-num">07</span>
+  <div class="slide-inner">
+    <span class="slide-tag gD">D · モード</span>
+    <h2><span class="num">D</span>暗号モード・パラメータ</h2>
+    <table class="tbl">
+      <thead><tr><th>略語</th><th>正式</th><th>意味</th></tr></thead>
+      <tbody>
+        <tr><td><strong>IV</strong></td><td>Initialization Vector</td><td>初期化ベクトル。CBC/GCM で毎回変える初期値</td></tr>
+        <tr><td><strong>CBC</strong></td><td>Cipher Block Chaining</td><td>ブロック暗号の連鎖モード。IV が要る</td></tr>
+        <tr><td><strong>GCM</strong></td><td>Galois/Counter Mode</td><td>認証付き暗号モード（暗号化＋改ざん検知）</td></tr>
+        <tr><td><strong>ECB</strong></td><td>Electronic Codebook</td><td>最も単純なモード（弱いので非推奨）</td></tr>
+        <tr><td><strong>OAEP</strong></td><td>Optimal Asymmetric Encryption Padding</td><td>RSA 暗号の安全なパディング方式</td></tr>
+        <tr><td><strong>PSS</strong></td><td>Probabilistic Signature Scheme</td><td>RSA 署名の現代的パディング（推奨）</td></tr>
+        <tr><td><strong>PKCS#1 / #7</strong></td><td>—</td><td>RSA のパディング(#1)、ブロック暗号のパディング(#7)</td></tr>
+        <tr><td><strong>KDF</strong></td><td>Key Derivation Function</td><td>共有秘密から鍵を導く関数（ECDH の後段など）</td></tr>
+        <tr><td><strong>KEK</strong></td><td>Key Encryption Key</td><td>鍵を暗号化するための鍵（鍵ラップで使う）</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- E + F -->
+<section class="slide" data-title="E. エンコード / F. バージョン">
+  <span class="slide-num">08</span>
+  <div class="slide-inner">
+    <span class="slide-tag gE">E·F</span>
+    <h2><span class="num">E</span>エンコード・データ表現 ／ <span class="num">F</span>その他</h2>
+    <table class="tbl">
+      <tbody>
+        <tr><td><strong>OID</strong></td><td>Object Identifier。「1.2.840.10045.3.1.7」のような階層的な識別番号。曲線やアルゴリズムを表す</td></tr>
+        <tr><td><strong>DER</strong></td><td>Distinguished Encoding Rules。ASN.1 をバイト列に符号化する規則（一意な形式）</td></tr>
+        <tr><td><strong>ASN.1</strong></td><td>Abstract Syntax Notation One。データ構造を定義する記法。証明書や鍵の標準表現</td></tr>
+        <tr><td><strong>PEM</strong></td><td>Privacy-Enhanced Mail。DER を Base64 + ヘッダで囲ったテキスト形式（<code>-----BEGIN...</code>）</td></tr>
+        <tr><td><strong>hex</strong></td><td>hexadecimal。16進数表記。本ツールはバイト列を hex で入出力する</td></tr>
+      </tbody>
+    </table>
+    <table class="tbl">
+      <tbody>
+        <tr><td><strong>HW / FW</strong></td><td>Hardware / Firmware のバージョン等</td></tr>
+        <tr><td><strong>SoftHSM</strong></td><td>ソフトウェアだけで HSM を模擬する実装（学習・テスト用）</td></tr>
+        <tr><td><strong>Drop</strong></td><td>(Rust 用語) 値がスコープを抜ける時の後始末。cryptoki はこれで <code>Finalize</code>/<code>CloseSession</code> を自動化</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- References -->
+<section class="slide" data-title="References">
+  <span class="slide-num">09</span>
+  <div class="slide-inner">
+    <span class="slide-tag refs">REFERENCES</span>
+    <h2>参考</h2>
+    <div class="card bordered-left">
+      <div class="card-title">関連ドキュメント</div>
+      <p style="margin:0;">
+        基礎概念: <a class="ref-url" href="01.PKCS11-HSM入門.html">01 PKCS11-HSM入門</a> ／
+        関数一覧と定数プレフィックス: <a class="ref-url" href="05.PKCS11-関数リファレンス.html">05 関数リファレンス</a>
+      </p>
+    </div>
+    <div style="text-align: center; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--line);">
+      <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--ink-muted); letter-spacing: 0.15em;">END OF DOCUMENT</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<nav class="nav-bottom" aria-label="スライドナビゲーション">
+  <button id="prevBtn" type="button" aria-label="前のスライドへ">← PREV</button>
+  <button id="nextBtn" type="button" aria-label="次のスライドへ">NEXT →</button>
+</nav>
+
+<script src="assets/deck.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>cryptoki セットプログラム解説</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/common.css">
+<link rel="stylesheet" href="assets/doc.css">
+<style>
+  :root { --teal: #2f8f83; --accent: var(--teal); }
+  body::before {
+    background-image:
+      radial-gradient(circle at 20% 30%, rgba(47, 143, 131, 0.05) 0%, transparent 50%),
+      radial-gradient(circle at 80% 70%, rgba(184, 138, 60, 0.04) 0%, transparent 50%);
+  }
+  .filename { color: var(--teal); background: rgba(47,143,131,0.1); border-color: rgba(47,143,131,0.3); }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="dot"></span>cryptoki セットプログラム解説</div>
+  <div style="display: flex; gap: 1rem; align-items: center;">
+    <div class="progress"><span class="cur" id="curNum">01</span><span class="total"> / <span id="totalNum">12</span></span></div>
+    <button class="toc-btn" id="tocBtn" type="button" aria-label="目次を開く" aria-haspopup="dialog">INDEX</button>
+  </div>
+</header>
+
+<div class="toc-modal" id="tocModal" role="dialog" aria-modal="true" aria-label="目次">
+  <div class="toc-content">
+    <h3>目次 — INDEX</h3>
+    <ul class="toc-list" id="tocList"></ul>
+  </div>
+</div>
+
+<main class="deck" id="deck">
+
+<!-- ====== TITLE ====== -->
+<section class="slide title-slide" data-title="タイトル">
+  <span class="slide-num">01</span>
+  <div class="slide-inner">
+    <div class="title-mark">cryptoki crate · HSM 実用編</div>
+    <h1 class="title">cryptoki<br><span class="accent">セットプログラム</span>解説</h1>
+    <div class="title-line"></div>
+    <p class="subtitle">概念 → コードの地図 → 使い方<br>SoftHSM2 などを cryptoki クレートで操作する「機能別セット」</p>
+    <div class="title-meta">
+      <strong>対象</strong> : 生 FFI 学習(doc 03)を終え、実用的に書きたい人<br>
+      <strong>到達点</strong> : <code>src/</code> のどのファイルが何をするか分かる<br>
+      <strong>前提</strong> : cryptoki 0.10 / edition 2024
+    </div>
+    <div class="card accent-left" style="margin-top:2rem;">
+      <p style="margin:0;">既存の <code>src/main.rs</code> は「生 FFI で C API を手で叩く学習用」(doc 03)。
+      こちらは「<strong>cryptoki クレートで実用的に書く版</strong>」。狙いが違う2本立て。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ====== TOC ====== -->
+<section class="slide" data-title="このドキュメントの構成">
+  <span class="slide-num">02</span>
+  <div class="slide-inner">
+    <span class="slide-tag s0">CONTENTS</span>
+    <h2>このドキュメントの構成</h2>
+    <p class="lead">概念のたとえから入り、ライフサイクル・C API 対応・ファイル構成・使い方の順で、コードへ最短で飛べるようにする。</p>
+    <div class="kv">
+      <div class="kv-row"><div class="k">03</div><div class="v">まず概念（金庫のたとえ）</div></div>
+      <div class="kv-row"><div class="k">04</div><div class="v">会話の骨格（ライフサイクル）と 3 段ロケット</div></div>
+      <div class="kv-row"><div class="k">05–06</div><div class="v">C API ↔ cryptoki 対応表</div></div>
+      <div class="kv-row"><div class="k">07–08</div><div class="v">ファイル構成（どれが何をするか）</div></div>
+      <div class="kv-row"><div class="k">09–10</div><div class="v">使い方（準備・実行・環境変数）</div></div>
+      <div class="kv-row"><div class="k">11</div><div class="v">学習ステップ</div></div>
+      <div class="kv-row"><div class="k">12</div><div class="v">References</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== 1. 概念 ====== -->
+<section class="slide" data-title="まず概念（金庫のたとえ）">
+  <span class="slide-num">03</span>
+  <div class="slide-inner">
+    <span class="slide-tag c1">1 · 概念</span>
+    <h2><span class="num">1</span>まず概念（金庫のたとえ）</h2>
+    <table class="tbl">
+      <thead><tr><th>概念</th><th>たとえ</th><th>意味</th></tr></thead>
+      <tbody>
+        <tr><td>Library(.so)</td><td>業務マニュアル</td><td><code>libsofthsm2.so</code>。これをロードして全関数を得る</td></tr>
+        <tr><td>Slot</td><td>金庫の差込口</td><td>接続点。スロット番号で指定</td></tr>
+        <tr><td>Token</td><td>金庫本体</td><td>鍵やデータの実体。HSM 本体</td></tr>
+        <tr><td>Session</td><td>面談中の状態</td><td>Token と会話する接続。開く→使う→閉じる</td></tr>
+        <tr><td>Login</td><td>暗証番号で本人確認</td><td>PIN を入れる。秘密鍵操作にはほぼ必須</td></tr>
+        <tr><td>Object</td><td>金庫の中身</td><td>鍵・証明書・データ。各々に Handle(整理番号)が付く</td></tr>
+        <tr><td>Attribute</td><td>中身に貼るラベル</td><td><code>Sign=true</code>, <code>Extractable=false</code> など</td></tr>
+        <tr><td>Mechanism</td><td>作業手順</td><td><code>RsaPkcs</code>, <code>Ecdsa</code>, <code>AesCbcPad</code> などアルゴリズム指定</td></tr>
+      </tbody>
+    </table>
+    <div class="card warn">
+      <div class="card-title">最重要原則</div>
+      <p style="margin:0;">秘密鍵は金庫から出ない。アプリは「これに署名して」と注文書(Mechanism + データ + 鍵Handle)を渡し、<strong>結果だけ</strong>受け取る。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ====== 2. ライフサイクル ====== -->
+<section class="slide" data-title="ライフサイクルと3段ロケット">
+  <span class="slide-num">04</span>
+  <div class="slide-inner">
+    <span class="slide-tag c2">2 · 骨格</span>
+    <h2><span class="num">2</span>会話の骨格と 3 段ロケット</h2>
+    <h3>外枠（ライフサイクル）</h3>
+    <div class="code-block"><span class="code-lang">lifecycle</span><pre>connect()      … C_GetFunctionList + C_Initialize
+  pick_slot()    … C_GetSlotList
+    login_rw()     … C_OpenSession + C_Login
+      ── 本番処理 ──
+    (自動)         … C_Logout / C_CloseSession  ← Session の Drop で自動
+  (自動)         … C_Finalize                   ← Pkcs11 の Drop で自動</pre></div>
+    <p>cryptoki は終了処理(<code>Finalize</code>/<code>CloseSession</code>/<code>Logout</code>)を <strong>Drop で自動化</strong>するので、自分で書くのは「接続〜ログイン〜本番処理」だけ。</p>
+    <h3>中身（3 段ロケット）</h3>
+    <p>PKCS#11 の処理系は <strong>Init → 本体 → (Final)</strong> で統一。cryptoki は前 2 段を 1 メソッドに合体する。</p>
+    <table class="tbl">
+      <thead><tr><th>操作</th><th>C API</th><th>cryptoki</th></tr></thead>
+      <tbody>
+        <tr><td>署名</td><td><code>C_SignInit</code> + <code>C_Sign</code></td><td><code>session.sign(...)</code></td></tr>
+        <tr><td>検証</td><td><code>C_VerifyInit</code> + <code>C_Verify</code></td><td><code>session.verify(...)</code></td></tr>
+        <tr><td>暗号化</td><td><code>C_EncryptInit</code> + <code>C_Encrypt</code></td><td><code>session.encrypt(...)</code></td></tr>
+        <tr><td>復号</td><td><code>C_DecryptInit</code> + <code>C_Decrypt</code></td><td><code>session.decrypt(...)</code></td></tr>
+        <tr><td>検索</td><td><code>C_FindObjectsInit</code> + Find + Final</td><td><code>session.find_objects(...)</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ====== 3. 対応表 (1) ====== -->
+<section class="slide" data-title="C API ↔ cryptoki 対応表">
+  <span class="slide-num">05</span>
+  <div class="slide-inner">
+    <span class="slide-tag c3">3 · 対応表</span>
+    <h2><span class="num">3</span>C API ↔ cryptoki 対応表</h2>
+    <table class="tbl">
+      <thead><tr><th>C API</th><th>cryptoki</th><th>隠され方</th></tr></thead>
+      <tbody>
+        <tr><td><code>C_GetFunctionList</code>+<code>C_Initialize</code></td><td><code>Pkcs11::new()</code> + <code>.initialize(CInitializeArgs::OsThreads)</code></td><td>関数表取得は内部で自動</td></tr>
+        <tr><td><code>C_Finalize</code></td><td><code>Pkcs11</code> の Drop</td><td>書かなくてよい</td></tr>
+        <tr><td><code>C_GetInfo</code></td><td><code>pkcs11.get_library_info()</code></td><td>バージョン/ベンダー</td></tr>
+        <tr><td><code>C_GetSlotList</code></td><td><code>pkcs11.get_slots_with_token()</code></td><td><code>Vec&lt;Slot&gt;</code></td></tr>
+        <tr><td><code>C_GetSlotInfo</code>/<code>C_GetTokenInfo</code></td><td><code>get_slot_info()</code> / <code>get_token_info()</code></td><td>構造体で返る</td></tr>
+        <tr><td><code>C_GetMechanismList</code></td><td><code>pkcs11.get_mechanism_list(slot)</code></td><td>対応アルゴリズム一覧</td></tr>
+        <tr><td><code>C_OpenSession</code></td><td><code>pkcs11.open_rw_session(slot)</code></td><td>RO/RW をメソッド名で表現</td></tr>
+        <tr><td><code>C_Login</code>/<code>C_Logout</code></td><td><code>session.login(UserType::User, Some(&amp;pin))</code> / Drop</td><td>ユーザ種別が enum</td></tr>
+        <tr><td><code>C_GenerateKeyPair</code></td><td><code>session.generate_key_pair(&amp;mech, &amp;pub_t, &amp;priv_t)</code></td><td>属性が <code>Vec&lt;Attribute&gt;</code></td></tr>
+        <tr><td><code>C_GenerateKey</code></td><td><code>session.generate_key(&amp;mech, &amp;t)</code></td><td>対称鍵用</td></tr>
+        <tr><td><code>CK_RV</code>(0=OK)</td><td><code>Result&lt;T, Error&gt;</code></td><td><code>0</code> 判定が <code>?</code> に</td></tr>
+        <tr><td><code>CK_ATTRIBUTE</code></td><td><code>Attribute::Sign(true)</code> などの enum</td><td>byte 詰め不要・型安全</td></tr>
+        <tr><td><code>CK_MECHANISM</code></td><td><code>Mechanism::RsaPkcsKeyPairGen</code> などの enum</td><td>同上</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ====== 3. 対応表 (2) ====== -->
+<section class="slide" data-title="CInitializeArgs とバージョン4種">
+  <span class="slide-num">06</span>
+  <div class="slide-inner">
+    <span class="slide-tag c3">3 · 対応表</span>
+    <h2>補足：<code>CInitializeArgs</code> と「4種のバージョン」</h2>
+    <div class="card accent-left">
+      <div class="card-title"><code>CInitializeArgs</code> の意味</div>
+      <p style="margin:0;"><code>C_Initialize</code> の引数は暗号と無関係で「マルチスレッド時のロック方法」だけを決める。
+      C 仕様では 4 モードあるが、cryptoki(0.10) は実用上の選択肢
+      <strong><code>OsThreads</code>（= <code>CKF_OS_LOCKING_OK</code>、OS ネイティブロックでスレッドセーフ）</strong>を公開している。</p>
+    </div>
+    <h3>「バージョン」は 4 種類ある</h3>
+    <div class="code-block"><span class="code-lang">versions</span><pre>get_library_info() → cryptoki_version  // ① 仕様(API)の版  例 2.40 / 3.0 / 3.2
+                   → library_version   // ② ライブラリ実装の版
+get_slot_info()    → hardware_version  // ③ ハード版
+                   → firmware_version  // ④ ファーム版</pre></div>
+    <p>①の「仕様の版」は、トークンが実装する PKCS#11 の世代を示す。現行の最新仕様は
+    <strong>v3.2（OASIS CS01, 2025-11-14）</strong>。SoftHSM2 など多くの実装は今も v2.40 相当を返す。</p>
+  </div>
+</section>
+
+<!-- ====== 4. ファイル構成 ====== -->
+<section class="slide" data-title="ファイル構成">
+  <span class="slide-num">07</span>
+  <div class="slide-inner">
+    <span class="slide-tag c4">4 · 構成</span>
+    <h2><span class="num">4</span>ファイル構成（どれが何をするか）</h2>
+    <div class="tree"><span class="dir">src/</span>
+├── <span class="file">lib.rs</span>            <span class="note">共通の Result 型 + モジュール宣言</span>
+├── <span class="file">session.rs</span>        <span class="note">接続・スロット選択・ログイン・鍵検索（会話の骨格）</span>
+├── <span class="dir">ops/</span>
+│   ├── <span class="file">mod.rs</span>
+│   ├── <span class="file">info.rs</span>       <span class="note">情報取得: バージョン/スロット/メカニズム/セッション</span>
+│   ├── <span class="file">keygen.rs</span>     <span class="note">鍵生成: RSA / EC / Ed25519 / X25519 / AES / HMAC</span>
+│   ├── <span class="file">sign.rs</span>       <span class="note">署名 / 検証（一発）</span>
+│   ├── <span class="file">crypt.rs</span>      <span class="note">暗号化 / 復号（一発）</span>
+│   ├── <span class="file">digest.rs</span>     <span class="note">ハッシュ(SHA-256)</span>
+│   ├── <span class="file">random.rs</span>     <span class="note">乱数(C_GenerateRandom / C_SeedRandom)</span>
+│   ├── <span class="file">objects.rs</span>    <span class="note">オブジェクト管理(list/attrs/destroy/copy)</span>
+│   ├── <span class="file">keywrap.rs</span>    <span class="note">鍵ラップ/アンラップ/ECDH 導出</span>
+│   ├── <span class="file">stream.rs</span>     <span class="note">分割処理(Update/Final)</span>
+│   └── <span class="file">admin.rs</span>      <span class="note">トークン/PIN 管理(init-token/init-pin/set-pin)</span>
+└── <span class="dir">bin/</span>
+    └── <span class="hl">hsm.rs</span>        <span class="note">CLI 本体（サブコマンドで上記を呼び分け）</span></div>
+    <p>ほぼ全コマンドは <code>cargo run --bin hsm -- help</code> で一覧表示。
+    各関数の C API 対応は <a class="ref-url" href="05.PKCS11-関数リファレンス.html">doc/05 関数リファレンス</a> を参照。</p>
+    <p><strong>「署名したい → <code>ops/sign.rs</code>」「RSA 生成 → <code>ops/keygen.rs::rsa</code>」「取得系 → <code>ops/info.rs</code>」</strong>という対応で目的のコードにすぐ飛べる。</p>
+  </div>
+</section>
+
+<!-- ====== 4. 鍵生成3種 ====== -->
+<section class="slide" data-title="鍵生成3種の比較">
+  <span class="slide-num">08</span>
+  <div class="slide-inner">
+    <span class="slide-tag c4">4 · 構成</span>
+    <h2>鍵生成 3 種の比較（<code>ops/keygen.rs</code>）</h2>
+    <table class="tbl">
+      <thead><tr><th>鍵</th><th>関数</th><th>メソッド</th><th>Mechanism</th><th>鍵長/曲線の指定</th></tr></thead>
+      <tbody>
+        <tr><td>RSA</td><td><code>keygen::rsa</code></td><td><code>generate_key_pair</code></td><td><code>RsaPkcsKeyPairGen</code></td><td><code>ModulusBits(2048)</code> + <code>PublicExponent</code></td></tr>
+        <tr><td>EC</td><td><code>keygen::ec</code></td><td><code>generate_key_pair</code></td><td><code>EccKeyPairGen</code></td><td><code>EcParams(OIDのDER)</code></td></tr>
+        <tr><td>AES</td><td><code>keygen::aes</code></td><td><code>generate_key</code>(単数)</td><td><code>AesKeyGen</code></td><td><code>ValueLen(32)</code></td></tr>
+      </tbody>
+    </table>
+    <p>非対称＝ペア生成(テンプレ2つ)、対称＝単数生成(テンプレ1つ)。詳細は
+    <a class="ref-url" href="06.鍵生成の詳解.html">doc/06 鍵生成の詳解</a>。</p>
+    <div class="card accent-left">
+      <div class="card-title">署名メカニズムの方針</div>
+      <p style="margin:0;">本プログラムの RSA 署名は <code>Sha256RsaPkcs</code>（PKCS#1 v1.5）を採用。SoftHSM 等での確実な動作と学習簡略化のためで、
+      新規設計では <code>RsaPkcsPss</code>（PSS, 現代の推奨）が望ましい点は doc/01 §10 の通り。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ====== 5. 使い方 (1) ====== -->
+<section class="slide" data-title="使い方（準備・実行）">
+  <span class="slide-num">09</span>
+  <div class="slide-inner">
+    <span class="slide-tag c5">5 · 使い方</span>
+    <h2><span class="num">5</span>使い方（準備 → 実行）</h2>
+    <h3>準備（SoftHSM2 でトークン初期化）</h3>
+    <div class="code-block shell"><span class="code-lang">shell</span><pre>softhsm2-util --init-token --free --label "test" --so-pin 5678 --pin 1234
+# .so を lib/ に置く（または環境変数 PKCS11_LIB で指定）</pre></div>
+    <h3>実行</h3>
+    <div class="code-block shell"><span class="code-lang">shell</span><pre># 取得系（ログイン不要・最初の疎通確認に最適）
+cargo run --bin hsm -- info
+
+# 鍵生成
+cargo run --bin hsm -- gen-rsa 2048 mykey
+cargo run --bin hsm -- gen-ec  p256 myec
+cargo run --bin hsm -- gen-aes 32 myaes
+
+# 署名 → 検証（sign が出す sig-hex を verify に渡す）
+cargo run --bin hsm -- sign   mykey "hello hsm"
+cargo run --bin hsm -- verify mykey "hello hsm" &lt;sig-hex&gt;
+
+# 暗号化 → 復号
+cargo run --bin hsm -- encrypt myaes "secret"
+cargo run --bin hsm -- decrypt myaes &lt;ct-hex&gt;</pre></div>
+  </div>
+</section>
+
+<!-- ====== 5. 使い方 (2) 環境変数 ====== -->
+<section class="slide" data-title="設定（環境変数）">
+  <span class="slide-num">10</span>
+  <div class="slide-inner">
+    <span class="slide-tag c5">5 · 使い方</span>
+    <h2>設定（環境変数）と実機への移行</h2>
+    <table class="tbl">
+      <thead><tr><th>変数</th><th>既定</th><th>意味</th></tr></thead>
+      <tbody>
+        <tr><td><code>PKCS11_LIB</code></td><td><code>lib/libsofthsm2.so</code></td><td>.so のパス</td></tr>
+        <tr><td><code>PKCS11_PIN</code></td><td><code>1234</code></td><td>ユーザ PIN</td></tr>
+        <tr><td><code>PKCS11_SLOT</code></td><td><code>0</code></td><td>スロット index</td></tr>
+      </tbody>
+    </table>
+    <div class="card accent-left">
+      <p style="margin:0;">実機 HSM へ移すときは、基本この 3 つ（パス・PIN・スロット）を変えるだけ。
+      PKCS#11 標準のおかげでコードはほぼそのまま動く（ベンダー独自メカニズムの有無だけ注意）。</p>
+    </div>
+    <div class="card warn">
+      <p style="margin:0;"><code>softhsm2-util --init-token</code> は初期化時にスロットが<strong>再採番</strong>されることがある。
+      <code>info</code> で実際のスロット番号を確認し、<code>PKCS11_SLOT</code> を合わせる。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ====== 6. 学習ステップ ====== -->
+<section class="slide" data-title="学習ステップ">
+  <span class="slide-num">11</span>
+  <div class="slide-inner">
+    <span class="slide-tag c6">6 · 学習</span>
+    <h2><span class="num">6</span>学習ステップ（おすすめ順）</h2>
+    <ul>
+      <li><code>info</code>（ログイン不要・3段ロケット無し。一番簡単）</li>
+      <li><code>gen-rsa</code> → <code>sign</code> → <code>verify</code>（PKCS#11 の中核）</li>
+      <li><code>gen-aes</code> → <code>encrypt</code> → <code>decrypt</code></li>
+      <li><code>ops/*.rs</code> を読んで C API 対応表(§3)と突き合わせる</li>
+      <li>実機 HSM へ（.so/PIN/スロットの差し替えのみ）</li>
+    </ul>
+    <div class="card accent-left">
+      <div class="card-title">関連ドキュメント</div>
+      <p style="margin:0;">
+        <a class="ref-url" href="05.PKCS11-関数リファレンス.html">05 関数リファレンス</a> ／
+        <a class="ref-url" href="06.鍵生成の詳解.html">06 鍵生成の詳解</a> ／
+        <a class="ref-url" href="07.ユーザ認証と情報取得.html">07 ユーザ認証と情報取得</a> ／
+        <a class="ref-url" href="08.用語・略語集.html">08 用語・略語集</a>
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ====== References ====== -->
+<section class="slide" data-title="References">
+  <span class="slide-num">12</span>
+  <div class="slide-inner">
+    <span class="slide-tag refs">REFERENCES</span>
+    <h2>参考</h2>
+    <div class="ref-section">
+      <ul class="ref-list">
+        <li>
+          <span class="ref-num">[1]</span>
+          <span class="ref-title">PKCS #11 Specification Version 3.2 (OASIS)</span>
+          <span class="ref-meta">Committee Specification 01, 14 November 2025。現行の最新仕様</span>
+          <a class="ref-url" href="https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.2/pkcs11-spec-v3.2.html" target="_blank" rel="noopener">docs.oasis-open.org/pkcs11/pkcs11-spec/v3.2/</a>
+        </li>
+        <li>
+          <span class="ref-num">[2]</span>
+          <span class="ref-title">cryptoki — Rust binding for PKCS#11</span>
+          <span class="ref-meta">本プログラムが使う高レベル API。バージョン 0.10 を前提に解説</span>
+          <a class="ref-url" href="https://docs.rs/cryptoki/0.10.0/cryptoki/" target="_blank" rel="noopener">docs.rs/cryptoki/0.10.0/</a>
+        </li>
+        <li>
+          <span class="ref-num">[3]</span>
+          <span class="ref-title">SoftHSM2 — OpenDNSSEC Project</span>
+          <span class="ref-meta">学習・API 動作確認用のソフトウェア HSM</span>
+          <a class="ref-url" href="https://www.opendnssec.org/softhsm/" target="_blank" rel="noopener">opendnssec.org/softhsm/</a>
+        </li>
+      </ul>
+    </div>
+    <div style="text-align: center; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--line);">
+      <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--ink-muted); letter-spacing: 0.15em;">END OF DOCUMENT</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<nav class="nav-bottom" aria-label="スライドナビゲーション">
+  <button id="prevBtn" type="button" aria-label="前のスライドへ">← PREV</button>
+  <button id="nextBtn" type="button" aria-label="次のスライドへ">NEXT →</button>
+</nav>
+
+<script src="assets/deck.js"></script>
+
+</body>
+</html>

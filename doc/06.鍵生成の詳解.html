@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>鍵生成の詳解（各種アルゴリズム）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/common.css">
+<link rel="stylesheet" href="assets/doc.css">
+<style>
+  :root { --accent: var(--vault); }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="dot"></span>鍵生成の詳解</div>
+  <div style="display: flex; gap: 1rem; align-items: center;">
+    <div class="progress"><span class="cur" id="curNum">01</span><span class="total"> / <span id="totalNum">13</span></span></div>
+    <button class="toc-btn" id="tocBtn" type="button" aria-label="目次を開く" aria-haspopup="dialog">INDEX</button>
+  </div>
+</header>
+
+<div class="toc-modal" id="tocModal" role="dialog" aria-modal="true" aria-label="目次">
+  <div class="toc-content">
+    <h3>目次 — INDEX</h3>
+    <ul class="toc-list" id="tocList"></ul>
+  </div>
+</div>
+
+<main class="deck" id="deck">
+
+<!-- TITLE -->
+<section class="slide title-slide" data-title="タイトル">
+  <span class="slide-num">01</span>
+  <div class="slide-inner">
+    <div class="title-mark">Key Generation · RSA / EC / Ed25519 / X25519 / AES</div>
+    <h1 class="title">鍵生成の<span class="accent">詳解</span></h1>
+    <div class="title-line"></div>
+    <p class="subtitle">署名も暗号も「鍵が無いと始まらない」<br>PKCS#11 / cryptoki での鍵生成の考え方とアルゴリズム別の作り方</p>
+    <div class="title-meta">
+      <strong>対象</strong> : doc/04 でコードの地図を掴んだ人<br>
+      <strong>対応コード</strong> : <code>src/ops/keygen.rs</code> / <code>src/ops/sign.rs</code><br>
+      <strong>前提</strong> : cryptoki 0.10
+    </div>
+  </div>
+</section>
+
+<!-- TOC -->
+<section class="slide" data-title="このドキュメントの構成">
+  <span class="slide-num">02</span>
+  <div class="slide-inner">
+    <span class="slide-tag s0">CONTENTS</span>
+    <h2>このドキュメントの構成</h2>
+    <div class="kv">
+      <div class="kv-row"><div class="k">03</div><div class="v">鍵生成で決めるのは「2つだけ」</div></div>
+      <div class="kv-row"><div class="k">04</div><div class="v">2系統：非対称(鍵ペア) と 対称(単一鍵)</div></div>
+      <div class="kv-row"><div class="k">05–06</div><div class="v">属性(Attribute)の意味 — テンプレの中身</div></div>
+      <div class="kv-row"><div class="k">07–10</div><div class="v">アルゴリズム別の作り方</div></div>
+      <div class="kv-row"><div class="k">11</div><div class="v">「鍵 → 署名」の対応（ゴール）</div></div>
+      <div class="kv-row"><div class="k">12</div><div class="v">つまずきポイント</div></div>
+      <div class="kv-row"><div class="k">13</div><div class="v">References</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 0 -->
+<section class="slide" data-title="鍵生成で決めるのは2つだけ">
+  <span class="slide-num">03</span>
+  <div class="slide-inner">
+    <span class="slide-tag c0">0 · 基本</span>
+    <h2><span class="num">0</span>鍵生成で決めるのは「2つだけ」</h2>
+    <p class="lead">どのアルゴリズムでも、鍵生成で指定するのは次の 2 つだけ。</p>
+    <ul>
+      <li><strong>メカニズム(Mechanism)</strong> … どのアルゴリズムで作るか。例: <code>RsaPkcsKeyPairGen</code>, <code>EccKeyPairGen</code>, <code>AesKeyGen</code></li>
+      <li><strong>テンプレート(Template)</strong> … 作る鍵に貼る「属性(Attribute)の配列」。例: <code>Token(true)</code>, <code>Sign(true)</code>, <code>Extractable(false)</code></li>
+    </ul>
+    <div class="code-block rust"><span class="code-lang">rust</span><pre>// 非対称(鍵ペア): メカニズム + 公開鍵テンプレ + 秘密鍵テンプレ
+session.generate_key_pair(&amp;mechanism, &amp;pub_template, &amp;priv_template)?;
+// 対称(単一鍵):   メカニズム + テンプレ1つ
+session.generate_key(&amp;mechanism, &amp;template)?;</pre></div>
+    <p>戻り値は <strong>鍵の中身ではなくハンドル(整理番号)</strong>。秘密鍵は HSM から出てこない。</p>
+  </div>
+</section>
+
+<!-- 1 -->
+<section class="slide" data-title="2系統：非対称と対称">
+  <span class="slide-num">04</span>
+  <div class="slide-inner">
+    <span class="slide-tag c1">1 · 2系統</span>
+    <h2><span class="num">1</span>非対称(鍵ペア) と 対称(単一鍵)</h2>
+    <table class="tbl">
+      <thead><tr><th></th><th>非対称鍵</th><th>対称鍵</th></tr></thead>
+      <tbody>
+        <tr><td>例</td><td>RSA, EC, Ed25519, X25519</td><td>AES, 3DES, Generic-Secret</td></tr>
+        <tr><td>鍵の数</td><td><strong>2つ</strong>(公開鍵+秘密鍵)がペア</td><td><strong>1つ</strong></td></tr>
+        <tr><td>メソッド</td><td><code>generate_key_pair</code></td><td><code>generate_key</code></td></tr>
+        <tr><td>テンプレ</td><td>2つ(pub用/priv用)</td><td>1つ</td></tr>
+        <tr><td>主な用途</td><td>署名/検証, 鍵共有, 公開鍵暗号</td><td>暗号化/復号, 鍵ラップ, HMAC</td></tr>
+        <tr><td>長さ指定</td><td>RSA=<code>ModulusBits</code>, EC=<code>EcParams</code>(曲線)</td><td><code>ValueLen</code>(バイト数)</td></tr>
+      </tbody>
+    </table>
+    <div class="card accent-left">
+      <p style="margin:0;"><strong>覚え方</strong>: 非対称=ペア生成=テンプレ2枚 / 対称=単数生成=テンプレ1枚。</p>
+    </div>
+  </div>
+</section>
+
+<!-- 2a/2b -->
+<section class="slide" data-title="属性：保存場所・種別">
+  <span class="slide-num">05</span>
+  <div class="slide-inner">
+    <span class="slide-tag c2">2 · 属性</span>
+    <h2><span class="num">2</span>属性の意味（前半）— 保存場所・種別</h2>
+    <h3>(a) 保存場所・識別</h3>
+    <table class="tbl">
+      <tbody>
+        <tr><td><code>Token(true)</code></td><td>トークンに<strong>永続保存</strong>。<code>false</code>ならセッション限り(切断で消える)</td></tr>
+        <tr><td><code>Label("...")</code></td><td>人間が読む名札。検索(<code>find_key</code>)のキーに使う</td></tr>
+        <tr><td><code>Id(...)</code></td><td>バイト列の ID。証明書と鍵の紐付け等に使う</td></tr>
+      </tbody>
+    </table>
+    <h3>(b) 鍵種別（対称鍵やラップ時に明示）</h3>
+    <table class="tbl">
+      <tbody>
+        <tr><td><code>Class(...)</code></td><td>オブジェクト種別。<code>PRIVATE_KEY</code>/<code>PUBLIC_KEY</code>/<code>SECRET_KEY</code></td></tr>
+        <tr><td><code>KeyType(...)</code></td><td>鍵アルゴリズム。<code>RSA</code>/<code>EC</code>/<code>AES</code>/<code>GENERIC_SECRET</code> 等</td></tr>
+      </tbody>
+    </table>
+    <div class="card accent-left">
+      <p style="margin:0;"><code>generate_key_pair</code>/<code>generate_key</code> では、メカニズムから種別が決まるので Class/KeyType を省略できることが多い（unwrap/derive 時は明示が要る）。</p>
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-title="属性：能力・保護">
+  <span class="slide-num">06</span>
+  <div class="slide-inner">
+    <span class="slide-tag c2">2 · 属性</span>
+    <h2>属性の意味（後半）— 能力・保護</h2>
+    <h3>(c) 能力フラグ — 「その鍵で何ができるか」</h3>
+    <table class="tbl">
+      <tbody>
+        <tr><td><code>Sign(true)</code></td><td>署名（秘密鍵/HMAC鍵）</td></tr>
+        <tr><td><code>Verify(true)</code></td><td>署名検証（公開鍵/HMAC鍵）</td></tr>
+        <tr><td><code>Encrypt(true)</code> / <code>Decrypt(true)</code></td><td>暗号化 / 復号</td></tr>
+        <tr><td><code>Wrap(true)</code> / <code>Unwrap(true)</code></td><td>他の鍵をラップ / ラップ鍵を取り込む</td></tr>
+        <tr><td><code>Derive(true)</code></td><td>鍵導出(ECDH等)に使える</td></tr>
+      </tbody>
+    </table>
+    <p><em>能力フラグは最小限だけ true にするのが鉄則(最小権限)。</em> 署名専用の秘密鍵に <code>Decrypt(true)</code> は付けない。</p>
+    <h3>(d) 保護 — HSM の肝</h3>
+    <table class="tbl">
+      <tbody>
+        <tr><td><code>Private(true)</code></td><td>このオブジェクトを見るにはログインが要る</td></tr>
+        <tr><td><code>Sensitive(true)</code></td><td>値(<code>CKA_VALUE</code>)を<strong>読み出せない</strong>ようにする</td></tr>
+        <tr><td><code>Extractable(false)</code></td><td>鍵を(ラップしてでも)<strong>持ち出せない</strong>ようにする</td></tr>
+      </tbody>
+    </table>
+    <div class="card warn">
+      <p style="margin:0;"><code>Sensitive(true)</code> + <code>Extractable(false)</code> が「鍵は金庫から出ない」を実現する組み合わせ。バックアップで持ち出したい鍵だけ <code>Extractable(true)</code>（→ <code>wrap</code> で取り出す）。</p>
+    </div>
+  </div>
+</section>
+
+<!-- 3-1 RSA -->
+<section class="slide" data-title="RSA">
+  <span class="slide-num">07</span>
+  <div class="slide-inner">
+    <span class="slide-tag c3">3 · アルゴリズム別</span>
+    <h2><span class="num">3-1</span>RSA（署名・暗号の定番）</h2>
+    <ul>
+      <li>メカニズム: <code>RsaPkcsKeyPairGen</code></li>
+      <li>長さ: <code>ModulusBits(2048/3072/4096…)</code> ＋ 公開指数 <code>PublicExponent</code>(=65537)</li>
+      <li>後段: 署名は <code>Sha256RsaPkcs</code>(PKCS#1 v1.5) / 推奨は <code>RsaPkcsPss</code>、暗号は <code>RsaPkcs</code>/<code>RsaPkcsOaep</code></li>
+    </ul>
+    <div class="code-block rust"><span class="code-lang">rust</span><pre>let pub_t = vec![
+    Attribute::Token(true), Attribute::Verify(true), Attribute::Encrypt(true),
+    Attribute::ModulusBits(2048.into()),
+    Attribute::PublicExponent(vec![0x01,0x00,0x01]), // 65537
+    Attribute::Label(b"my-rsa".to_vec()),
+];
+let priv_t = vec![
+    Attribute::Token(true), Attribute::Private(true),
+    Attribute::Sign(true), Attribute::Decrypt(true),
+    Attribute::Sensitive(true), Attribute::Extractable(false),
+    Attribute::Label(b"my-rsa".to_vec()),
+];
+session.generate_key_pair(&amp;Mechanism::RsaPkcsKeyPairGen, &amp;pub_t, &amp;priv_t)?;</pre></div>
+    <p>CLI: <code>gen-rsa 2048 my-rsa</code></p>
+  </div>
+</section>
+
+<!-- 3-2 EC -->
+<section class="slide" data-title="EC / ECDSA">
+  <span class="slide-num">08</span>
+  <div class="slide-inner">
+    <span class="slide-tag c3">3 · アルゴリズム別</span>
+    <h2><span class="num">3-2</span>EC / ECDSA（短い鍵で強い。主流）</h2>
+    <ul>
+      <li>メカニズム: <code>EccKeyPairGen</code></li>
+      <li>長さの代わりに <strong>曲線の OID を <code>EcParams</code> で</strong>渡す</li>
+      <li>後段の署名: <code>EcdsaSha256</code></li>
+    </ul>
+    <table class="tbl">
+      <thead><tr><th>曲線名</th><th>別名</th><th>OID</th><th>DER(EcParams)</th></tr></thead>
+      <tbody>
+        <tr><td>p256</td><td>prime256v1 / secp256r1</td><td>1.2.840.10045.3.1.7</td><td><code>06 08 2A 86 48 CE 3D 03 01 07</code></td></tr>
+        <tr><td>p384</td><td>secp384r1</td><td>1.3.132.0.34</td><td><code>06 05 2B 81 04 00 22</code></td></tr>
+        <tr><td>p521</td><td>secp521r1</td><td>1.3.132.0.35</td><td><code>06 05 2B 81 04 00 23</code></td></tr>
+        <tr><td>secp256k1</td><td>(Bitcoin等)</td><td>1.3.132.0.10</td><td><code>06 05 2B 81 04 00 0A</code></td></tr>
+      </tbody>
+    </table>
+    <p>CLI: <code>gen-ec p256 my-ec</code> / <code>gen-ec secp256k1 btc</code>（<code>keygen::ec_curve_oid("p256")</code> が上記 DER を返す）</p>
+    <div class="card accent-left">
+      <div class="card-title">OID の DER って何?</div>
+      <p style="margin:0;">曲線名を表す数値列(OID)を ASN.1 でバイト列に符号化したもの。先頭 <code>06</code> が「これは OID」、次が長さ、残りが中身。丸暗記不要、上表からコピーすればよい。</p>
+    </div>
+  </div>
+</section>
+
+<!-- 3-3,3-4 Ed/X -->
+<section class="slide" data-title="Ed25519 / X25519">
+  <span class="slide-num">09</span>
+  <div class="slide-inner">
+    <span class="slide-tag c3">3 · アルゴリズム別</span>
+    <h2><span class="num">3-3/4</span>Ed25519 と X25519</h2>
+    <h3>Ed25519（最新の署名。高速・安全）</h3>
+    <ul>
+      <li>メカニズム: <code>EccEdwardsKeyPairGen</code></li>
+      <li><code>EcParams</code> = edwards25519 の OID(1.3.101.112) → <code>06 03 2B 65 70</code></li>
+      <li>後段の署名: <code>Eddsa</code>（ハッシュ込みなので別途 SHA は不要）／ CLI: <code>gen-ed25519 my-ed</code></li>
+    </ul>
+    <div class="card accent-left"><p style="margin:0;">トークンによっては <code>EcParams</code> に OID でなく曲線名文字列 <code>"edwards25519"</code> を要求する実装もある。エラーが出たら名前文字列を試す。</p></div>
+    <h3>X25519（署名ではなく「鍵共有」用）</h3>
+    <ul>
+      <li>メカニズム: <code>EccMontgomeryKeyPairGen</code></li>
+      <li><code>EcParams</code> = curve25519 の OID(1.3.101.110) → <code>06 03 2B 65 6E</code></li>
+      <li>能力は <code>Sign</code> ではなく <strong><code>Derive(true)</code></strong>（ECDH で共有鍵を作る）／ 後段: <code>derive</code>(ECDH)。CLI: <code>gen-x25519 my-x</code></li>
+    </ul>
+  </div>
+</section>
+
+<!-- 3-5,3-6 AES/HMAC -->
+<section class="slide" data-title="AES / Generic-Secret">
+  <span class="slide-num">10</span>
+  <div class="slide-inner">
+    <span class="slide-tag c3">3 · アルゴリズム別</span>
+    <h2><span class="num">3-5/6</span>AES と Generic-Secret(HMAC)</h2>
+    <h3>AES（対称鍵。暗号化・鍵ラップ）</h3>
+    <ul>
+      <li>メカニズム: <code>AesKeyGen</code>、長さは <code>ValueLen</code>(バイト): 16/24/32 = AES-128/192/256</li>
+      <li>後段: 暗号は <code>AesCbcPad</code>/<code>AesGcm</code>、鍵ラップは <code>AesKeyWrapPad</code></li>
+    </ul>
+    <div class="code-block rust"><span class="code-lang">rust</span><pre>let t = vec![Attribute::Token(true), Attribute::ValueLen(32.into()),
+             Attribute::Encrypt(true), Attribute::Decrypt(true),
+             Attribute::Wrap(true), Attribute::Unwrap(true),
+             Attribute::Label(b"my-aes".to_vec())];
+session.generate_key(&amp;Mechanism::AesKeyGen, &amp;t)?; // ← 単数生成</pre></div>
+    <p>CLI: <code>gen-aes 32 my-aes</code></p>
+    <h3>Generic-Secret（HMAC 用のただのバイト列鍵）</h3>
+    <ul>
+      <li>メカニズム: <code>GenericSecretKeyGen</code>、長さ <code>ValueLen</code></li>
+      <li><code>Sign</code>/<code>Verify</code> を true（HMAC の生成・検証に使う）／ CLI: <code>gen-hmac 32 my-hmac</code></li>
+    </ul>
+  </div>
+</section>
+
+<!-- 4 -->
+<section class="slide" data-title="鍵 → 署名 の対応">
+  <span class="slide-num">11</span>
+  <div class="slide-inner">
+    <span class="slide-tag c4">4 · ゴール</span>
+    <h2><span class="num">4</span>「鍵 → 署名」の対応（ここがゴール）</h2>
+    <p>鍵の種類によって署名メカニズムが変わる。本プログラムの <code>sign</code> は <strong>鍵の KeyType を読んで自動で選ぶ</strong>ので、利用者は鍵ラベルを渡すだけでよい（<code>src/ops/sign.rs</code>）。</p>
+    <table class="tbl">
+      <thead><tr><th>鍵生成</th><th>KeyType</th><th>署名メカニズム</th><th>検証メカニズム</th></tr></thead>
+      <tbody>
+        <tr><td><code>gen-rsa</code></td><td>RSA</td><td><code>Sha256RsaPkcs</code></td><td>同左</td></tr>
+        <tr><td><code>gen-ec</code></td><td>EC</td><td><code>EcdsaSha256</code></td><td>同左</td></tr>
+        <tr><td><code>gen-ed25519</code></td><td>EC_EDWARDS</td><td><code>Eddsa</code></td><td>同左</td></tr>
+        <tr><td><code>gen-aes</code> / <code>gen-hmac</code></td><td>(対称)</td><td>署名ではなく暗号/HMAC</td><td>—</td></tr>
+        <tr><td><code>gen-x25519</code></td><td>EC_MONTGOMERY</td><td>署名不可(鍵共有専用)</td><td>—</td></tr>
+      </tbody>
+    </table>
+    <div class="code-block shell"><span class="code-lang">shell</span><pre>cargo run --bin hsm -- gen-rsa 2048 rsakey
+cargo run --bin hsm -- sign   rsakey "hello"      # → sig(hex)
+cargo run --bin hsm -- verify rsakey "hello" &lt;hex&gt;
+cargo run --bin hsm -- gen-ec p256 eckey &amp;&amp; cargo run --bin hsm -- sign eckey "hello"
+cargo run --bin hsm -- list      # 確認
+cargo run --bin hsm -- attrs eckey</pre></div>
+  </div>
+</section>
+
+<!-- 5 -->
+<section class="slide" data-title="つまずきポイント">
+  <span class="slide-num">12</span>
+  <div class="slide-inner">
+    <span class="slide-tag c5">5 · 注意</span>
+    <h2><span class="num">5</span>つまずきポイント</h2>
+    <ul>
+      <li><strong>鍵長/曲線の指定場所が違う</strong>: RSA=<code>ModulusBits</code>、EC=<code>EcParams</code>、対称=<code>ValueLen</code>。</li>
+      <li><strong>能力フラグ不足でエラー</strong>: 署名鍵に <code>Sign(true)</code> が無い、ラップ元に <code>Extractable(true)</code> が無い等。操作が <code>CKR_KEY_FUNCTION_NOT_PERMITTED</code> 等で弾かれたら、まず属性を疑う。</li>
+      <li><strong>トークンが対応していない</strong>: <code>info</code> の対応メカニズム一覧に目的の <code>*KeyPairGen</code> が無ければ作れない（実機 HSM で要確認）。</li>
+      <li><strong><code>Token(true)</code> を忘れる</strong>: セッションが切れると鍵が消える。永続化したいなら必須。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- References -->
+<section class="slide" data-title="References">
+  <span class="slide-num">13</span>
+  <div class="slide-inner">
+    <span class="slide-tag refs">REFERENCES</span>
+    <h2>参考</h2>
+    <div class="ref-section">
+      <ul class="ref-list">
+        <li><span class="ref-num">[1]</span><span class="ref-title">PKCS #11 Specification Version 3.2 (OASIS)</span><span class="ref-meta">§5.15 鍵管理, §6 メカニズム。CS01, 2025-11-14</span><a class="ref-url" href="https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.2/pkcs11-spec-v3.2.html" target="_blank" rel="noopener">docs.oasis-open.org/pkcs11/pkcs11-spec/v3.2/</a></li>
+        <li><span class="ref-num">[2]</span><span class="ref-title">NIST FIPS 186-5 — Digital Signature Standard</span><span class="ref-meta">RSA/ECDSA/EdDSA の規定。Annex A に鍵生成手順</span><a class="ref-url" href="https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-5.pdf" target="_blank" rel="noopener">nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-5.pdf</a></li>
+        <li><span class="ref-num">[3]</span><span class="ref-title">cryptoki 0.10 — docs.rs</span><span class="ref-meta"><code>Attribute</code> / <code>Mechanism</code> の enum 定義</span><a class="ref-url" href="https://docs.rs/cryptoki/0.10.0/cryptoki/" target="_blank" rel="noopener">docs.rs/cryptoki/0.10.0/</a></li>
+      </ul>
+    </div>
+    <div class="card bordered-left">
+      <div class="card-title">関連ドキュメント</div>
+      <p style="margin:0;">
+        関数の全体像: <a class="ref-url" href="05.PKCS11-関数リファレンス.html">05 関数リファレンス</a> ／
+        設計と C API 対応: <a class="ref-url" href="04.cryptoki-セットプログラム解説.html">04 cryptoki 解説</a> ／
+        実装: <code>../src/ops/keygen.rs</code> / <code>../src/ops/sign.rs</code>
+      </p>
+    </div>
+    <div style="text-align: center; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--line);">
+      <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--ink-muted); letter-spacing: 0.15em;">END OF DOCUMENT</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<nav class="nav-bottom" aria-label="スライドナビゲーション">
+  <button id="prevBtn" type="button" aria-label="前のスライドへ">← PREV</button>
+  <button id="nextBtn" type="button" aria-label="次のスライドへ">NEXT →</button>
+</nav>
+
+<script src="assets/deck.js"></script>
+
+</body>
+</html>

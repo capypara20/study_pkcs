@@ -21,11 +21,11 @@ cargo run --bin hsm -- help     # cryptoki セットプログラム
 | [doc/01.PKCS11-HSM入門.html](doc/01.PKCS11-HSM入門.html) | 基礎概念（Slot/Token/Session/Object/Attribute/Mechanism） |
 | [doc/02.PKCS11-操作フロー詳解.html](doc/02.PKCS11-操作フロー詳解.html) | 乱数・署名・鍵生成の 3 段ロケット |
 | [doc/03.PKCS11-Rust生FFI実装.html](doc/03.PKCS11-Rust生FFI実装.html) | 生 FFI 実装・型マッピング |
-| [doc/04.cryptoki-セットプログラム解説.md](doc/04.cryptoki-セットプログラム解説.md) | cryptoki 版の設計・C API 対応・使い方 |
-| [doc/05.PKCS11-関数リファレンス.md](doc/05.PKCS11-関数リファレンス.md) | **全 ~68 関数の早見表**（公式仕様の補完・実装状況つき） |
-| [doc/06.鍵生成の詳解.md](doc/06.鍵生成の詳解.md) | **鍵生成の深掘り**（属性の意味・RSA/EC/Ed25519/X25519/AES/HMAC の作り方・鍵→署名の対応） |
-| [doc/07.ユーザ認証と情報取得.md](doc/07.ユーザ認証と情報取得.md) | **User/SO・PIN・RO/RW・セッション状態**と**情報取得系**（各フィールドの意味） |
-| [doc/08.用語・略語集.md](doc/08.用語・略語集.md) | **略語・用語の早見表**（HSM/OID/DER/ECDH/RO/RW/CK* 接頭辞 など） |
+| [doc/04.cryptoki-セットプログラム解説.html](doc/04.cryptoki-セットプログラム解説.html) | cryptoki 版の設計・C API 対応・使い方 |
+| [doc/05.PKCS11-関数リファレンス.html](doc/05.PKCS11-関数リファレンス.html) | **全関数の早見表**（2.40 の 68 関数 ＋ 3.0/3.2 追加分・実装状況つき） |
+| [doc/06.鍵生成の詳解.html](doc/06.鍵生成の詳解.html) | **鍵生成の深掘り**（属性の意味・RSA/EC/Ed25519/X25519/AES/HMAC の作り方・鍵→署名の対応） |
+| [doc/07.ユーザ認証と情報取得.html](doc/07.ユーザ認証と情報取得.html) | **User/SO・PIN・RO/RW・セッション状態**と**情報取得系**（各フィールドの意味） |
+| [doc/08.用語・略語集.html](doc/08.用語・略語集.html) | **略語・用語の早見表**（HSM/OID/DER/ECDH/RO/RW/CK* 接頭辞 など） |
 
 ---
 
@@ -113,7 +113,7 @@ softhsm2-util --init-token --slot 0 --label "test" --so-pin 1234 --pin 1234
 
 **`cryptoki` 0.10 がラッパーを提供する関数はほぼ全て実装済み。**
 未実装で残るのは「cryptoki がそもそも安全ラッパーを用意していない関数」だけ（＝生 FFI でしか呼べない）。
-関数ごとの詳細は [doc/05](doc/05.PKCS11-関数リファレンス.md) を参照。
+関数ごとの詳細は [doc/05](doc/05.PKCS11-関数リファレンス.html) を参照。
 
 | カテゴリ | 実装済み | 未実装（cryptoki 0.10 にラッパー無し） |
 |---|---|---|
