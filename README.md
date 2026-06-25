@@ -23,6 +23,7 @@ cargo run --bin hsm -- help     # cryptoki セットプログラム
 | [doc/03.PKCS11-Rust生FFI実装.html](doc/03.PKCS11-Rust生FFI実装.html) | 生 FFI 実装・型マッピング |
 | [doc/04.cryptoki-セットプログラム解説.md](doc/04.cryptoki-セットプログラム解説.md) | cryptoki 版の設計・C API 対応・使い方 |
 | [doc/05.PKCS11-関数リファレンス.md](doc/05.PKCS11-関数リファレンス.md) | **全 ~68 関数の早見表**（公式仕様の補完・実装状況つき） |
+| [doc/06.鍵生成の詳解.md](doc/06.鍵生成の詳解.md) | **鍵生成の深掘り**（属性の意味・RSA/EC/Ed25519/X25519/AES/HMAC の作り方・鍵→署名の対応） |
 
 ---
 
@@ -33,7 +34,7 @@ cargo run --bin hsm -- help     # cryptoki セットプログラム
 | やりたいこと | ファイル | 関数 |
 |---|---|---|
 | 情報取得（バージョン/スロット/メカニズム/セッション） | `src/ops/info.rs` | `show()` / `mechanism_info()` / `session_info()` |
-| 鍵生成 RSA / EC / AES | `src/ops/keygen.rs` | `rsa()` / `ec()` / `aes()` |
+| 鍵生成 RSA / EC / Ed25519 / X25519 / AES / HMAC | `src/ops/keygen.rs` | `rsa()` / `ec()` / `ed25519()` / `x25519()` / `aes()` / `generic_secret()` |
 | 署名 / 検証（一発） | `src/ops/sign.rs` | `sign()` / `verify()` |
 | 暗号化 / 復号（一発） | `src/ops/crypt.rs` | `encrypt()` / `decrypt()` |
 | ハッシュ | `src/ops/digest.rs` | `sha256()` |
@@ -50,10 +51,12 @@ cargo run --bin hsm -- help     # cryptoki セットプログラム
 # 取得系（ログイン不要・最初の疎通確認に最適）
 cargo run --bin hsm -- info
 
-# 鍵生成
+# 鍵生成（アルゴリズム別。詳しくは doc/06）
 cargo run --bin hsm -- gen-rsa 2048 mykey
-cargo run --bin hsm -- gen-ec  myec
+cargo run --bin hsm -- gen-ec  p256 myec       # 曲線 p256/p384/p521/secp256k1
+cargo run --bin hsm -- gen-ed25519 myed
 cargo run --bin hsm -- gen-aes 32 myaes
+cargo run --bin hsm -- gen-hmac 32 myhmac
 
 # 署名 → 検証（sign が出す sig-hex を verify に渡す）
 cargo run --bin hsm -- sign   mykey "hello hsm"

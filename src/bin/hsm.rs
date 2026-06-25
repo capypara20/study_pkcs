@@ -72,15 +72,32 @@ fn run() -> Result<()> {
             println!("RSA-{bits} 鍵ペア生成 OK  label='{label}'  pub={pubk:?} priv={privk:?}");
         }
         "gen-ec" => {
-            let label = arg(&args, 1).unwrap_or("my-ec");
-            let (pubk, privk) = keygen::ec(&s, label)?;
-            println!("EC(P-256) 鍵ペア生成 OK  label='{label}'  pub={pubk:?} priv={privk:?}");
+            let curve = arg(&args, 1).unwrap_or("p256");
+            let label = arg(&args, 2).unwrap_or("my-ec");
+            let (pubk, privk) = keygen::ec(&s, curve, label)?;
+            println!("EC({curve}) 鍵ペア生成 OK  label='{label}'  pub={pubk:?} priv={privk:?}");
+        }
+        "gen-ed25519" => {
+            let label = arg(&args, 1).unwrap_or("my-ed");
+            let (pubk, privk) = keygen::ed25519(&s, label)?;
+            println!("Ed25519 鍵ペア生成 OK  label='{label}'  pub={pubk:?} priv={privk:?}");
+        }
+        "gen-x25519" => {
+            let label = arg(&args, 1).unwrap_or("my-x");
+            let (pubk, privk) = keygen::x25519(&s, label)?;
+            println!("X25519 鍵ペア生成 OK  label='{label}'  pub={pubk:?} priv={privk:?}");
         }
         "gen-aes" => {
             let bytes: u64 = arg(&args, 1).unwrap_or("32").parse()?;
             let label = arg(&args, 2).unwrap_or("my-aes");
             let key = keygen::aes(&s, bytes, label)?;
             println!("AES-{} 鍵生成 OK  label='{label}'  key={key:?}", bytes * 8);
+        }
+        "gen-hmac" => {
+            let bytes: u64 = arg(&args, 1).unwrap_or("32").parse()?;
+            let label = arg(&args, 2).unwrap_or("my-hmac");
+            let key = keygen::generic_secret(&s, bytes, label)?;
+            println!("Generic-Secret({} バイト) 生成 OK  label='{label}'  key={key:?}", bytes);
         }
 
         // ===== 署名・検証（一発） =====
@@ -237,9 +254,12 @@ fn print_help() {
          \x20 mech-info <MECHANISM>         指定メカニズムの詳細(鍵長など)\n\
          \x20 session-info                  セッション状態\n\
          [鍵生成]\n\
-         \x20 gen-rsa  [bits]  [label]      RSA 鍵ペア (既定 2048, my-rsa)\n\
-         \x20 gen-ec   [label]              EC(P-256) 鍵ペア (既定 my-ec)\n\
-         \x20 gen-aes  [bytes] [label]      AES 鍵 (既定 32B=AES-256, my-aes)\n\
+         \x20 gen-rsa     [bits]  [label]   RSA 鍵ペア (既定 2048, my-rsa)\n\
+         \x20 gen-ec      [curve] [label]   EC 鍵ペア (曲線 p256/p384/p521/secp256k1, 既定 p256)\n\
+         \x20 gen-ed25519 [label]           Ed25519 鍵ペア (署名用)\n\
+         \x20 gen-x25519  [label]           X25519 鍵ペア (鍵共有用)\n\
+         \x20 gen-aes     [bytes] [label]   AES 鍵 (既定 32B=AES-256, my-aes)\n\
+         \x20 gen-hmac    [bytes] [label]   Generic-Secret 鍵 (HMAC 用, 既定 32B)\n\
          [署名/検証]\n\
          \x20 sign     <label> <msg>        署名 (SHA256+RSA, 一発)\n\
          \x20 verify   <label> <msg> <hex>  検証\n\
