@@ -683,7 +683,7 @@ libloading = <span class="str">"0.8"</span></pre>
 
     <div class="card warn">
       <div class="card-title">数値はベタ書きだが仕様で確定</div>
-      <p style="font-size:0.92rem">これらの16進値はPKCS#11ヘッダ（<code>pkcs11t.h</code>）で定義された固定値。<strong>勝手に変えてはいけない</strong>。ベンダー拡張は<code>CKM_VENDOR_DEFINED</code>(<code>0x8000_0000</code>)以降の領域を使う。</p>
+      <p style="font-size:0.92rem">これらの16進値はPKCS#11ヘッダ（<code>pkcs11t.h</code>）で定義された固定値。<strong>勝手に変えてはいけない</strong>。製品独自の拡張は<code>CKM_VENDOR_DEFINED</code>(<code>0x8000_0000</code>)以降の領域を使う。</p>
     </div>
 
     <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[1] PKCS#11 Spec v3.2 §3 (定数定義)</a></div>
@@ -1231,14 +1231,14 @@ signature: <span class="num">256</span> bytes</pre>
         </div>
         <div class="card rust-accent">
           <div class="card-title">実務の結論</div>
-          <p style="font-size:0.9rem">学習・検証には生FFIで内部理解。<strong>本番は<code>cryptoki</code>（高レベル）を使う</strong>のが安全。今回のコードは「cryptokiの中身」を自分で書いたもの。</p>
+          <p style="font-size:0.9rem">仕組みを理解するには生FFIで内部を追う。<strong>普段は<code>cryptoki</code>（高レベル）を使う</strong>のが安全。今回のコードは「cryptokiの中身」を自分で書いたもの。</p>
         </div>
       </div>
     </div>
 
     <div class="card bordered-left">
-      <div class="card-title">第2部（性能評価）との接続</div>
-      <p style="font-size:0.92rem">性能測定をやるなら、この<code>ops/</code>の各関数を<code>std::time::Instant</code>で挟むだけ。ただし第2部で述べた通り、<strong>鍵生成は署名と時間スケールが違うので別ベンチにする</strong>・<strong>ウォームアップを入れる</strong>のを忘れずに。生FFIなら測定オーバーヘッドが最小なのも利点。</p>
+      <div class="card-title">第2部（処理時間を見る）との接続</div>
+      <p style="font-size:0.92rem">処理時間を見たいなら、この<code>ops/</code>の各関数を<code>std::time::Instant</code>で挟むだけ。ただし第2部で述べた通り、<strong>鍵生成は署名と時間スケールが違うので分けて見る</strong>・<strong>ならし運転を入れる</strong>のを忘れずに。生FFIなら計りものの上乗せが最小なのも利点。</p>
     </div>
 
     <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[3] libloading docs</a><a href="#slide-19">[5] cryptoki-sys</a><a href="#slide-19">[7] Rustonomicon (FFI/repr)</a></div>

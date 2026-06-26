@@ -117,6 +117,33 @@
     (自動)         … C_Logout / C_CloseSession  ← Session の Drop で自動
   (自動)         … C_Finalize                   ← Pkcs11 の Drop で自動</pre></div>
     <p>cryptoki は終了処理(<code>Finalize</code>/<code>CloseSession</code>/<code>Logout</code>)を <strong>Drop で自動化</strong>するので、自分で書くのは「接続〜ログイン〜本番処理」だけ。</p>
+
+    <div class="card accent-left">
+      <div class="card-title">Drop で後始末が自動になる仕組み（RAII）</div>
+      <p style="margin:0;">Rust では値がスコープを抜けると <code>Drop</code> が呼ばれる。cryptoki は <code>Session</code> の Drop で <code>C_Logout</code>＋<code>C_CloseSession</code>、<code>Pkcs11</code> の Drop で <code>C_Finalize</code> を自動で呼ぶ。
+      生 FFI(doc 03)では閉じ忘れ・二重解放が起きやすかったが、ここでは<strong>「開いたら閉じる」を型とスコープが保証</strong>してくれる。だから本体コードは下のように短くなる。</p>
+    </div>
+
+    <h3>実際のコードの骨格（最小例）</h3>
+    <div class="code-block rust"><span class="code-lang">rust</span><pre><span class="com">// ① 接続：.so をロードして初期化</span>
+let pkcs11 = Pkcs11::new(lib_path)?;
+pkcs11.initialize(CInitializeArgs::OsThreads)?;
+
+<span class="com">// ② スロットを選んで RW セッションを開く</span>
+let slot = pkcs11.get_slots_with_token()?[0];
+let session = pkcs11.open_rw_session(slot)?;
+
+<span class="com">// ③ ログイン（PIN）</span>
+session.login(UserType::User, Some(&amp;pin))?;
+
+<span class="com">// ④ 本番処理：鍵を探して署名する</span>
+let key = find_key(&amp;session, "mykey")?;
+let sig = session.sign(&amp;Mechanism::Sha256RsaPkcs, key, data)?;
+
+<span class="com">// ⑤ 後始末は書かない —— session と pkcs11 が</span>
+<span class="com">//    スコープを抜けるときに Drop が自動でやる</span></pre></div>
+    <p>骨格はこの 5 ステップだけ。<code>session.rs</code> が①〜③、<code>ops/*.rs</code> が④を担当する。<code>?</code> は「エラーなら即座に返す」演算子で、C の <code>if (rv != CKR_OK)</code> を毎回書く手間がなくなる。</p>
+
     <h3>中身（3 段ロケット）</h3>
     <p>PKCS#11 の処理系は <strong>Init → 本体 → (Final)</strong> で統一。cryptoki は前 2 段を 1 メソッドに合体する。</p>
     <table class="tbl">
@@ -138,12 +165,19 @@
   <div class="slide-inner">
     <span class="slide-tag c3">3 · 対応表</span>
     <h2><span class="num">3</span>C API ↔ cryptoki 対応表</h2>
+    <p class="lead">生 FFI で何行も書いていた C API が、cryptoki ではどのメソッド 1 本に対応するかの対照表。<strong>「C でこう書く ＝ Rust でこう」</strong>を 1 対 1 で引けるようにしてある。</p>
+    <div class="card accent-left">
+      <div class="card-title">cryptoki が肩代わりしてくれる 3 つのこと</div>
+      <p style="margin:0;"><strong>① 関数表の取得</strong>：<code>C_GetFunctionList</code> は <code>Pkcs11::new()</code> の内部で自動。
+      <strong>② 後始末</strong>：<code>Finalize</code>/<code>CloseSession</code>/<code>Logout</code> は Drop で自動。
+      <strong>③ 型とエラー</strong>：属性やメカニズムは enum、戻り値は <code>Result</code> になり、<code>CK_RV</code> の数値判定や byte 詰めが要らなくなる。</p>
+    </div>
     <table class="tbl">
       <thead><tr><th>C API</th><th>cryptoki</th><th>隠され方</th></tr></thead>
       <tbody>
         <tr><td><code>C_GetFunctionList</code>+<code>C_Initialize</code></td><td><code>Pkcs11::new()</code> + <code>.initialize(CInitializeArgs::OsThreads)</code></td><td>関数表取得は内部で自動</td></tr>
         <tr><td><code>C_Finalize</code></td><td><code>Pkcs11</code> の Drop</td><td>書かなくてよい</td></tr>
-        <tr><td><code>C_GetInfo</code></td><td><code>pkcs11.get_library_info()</code></td><td>バージョン/ベンダー</td></tr>
+        <tr><td><code>C_GetInfo</code></td><td><code>pkcs11.get_library_info()</code></td><td>バージョン/提供元</td></tr>
         <tr><td><code>C_GetSlotList</code></td><td><code>pkcs11.get_slots_with_token()</code></td><td><code>Vec&lt;Slot&gt;</code></td></tr>
         <tr><td><code>C_GetSlotInfo</code>/<code>C_GetTokenInfo</code></td><td><code>get_slot_info()</code> / <code>get_token_info()</code></td><td>構造体で返る</td></tr>
         <tr><td><code>C_GetMechanismList</code></td><td><code>pkcs11.get_mechanism_list(slot)</code></td><td>対応アルゴリズム一覧</td></tr>
@@ -259,6 +293,12 @@ cargo run --bin hsm -- verify mykey "hello hsm" &lt;sig-hex&gt;
 # 暗号化 → 復号
 cargo run --bin hsm -- encrypt myaes "secret"
 cargo run --bin hsm -- decrypt myaes &lt;ct-hex&gt;</pre></div>
+    <h3>出力イメージ（<code>info</code>）</h3>
+    <div class="code-block shell"><span class="code-lang">出力例</span><pre>Cryptoki version : 2.40        <span class="com"># 仕様(API)の版</span>
+Library          : SoftHSM 2.6  <span class="com"># 実装の版と提供元</span>
+Slot 0  token "test"  present   <span class="com"># 使えるスロットとトークン</span>
+Mechanisms: RsaPkcsKeyPairGen, EcKeyPairGen, Sha256RsaPkcs, ...</pre></div>
+    <p><code>info</code> はログイン不要なので、まずこれが通れば「<strong>.so が読めて、スロットとトークンが見えている</strong>」ことが確認できる。鍵生成や署名でつまずいたときも、最初に <code>info</code> へ戻ると切り分けが早い。</p>
   </div>
 </section>
 
@@ -277,8 +317,8 @@ cargo run --bin hsm -- decrypt myaes &lt;ct-hex&gt;</pre></div>
       </tbody>
     </table>
     <div class="card accent-left">
-      <p style="margin:0;">実機 HSM へ移すときは、基本この 3 つ（パス・PIN・スロット）を変えるだけ。
-      PKCS#11 標準のおかげでコードはほぼそのまま動く（ベンダー独自メカニズムの有無だけ注意）。</p>
+      <p style="margin:0;">別の HSM へ移すときは、基本この 3 つ（パス・PIN・スロット）を変えるだけ。
+      PKCS#11 標準のおかげでコードはほぼそのまま動く（製品独自メカニズムの有無だけ注意）。</p>
     </div>
     <div class="card warn">
       <p style="margin:0;"><code>softhsm2-util --init-token</code> は初期化時にスロットが<strong>再採番</strong>されることがある。

@@ -68,14 +68,15 @@
       </ul>
     </div>
 
-    <div class="subhead">凡例（<strong>実装</strong>列）</div>
+    <div class="subhead">凡例（<strong>対応状況</strong>列）</div>
+    <p style="margin:0 0 0.5rem;">この列は <strong>この資料のサンプル <code>hsm</code> プログラムと cryptoki クレートでの扱い</strong>を表す（Rust 標準ライブラリの話ではない）。</p>
     <div class="legend">
-      <span class="item"><span class="mk ok">✅</span> <code>hsm</code> プログラムで実際に使用</span>
-      <span class="item"><span class="mk au">△</span> cryptoki が内部で自動実行（自分で呼ばない）</span>
-      <span class="item"><span class="mk wip">◯</span> cryptoki 0.10 にラッパーあり・未配線（すぐ足せる）</span>
+      <span class="item"><span class="mk ok">✅</span> サンプル <code>hsm</code> プログラムで実際に呼んでいる</span>
+      <span class="item"><span class="mk au">△</span> cryptoki が内部で自動的に呼ぶ（自分では書かない）</span>
+      <span class="item"><span class="mk wip">◯</span> cryptoki 0.10 にラッパーあり・サンプルでは未使用（すぐ足せる）</span>
       <span class="item"><span class="mk no">✕</span> cryptoki 0.10 に安全ラッパー無し（生 FFI のみ）</span>
     </div>
-    <p><strong>cryptoki</strong> 列 … <code>cryptoki</code> クレート(0.10)での対応メソッド。</p>
+    <p><strong>cryptoki</strong> 列 … <code>cryptoki</code> クレート(0.10)で対応するメソッド名。</p>
   </div>
 
   <!-- ====== 命名規則 ====== -->
@@ -142,11 +143,11 @@ let sig = session.sign_final()?;    // ③ 締めて署名を受け取る</pre><
   <!-- ====== A ====== -->
   <h2 id="cat-a">A. 初期化・全体（General Purpose）</h2>
   <table class="tbl">
-    <thead><tr><th>関数</th><th>説明</th><th class="c">実装</th><th>cryptoki</th></tr></thead>
+    <thead><tr><th>関数</th><th>説明</th><th class="c">対応状況</th><th>cryptoki</th></tr></thead>
     <tbody>
       <tr><td><code>C_Initialize</code></td><td>ライブラリを初期化（最初に1回）</td><td class="c"><span class="au">△</span></td><td><code>pkcs11.initialize(CInitializeArgs::OsThreads)</code></td></tr>
       <tr><td><code>C_Finalize</code></td><td>ライブラリ後始末（最後に1回）</td><td class="c"><span class="au">△</span></td><td><code>Pkcs11</code> の Drop で自動</td></tr>
-      <tr><td><code>C_GetInfo</code></td><td>ライブラリ全体の情報（版・ベンダー）</td><td class="c"><span class="ok">✅</span></td><td><code>get_library_info()</code></td></tr>
+      <tr><td><code>C_GetInfo</code></td><td>ライブラリ全体の情報（版・提供元）</td><td class="c"><span class="ok">✅</span></td><td><code>get_library_info()</code></td></tr>
       <tr><td><code>C_GetFunctionList</code></td><td>関数ポインタ表を取得（2.40 系の入口）</td><td class="c"><span class="au">△</span></td><td><code>Pkcs11::new()</code> 内部で自動</td></tr>
       <tr><td><code>C_GetFunctionStatus</code></td><td>（旧式）並行関数の状態。今は非対応を返すだけ</td><td class="c"><span class="no">✕</span></td><td>—</td></tr>
       <tr><td><code>C_CancelFunction</code></td><td>（旧式）並行関数のキャンセル。今はほぼ無効</td><td class="c"><span class="no">✕</span></td><td>—</td></tr>
@@ -156,7 +157,7 @@ let sig = session.sign_final()?;    // ③ 締めて署名を受け取る</pre><
   <!-- ====== B ====== -->
   <h2 id="cat-b">B. スロット・トークン管理（Slot and Token）</h2>
   <table class="tbl">
-    <thead><tr><th>関数</th><th>説明</th><th class="c">実装</th><th>cryptoki</th></tr></thead>
+    <thead><tr><th>関数</th><th>説明</th><th class="c">対応状況</th><th>cryptoki</th></tr></thead>
     <tbody>
       <tr><td><code>C_GetSlotList</code></td><td>使えるスロット一覧を取得</td><td class="c"><span class="ok">✅</span></td><td><code>get_slots_with_token()</code> / <code>get_all_slots()</code></td></tr>
       <tr><td><code>C_GetSlotInfo</code></td><td>スロット情報（説明・HW/FW版・トークン有無）</td><td class="c"><span class="ok">✅</span></td><td><code>get_slot_info(slot)</code></td></tr>
@@ -173,7 +174,7 @@ let sig = session.sign_final()?;    // ③ 締めて署名を受け取る</pre><
   <!-- ====== C ====== -->
   <h2 id="cat-c">C. セッション管理（Session）</h2>
   <table class="tbl">
-    <thead><tr><th>関数</th><th>説明</th><th class="c">実装</th><th>cryptoki</th></tr></thead>
+    <thead><tr><th>関数</th><th>説明</th><th class="c">対応状況</th><th>cryptoki</th></tr></thead>
     <tbody>
       <tr><td><code>C_OpenSession</code></td><td>セッションを開く（RO/RW を選ぶ）</td><td class="c"><span class="ok">✅</span></td><td><code>open_rw_session(slot)</code> / <code>open_ro_session(slot)</code></td></tr>
       <tr><td><code>C_CloseSession</code></td><td>セッションを閉じる</td><td class="c"><span class="au">△</span></td><td><code>Session</code> の Drop で自動</td></tr>
@@ -190,7 +191,7 @@ let sig = session.sign_final()?;    // ③ 締めて署名を受け取る</pre><
   <!-- ====== D ====== -->
   <h2 id="cat-d">D. オブジェクト管理（Object）</h2>
   <table class="tbl">
-    <thead><tr><th>関数</th><th>説明</th><th class="c">実装</th><th>cryptoki</th></tr></thead>
+    <thead><tr><th>関数</th><th>説明</th><th class="c">対応状況</th><th>cryptoki</th></tr></thead>
     <tbody>
       <tr><td><code>C_CreateObject</code></td><td>既存データから新オブジェクトを作る（鍵の取込等）</td><td class="c"><span class="wip">◯</span></td><td><code>session.create_object(&amp;template)</code>（未配線）</td></tr>
       <tr><td><code>C_CopyObject</code></td><td>オブジェクトを属性を変えて複製</td><td class="c"><span class="ok">✅</span></td><td><code>session.copy_object(handle, &amp;template)</code></td></tr>
@@ -207,7 +208,7 @@ let sig = session.sign_final()?;    // ③ 締めて署名を受け取る</pre><
   <!-- ====== E ====== -->
   <h2 id="cat-e">E. 暗号化 / 復号（Encrypt / Decrypt）</h2>
   <table class="tbl">
-    <thead><tr><th>関数</th><th>説明</th><th class="c">実装</th><th>cryptoki</th></tr></thead>
+    <thead><tr><th>関数</th><th>説明</th><th class="c">対応状況</th><th>cryptoki</th></tr></thead>
     <tbody>
       <tr><td><code>C_EncryptInit</code></td><td>暗号化開始（メカニズム＋鍵）</td><td class="c"><span class="ok">✅</span></td><td><code>encrypt()</code> に内包</td></tr>
       <tr><td><code>C_Encrypt</code></td><td>一発で暗号化</td><td class="c"><span class="ok">✅</span></td><td><code>session.encrypt(&amp;mech, key, data)</code></td></tr>
@@ -223,7 +224,7 @@ let sig = session.sign_final()?;    // ③ 締めて署名を受け取る</pre><
   <!-- ====== F ====== -->
   <h2 id="cat-f">F. ダイジェスト（Digest = ハッシュ）</h2>
   <table class="tbl">
-    <thead><tr><th>関数</th><th>説明</th><th class="c">実装</th><th>cryptoki</th></tr></thead>
+    <thead><tr><th>関数</th><th>説明</th><th class="c">対応状況</th><th>cryptoki</th></tr></thead>
     <tbody>
       <tr><td><code>C_DigestInit</code></td><td>ハッシュ開始（SHA256 等）</td><td class="c"><span class="ok">✅</span></td><td><code>digest()</code> / <code>digest_init()</code></td></tr>
       <tr><td><code>C_Digest</code></td><td>一発でハッシュ</td><td class="c"><span class="ok">✅</span></td><td><code>session.digest(&amp;mech, data)</code></td></tr>
@@ -236,7 +237,7 @@ let sig = session.sign_final()?;    // ③ 締めて署名を受け取る</pre><
   <!-- ====== G ====== -->
   <h2 id="cat-g">G. 署名 / 検証（Sign / Verify）</h2>
   <table class="tbl">
-    <thead><tr><th>関数</th><th>説明</th><th class="c">実装</th><th>cryptoki</th></tr></thead>
+    <thead><tr><th>関数</th><th>説明</th><th class="c">対応状況</th><th>cryptoki</th></tr></thead>
     <tbody>
       <tr><td><code>C_SignInit</code></td><td>署名開始（メカニズム＋秘密鍵）</td><td class="c"><span class="ok">✅</span></td><td><code>sign()</code> に内包</td></tr>
       <tr><td><code>C_Sign</code></td><td>一発で署名</td><td class="c"><span class="ok">✅</span></td><td><code>session.sign(&amp;mech, key, data)</code></td></tr>
@@ -256,7 +257,7 @@ let sig = session.sign_final()?;    // ③ 締めて署名を受け取る</pre><
   <!-- ====== H ====== -->
   <h2 id="cat-h">H. 鍵管理（Key Management）</h2>
   <table class="tbl">
-    <thead><tr><th>関数</th><th>説明</th><th class="c">実装</th><th>cryptoki</th></tr></thead>
+    <thead><tr><th>関数</th><th>説明</th><th class="c">対応状況</th><th>cryptoki</th></tr></thead>
     <tbody>
       <tr><td><code>C_GenerateKey</code></td><td>対称鍵を生成（AES 等。テンプレ1つ）</td><td class="c"><span class="ok">✅</span></td><td><code>session.generate_key(&amp;mech, &amp;template)</code></td></tr>
       <tr><td><code>C_GenerateKeyPair</code></td><td>非対称鍵ペアを生成（RSA/EC。テンプレ2つ）</td><td class="c"><span class="ok">✅</span></td><td><code>session.generate_key_pair(&amp;mech, &amp;pub_t, &amp;priv_t)</code></td></tr>
@@ -269,7 +270,7 @@ let sig = session.sign_final()?;    // ③ 締めて署名を受け取る</pre><
   <!-- ====== I ====== -->
   <h2 id="cat-i">I. 乱数（Random）</h2>
   <table class="tbl">
-    <thead><tr><th>関数</th><th>説明</th><th class="c">実装</th><th>cryptoki</th></tr></thead>
+    <thead><tr><th>関数</th><th>説明</th><th class="c">対応状況</th><th>cryptoki</th></tr></thead>
     <tbody>
       <tr><td><code>C_SeedRandom</code></td><td>乱数生成器に種を追加</td><td class="c"><span class="ok">✅</span></td><td><code>session.seed_random(&amp;seed)</code></td></tr>
       <tr><td><code>C_GenerateRandom</code></td><td>乱数を生成（HSM の RNG を使う）</td><td class="c"><span class="ok">✅</span></td><td><code>session.generate_random_vec(len)</code></td></tr>
@@ -278,10 +279,10 @@ let sig = session.sign_final()?;    // ③ 締めて署名を受け取る</pre><
   <div class="card accent-left"><p style="margin:0;"><span class="ok">✅</span> <code>C_GenerateRandom</code> は <strong>ログイン不要・Init/Final 無し</strong>で一番簡単。疎通確認の練習に最適。</p></div>
 
   <!-- ====== J ====== -->
-  <h2 id="cat-j">J. 複合操作（Dual-function：性能最適化用）</h2>
+  <h2 id="cat-j">J. 複合操作（Dual-function：2処理を1パスでまとめる用）</h2>
   <p>2 つの処理を1パスでまとめて行う上級者向け関数。通常は使わない。</p>
   <table class="tbl">
-    <thead><tr><th>関数</th><th>説明</th><th class="c">実装</th></tr></thead>
+    <thead><tr><th>関数</th><th>説明</th><th class="c">対応状況</th></tr></thead>
     <tbody>
       <tr><td><code>C_DigestEncryptUpdate</code></td><td>ハッシュしつつ暗号化</td><td class="c"><span class="no">✕</span>（ラッパー無し）</td></tr>
       <tr><td><code>C_DecryptDigestUpdate</code></td><td>復号しつつハッシュ</td><td class="c"><span class="no">✕</span>（ラッパー無し）</td></tr>
@@ -297,7 +298,7 @@ let sig = session.sign_final()?;    // ③ 締めて署名を受け取る</pre><
 
   <div class="subhead">K-1. インターフェース・全体（3.0）</div>
   <table class="tbl">
-    <thead><tr><th>関数</th><th>説明</th><th class="c">実装</th></tr></thead>
+    <thead><tr><th>関数</th><th>説明</th><th class="c">対応状況</th></tr></thead>
     <tbody>
       <tr><td><code>C_GetInterfaceList</code></td><td>ライブラリが提供する<strong>インターフェース一覧</strong>を取得</td><td class="c"><span class="no">✕</span></td></tr>
       <tr><td><code>C_GetInterface</code></td><td>名前/版でインターフェースを取得。<strong>v3.0 以降の推奨エントリポイント</strong>（<code>C_GetFunctionList</code> の後継。3.x の新関数はこちら経由で得る）</td><td class="c"><span class="no">✕</span></td></tr>
@@ -306,7 +307,7 @@ let sig = session.sign_final()?;    // ③ 締めて署名を受け取る</pre><
 
   <div class="subhead">K-2. セッション・認証（3.0）</div>
   <table class="tbl">
-    <thead><tr><th>関数</th><th>説明</th><th class="c">実装</th></tr></thead>
+    <thead><tr><th>関数</th><th>説明</th><th class="c">対応状況</th></tr></thead>
     <tbody>
       <tr><td><code>C_LoginUser</code></td><td>ユーザ名付きログイン。複数ユーザ／3.0 の細かい認証モデルに対応</td><td class="c"><span class="no">✕</span></td></tr>
       <tr><td><code>C_SessionCancel</code></td><td>セッションで進行中の操作を明示的にキャンセル</td><td class="c"><span class="no">✕</span></td></tr>

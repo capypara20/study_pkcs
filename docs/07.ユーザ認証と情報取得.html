@@ -191,13 +191,13 @@ get_mechanism_list/info()   対応アルゴリズム  (C_GetMechanismList/Info)<
       <tbody>
         <tr><td><code>cryptoki_version()</code></td><td><strong>仕様(API)</strong> のバージョン（例 2.40 / 3.0 / 3.2）</td></tr>
         <tr><td><code>library_version()</code></td><td><strong>実装</strong> のバージョン（例 SoftHSM 2.6）</td></tr>
-        <tr><td><code>manufacturer_id()</code> / <code>library_description()</code></td><td>ベンダー名 / 説明文字列</td></tr>
+        <tr><td><code>manufacturer_id()</code> / <code>library_description()</code></td><td>提供元名 / 説明文字列</td></tr>
       </tbody>
     </table>
     <h3>スロット情報（C_GetSlotInfo / <code>SlotInfo</code>）</h3>
     <table class="tbl">
       <tbody>
-        <tr><td><code>slot_description()</code> / <code>manufacturer_id()</code></td><td>差込口の説明 / ベンダー</td></tr>
+        <tr><td><code>slot_description()</code> / <code>manufacturer_id()</code></td><td>差込口の説明 / 提供元</td></tr>
         <tr><td><code>hardware_version()</code> / <code>firmware_version()</code></td><td>スロット側の HW/FW バージョン</td></tr>
         <tr><td><code>token_present()</code></td><td>トークンが刺さっているか</td></tr>
         <tr><td><code>removable_device()</code> / <code>hardware_slot()</code></td><td>抜き差し可 / 物理スロットか</td></tr>
@@ -304,7 +304,7 @@ get_mechanism_list/info()   対応アルゴリズム  (C_GetMechanismList/Info)<
         <tr><td><code>hardware()</code></td><td>ハードウェアで処理されるか</td></tr>
       </tbody>
     </table>
-    <p>実機 HSM 評価では「<strong>RSA-4096 を本当にサポートするか</strong>」等をここで確認: <code>cargo run --bin hsm -- mech-info RsaPkcsKeyPairGen</code></p>
+    <p>使っている HSM が「<strong>RSA-4096 を本当にサポートするか</strong>」等をここで確認: <code>cargo run --bin hsm -- mech-info RsaPkcsKeyPairGen</code></p>
   </div>
 </section>
 

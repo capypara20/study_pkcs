@@ -45,8 +45,8 @@
     </p>
     <div class="title-meta">
       <strong>対象</strong> :  PKCS#11入門ドキュメントを読了した開発者<br>
-      <strong>到達点</strong> : 性能測定の計測点を判断できる状態<br>
-      <strong>進め方</strong> : 3操作 × 5フェーズ（概要→準備→実行→結果→性能評価）
+      <strong>到達点</strong> : 各操作で時間がどこにかかるか説明できる状態<br>
+      <strong>進め方</strong> : 3操作 × 5フェーズ（概要→準備→実行→結果→処理時間）
     </div>
   </div>
 </section>
@@ -57,7 +57,7 @@
   <div class="slide-inner">
     <span class="slide-tag">CONTENTS</span>
     <h2>このドキュメントの構成</h2>
-    <p class="lead">3つの操作を <strong>概要 → 準備 → 実行 → 結果 → 性能評価</strong> の5フェーズで掘り下げる。各章で <span class="measure-marker">★ 測定点</span> を明示する。</p>
+    <p class="lead">3つの操作を <strong>概要 → 準備 → 実行 → 結果 → 処理時間</strong> の5フェーズで掘り下げる。各章で <span class="measure-marker">★ 時間を見る所</span> を明示する。</p>
 
     <div class="cols-2">
       <div>
@@ -67,7 +67,7 @@
           <div class="kv-row"><div class="k">04</div><div class="v">準備フェーズ</div></div>
           <div class="kv-row"><div class="k">05</div><div class="v">実行フェーズ + シーケンス図</div></div>
           <div class="kv-row"><div class="k">06</div><div class="v">結果フェーズ + コード例</div></div>
-          <div class="kv-row"><div class="k">07</div><div class="v">★ 性能評価ポイント</div></div>
+          <div class="kv-row"><div class="k">07</div><div class="v">★ 処理時間を見る</div></div>
         </div>
 
         <div class="kv">
@@ -77,7 +77,7 @@
           <div class="kv-row"><div class="k">10</div><div class="v">実行フェーズ + シーケンス図</div></div>
           <div class="kv-row"><div class="k">11</div><div class="v">マルチパート vs ワンショット</div></div>
           <div class="kv-row"><div class="k">12</div><div class="v">結果フェーズ + コード例</div></div>
-          <div class="kv-row"><div class="k">13</div><div class="v">★ 性能評価ポイント</div></div>
+          <div class="kv-row"><div class="k">13</div><div class="v">★ 処理時間を見る</div></div>
         </div>
       </div>
 
@@ -89,13 +89,13 @@
           <div class="kv-row"><div class="k">16</div><div class="v">実行フェーズ + シーケンス図</div></div>
           <div class="kv-row"><div class="k">17</div><div class="v">RSA / EC / AES の特性差</div></div>
           <div class="kv-row"><div class="k">18</div><div class="v">結果フェーズ + コード例</div></div>
-          <div class="kv-row"><div class="k">19</div><div class="v">★ 性能評価ポイント</div></div>
+          <div class="kv-row"><div class="k">19</div><div class="v">★ 処理時間を見る</div></div>
         </div>
 
         <div class="kv">
           <div class="kv-row"><div class="k">CLOSING</div><div class="v">総合まとめ</div></div>
-          <div class="kv-row"><div class="k">20</div><div class="v">3操作の性能特性比較</div></div>
-          <div class="kv-row"><div class="k">21</div><div class="v">ベンチマーク設計の総合指針</div></div>
+          <div class="kv-row"><div class="k">20</div><div class="v">3操作の特性比較</div></div>
+          <div class="kv-row"><div class="k">21</div><div class="v">処理時間を見るときの総合指針</div></div>
           <div class="kv-row"><div class="k">22</div><div class="v">References（一次資料）</div></div>
         </div>
       </div>
@@ -160,7 +160,7 @@
       <table class="tbl" style="margin-top:0.5rem">
         <tr><th style="width:200px">条件</th><th>必須？</th><th>備考</th></tr>
         <tr><td>セッション</td><td>必須</td><td><code>C_OpenSession</code> 済み</td></tr>
-        <tr><td>ログイン</td><td>原則不要</td><td>仕様上はPublic状態でOK。ただしベンダーによっては必須</td></tr>
+        <tr><td>ログイン</td><td>原則不要</td><td>仕様上はPublic状態でOK。ただし製品によっては必須</td></tr>
         <tr><td>鍵ハンドル</td><td>不要</td><td>乱数に鍵は関係ない</td></tr>
         <tr><td>メカニズム</td><td>不要</td><td>選択肢なし</td></tr>
         <tr><td>出力バッファ</td><td>必須</td><td>アプリ側で <code>ulRandomLen</code> 分を事前確保</td></tr>
@@ -206,7 +206,7 @@
       <ul style="margin: 0.5rem 0">
         <li><code>16 bytes</code> = AES-128の鍵やCBC IVに十分</li>
         <li><code>32 bytes</code> = AES-256やSHA-256のソルト相当、最も一般的</li>
-        <li><code>大きすぎるサイズ</code> はベンダーによって上限あり（数KB〜MB）</li>
+        <li><code>大きすぎるサイズ</code> は製品によって上限あり（数KB〜MB）</li>
       </ul>
     </div>
 
@@ -375,69 +375,57 @@
   </div>
 </section>
 
-<!-- ====== SLIDE 07: Random - Performance ====== -->
-<section class="slide" data-title="乱数生成 性能評価">
+<!-- ====== SLIDE 07: Random - timing ====== -->
+<section class="slide" data-title="乱数生成 処理時間">
   <span class="slide-num">07 / 22</span>
   <div class="slide-inner">
-    <span class="slide-tag ch1">CHAPTER 1 · 乱数生成 · ★ 性能評価</span>
-    <h2><span class="num">07</span>性能評価ポイント</h2>
-    <p class="lead">乱数生成は<strong>暗号演算を伴わない</strong>ため、純粋に「<strong>ライブラリのオーバーヘッド + ネットワーク往復 + HSM内のTRNG読み出し</strong>」の測定になる。</p>
+    <span class="slide-tag ch1">CHAPTER 1 · 乱数生成 · ★ 処理時間</span>
+    <h2><span class="num">07</span>処理時間を見るポイント</h2>
+    <p class="lead">乱数生成は<strong>暗号演算を伴わない</strong>。SoftHSM で測れば「<strong>ライブラリの手間 ＋ 乱数の読み出し</strong>」がそのまま時間に出るので、いちばん素直に見られる操作。</p>
 
     <div class="card measure">
-      <div class="card-title">★ どこを測るか</div>
-      <p>計測対象は <code>C_GenerateRandom</code> の呼び出し前後の時刻差。<strong>Init/Finalがないので測定設計が最もシンプル</strong>。</p>
+      <div class="card-title">★ どこを見るか</div>
+      <p>見るのは <code>C_GenerateRandom</code> の呼び出し前後の時刻差。<strong>Init/Finalがないので一番シンプル</strong>。</p>
       <div class="code-block c" style="margin-top: 1rem;">
-<span class="code-lang">疑似コード</span><pre><span class="com">// ★ 計測区間</span>
+<span class="code-lang">疑似コード</span><pre><span class="com">// ★ ここの時間を見る</span>
 t0 = <span class="fn-name">get_time_ns</span>();
 rv = pFuncs-><span class="fn-name">C_GenerateRandom</span>(hSession, buf, len);
 t1 = <span class="fn-name">get_time_ns</span>();
 
-latency_ns = t1 - t0;</pre>
+elapsed_ns = t1 - t0;</pre>
       </div>
     </div>
 
     <div class="cols-2">
       <div>
-        <h3><span class="marker">▸</span>測定すべき変数</h3>
+        <h3><span class="marker">▸</span>変えてみると面白い所</h3>
         <ul>
           <li><strong>バッファサイズ別</strong>：16B / 32B / 256B / 1KB / 16KB</li>
           <li><strong>並列度</strong>：シングル → マルチスレッド</li>
-          <li><strong>連続呼び出し</strong>：定常状態のスループット</li>
+          <li><strong>連続呼び出し</strong>：1秒あたり何回呼べるか</li>
           <li><strong>セッション数</strong>：1セッション vs 複数並列</li>
         </ul>
       </div>
       <div>
-        <h3><span class="marker">▸</span>取るべきメトリクス</h3>
+        <h3><span class="marker">▸</span>見ると分かること</h3>
         <ul>
-          <li><strong>レイテンシ</strong>（平均、p50、p99）</li>
-          <li><strong>スループット</strong>（ops/sec、MB/sec）</li>
-          <li><strong>スケール係数</strong>（スレッド数とTPSの比）</li>
+          <li>1回あたりの時間（平均・最小・最大）</li>
+          <li>1秒あたりの回数</li>
+          <li>スレッドを増やすと回数がどう変わるか</li>
         </ul>
       </div>
     </div>
 
     <div class="card warn">
-      <div class="card-title">注意：HSM側のRNG上限</div>
+      <div class="card-title">頭の片隅に置くこと</div>
       <ul style="margin: 0.4rem 0;">
-        <li>HSMの<strong>TRNGスループット</strong>には物理的な上限がある（数MB/sec〜）</li>
-        <li>大量に乱数を取り続けると<strong>エントロピー枯渇</strong>を起こすベンダーもある</li>
-        <li>ネットワーク型HSMでは<strong>TLS往復のレイテンシ</strong>が支配的になる（バッファサイズが小さい場合）</li>
+        <li>HSM の乱数生成器には物理的な上限があり、取り続けると頭打ちになることがある</li>
+        <li>ネットワーク型HSMでは<strong>通信の往復にかかる時間</strong>が大きく効いてくる（小さいバッファのとき特に）</li>
+        <li>SoftHSM はソフトウェアなので、ここで見えるのは「API の動きと CPU 上での時間感」だと割り切る</li>
       </ul>
     </div>
 
-    <div class="card bordered-left">
-      <div class="card-title">期待される結果の目安（ネットワーク型HSM）</div>
-      <table class="tbl">
-        <tr><th>項目</th><th>典型値（参考）</th><th>備考</th></tr>
-        <tr><td>レイテンシ（32B）</td><td>0.5〜2 ms</td><td>RTT支配</td></tr>
-        <tr><td>レイテンシ（16KB）</td><td>2〜10 ms</td><td>転送量増加</td></tr>
-        <tr><td>スループット（単一）</td><td>500〜2000 ops/sec</td><td>シングルスレッド</td></tr>
-        <tr><td>スループット（並列）</td><td>セッション数倍</td><td>HSM上限まで</td></tr>
-      </table>
-      <p style="font-size:0.85rem; color:var(--ink-muted); margin-top: 0.5rem;">※ あくまで一般的な目安。実機・ネットワーク環境で大きく変動する</p>
-    </div>
-
-    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2 §5.18</a><a href="#slide-21">[7] AWS CloudHSM PKCS#11 library</a><a href="#slide-21">[14] NIST SP 800-90B (Entropy)</a></div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2 §5.18</a><a href="#slide-21">[6] SoftHSM2</a><a href="#slide-21">[14] NIST SP 800-90B (Entropy)</a></div>
   </div>
 </section>
 
@@ -447,7 +435,7 @@ latency_ns = t1 - t0;</pre>
   <div class="slide-inner">
     <span class="slide-tag ch2">CHAPTER 2 · 署名 · 概要</span>
     <h2><span class="num">08</span>署名 — 3段ロケットの実例</h2>
-    <p class="lead">PKCS#11で<strong>もっとも使われる操作</strong>。<code>C_SignInit</code> で準備、<code>C_Sign</code> で実行。秘密鍵はHSM内にあるまま、署名だけが返ってくる。性能評価のメインターゲット。</p>
+    <p class="lead">PKCS#11で<strong>もっとも使われる操作</strong>。<code>C_SignInit</code> で準備、<code>C_Sign</code> で実行。秘密鍵はHSM内にあるまま、署名だけが返ってくる。処理時間を見るときの主役。</p>
 
     <div class="cols-2">
       <div>
@@ -604,7 +592,7 @@ latency_ns = t1 - t0;</pre>
         <ul style="font-size:0.92rem; margin: 0.5rem 0">
           <li>ライブラリ：引数検証、鍵の<code>CKA_SIGN</code>属性チェック、メカニズムが鍵タイプと整合するか確認</li>
           <li>ライブラリ：セッション状態を「署名待ち：鍵#47、PSS方式」に変更</li>
-          <li>ベンダーによっては：HSM側にもInit通知を送る（事前準備）</li>
+          <li>製品によっては：HSM側にもInit通知を送る（事前準備）</li>
         </ul>
       </div>
       <div class="card warn">
@@ -686,8 +674,8 @@ latency_ns = t1 - t0;</pre>
         <text x="620" y="350" text-anchor="middle" font-size="9" fill="#3c4865">c. PSSパディング適用</text>
         <text x="620" y="365" text-anchor="middle" font-size="9" fill="#3c4865">d. RSA秘密鍵演算（重い）</text>
         <text x="620" y="380" text-anchor="middle" font-size="9" fill="#3c4865">e. アクセスログ記録</text>
-        <text x="620" y="402" text-anchor="middle" font-size="10" fill="#a83a2b" font-weight="700" font-style="italic">所要：RSA-2048で 5〜30ms</text>
-        <text x="620" y="418" text-anchor="middle" font-size="9" fill="#6d7591">(HSMの処理能力に依存)</text>
+        <text x="620" y="402" text-anchor="middle" font-size="10" fill="#a83a2b" font-weight="700" font-style="italic">RSA秘密鍵演算はやや重い</text>
+        <text x="620" y="418" text-anchor="middle" font-size="9" fill="#6d7591">(鍵長と処理能力に依存)</text>
 
         <!-- HSM → Lib: response -->
         <path d="M 625 458 L 385 458" stroke="#18233a" stroke-width="2" marker-end="url(#arr-sign)"/>
@@ -730,11 +718,11 @@ latency_ns = t1 - t0;</pre>
   <div class="slide-inner">
     <span class="slide-tag ch2">CHAPTER 2 · 署名 · 補論</span>
     <h2><span class="num">11</span>マルチパート vs ワンショット</h2>
-    <p class="lead">PKCS#11は<strong>2種類の署名スタイル</strong>を提供する。「データ全部一気に渡す」のか「少しずつ渡す」のか。性能評価ではどちらかに統一する必要がある。</p>
+    <p class="lead">PKCS#11は<strong>2種類の署名スタイル</strong>を提供する。「データ全部一気に渡す」のか「少しずつ渡す」のか。処理時間を見るときはどちらかに統一しておくと比べやすい。</p>
 
     <div class="cols-2">
       <div class="card bordered-left">
-        <div class="card-title">A. ワンショット（推奨：性能評価で使う）</div>
+        <div class="card-title">A. ワンショット（時間を見るならこちら）</div>
         <div class="code-block c" style="margin-top:0.5rem">
 <span class="code-lang">パターンA</span><pre><span class="fn-name">C_SignInit</span>(hSession, &amp;mech, hKey);
 <span class="fn-name">C_Sign</span>(hSession, data, dataLen,
@@ -744,7 +732,7 @@ latency_ns = t1 - t0;</pre>
         <ul style="font-size:0.9rem; margin:0.5rem 0">
           <li>データ全体をメモリに保持</li>
           <li>HSMへの往復が <strong>1回</strong></li>
-          <li>性能測定に向く（変数が少ない）</li>
+          <li>時間を見やすい（変数が少ない）</li>
           <li>典型サイズ：〜数MB</li>
         </ul>
       </div>
@@ -761,7 +749,7 @@ latency_ns = t1 - t0;</pre>
           <li>ストリーミング処理</li>
           <li>HSMへの往復が <strong>Update回数+2回</strong></li>
           <li>大きなデータ（GB級）で必須</li>
-          <li>性能評価では避ける（ノイズが多い）</li>
+          <li>時間を見るときは避ける（ばらつきが多い）</li>
         </ul>
       </div>
     </div>
@@ -817,7 +805,7 @@ latency_ns = t1 - t0;</pre>
     </div>
 
     <div class="card warn">
-      <div class="card-title">性能評価で見落としがちなポイント</div>
+      <div class="card-title">見落としがちなポイント</div>
       <p>マルチパートは<strong>Updateごとにネットワーク往復が発生</strong>するため、ネットワーク型HSMでは想像以上に遅い。1MBのデータを 1KBチャンクで送ると 1024往復。<strong>ワンショットなら 1往復で済む</strong>。「ストリーミング = 速い」と直感で考えると逆の結果になる。</p>
     </div>
 
@@ -831,7 +819,7 @@ latency_ns = t1 - t0;</pre>
   <div class="slide-inner">
     <span class="slide-tag ch2">CHAPTER 2 · 署名 · 結果</span>
     <h2><span class="num">12</span>結果フェーズ + コード例</h2>
-    <p class="lead">署名はバッファに書き込まれる。<strong>2-call convention</strong>（バッファサイズ問い合わせ→実署名）を理解しておくと、ベンダー間の挙動差に対応しやすい。</p>
+    <p class="lead">署名はバッファに書き込まれる。<strong>2-call convention</strong>（バッファサイズ問い合わせ→実署名）を理解しておくと、製品間の挙動差に対応しやすい。</p>
 
     <div class="phase-box phase-result">
       <div class="phase-label">▸ RESULT</div>
@@ -903,26 +891,26 @@ pFuncs-><span class="fn-name">C_Sign</span>(hSession, data, dataLen,
 
     <div class="card bordered-left">
       <div class="card-title">セッション状態のリセット</div>
-      <p><code>C_Sign</code>が成功（または失敗）すると、<strong>セッション状態は「アクティブ操作なし」に戻る</strong>。同じ鍵で再度署名するには、もう一度 <code>C_SignInit</code> から始める必要がある。これが性能評価で「Initを毎回呼ぶか」議論のポイント。</p>
+      <p><code>C_Sign</code>が成功（または失敗）すると、<strong>セッション状態は「アクティブ操作なし」に戻る</strong>。同じ鍵で再度署名するには、もう一度 <code>C_SignInit</code> から始める必要がある。処理時間を見るときに「Initを毎回含めるか」を分けて考えるポイント。</p>
     </div>
 
-    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2 §5.13.2</a><a href="#slide-21">[9] AWS CloudHSM PKCS#11 examples</a><a href="#slide-21">[13] cryptoki crate</a></div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2 §5.13.2</a><a href="#slide-21">[6] SoftHSM2</a><a href="#slide-21">[13] cryptoki crate</a></div>
   </div>
 </section>
 
-<!-- ====== SLIDE 13: Sign - Performance ====== -->
-<section class="slide" data-title="署名 性能評価">
+<!-- ====== SLIDE 13: Sign - timing ====== -->
+<section class="slide" data-title="署名 処理時間">
   <span class="slide-num">13 / 22</span>
   <div class="slide-inner">
-    <span class="slide-tag ch2">CHAPTER 2 · 署名 · ★ 性能評価</span>
-    <h2><span class="num">13</span>性能評価ポイント</h2>
-    <p class="lead">署名は<strong>性能評価のメインターゲット</strong>。実運用で最も呼ばれる操作で、HSMのスペックの差が一番出る。「鍵長」「メカニズム」「並列度」の3軸で測る。</p>
+    <span class="slide-tag ch2">CHAPTER 2 · 署名 · ★ 処理時間</span>
+    <h2><span class="num">13</span>処理時間を見るポイント</h2>
+    <p class="lead">署名は<strong>実運用で最もよく呼ばれる操作</strong>。鍵長や方式で重さが大きく変わるので、SoftHSM で「鍵長」「メカニズム」「並列度」を変えて時間を見ると違いが分かりやすい。</p>
 
     <div class="card measure">
-      <div class="card-title">★ どこを測るか — 2つの設計</div>
+      <div class="card-title">★ どこを見るか — 2つの取り方</div>
       <div class="cols-2" style="margin-top: 0.8rem;">
         <div class="code-block c">
-<span class="code-lang">Init込み (現実的)</span><pre><span class="com">// 毎回 SignInit + Sign を測る</span>
+<span class="code-lang">Init込み (現実的)</span><pre><span class="com">// 毎回 SignInit + Sign を見る</span>
 t0 = <span class="fn-name">now</span>();
 <span class="fn-name">C_SignInit</span>(s, &amp;mech, hKey);
 <span class="fn-name">C_Sign</span>(s, data, len, sig, &amp;sLen);
@@ -930,8 +918,8 @@ t1 = <span class="fn-name">now</span>();
 <span class="com">// → 実運用に近い</span></pre>
         </div>
         <div class="code-block c">
-<span class="code-lang">Sign単体 (純粋計測)</span><pre><span class="com">// SignInitを事前に1回だけ呼んで</span>
-<span class="com">// Sign のみを繰り返し測る</span>
+<span class="code-lang">Sign単体 (本処理だけ)</span><pre><span class="com">// SignInitを事前に1回だけ呼んで</span>
+<span class="com">// Sign のみを繰り返し見る</span>
 <span class="fn-name">C_SignInit</span>(...);  <span class="com">// 一度だけ</span>
 <span class="kw">for</span> i <span class="kw">in</span> <span class="num">0</span>..N {
    t0 = <span class="fn-name">now</span>();
@@ -940,12 +928,12 @@ t1 = <span class="fn-name">now</span>();
 }</pre>
         </div>
       </div>
-      <p style="font-size:0.9rem; margin-top:0.5rem;"><strong>※ 注：Sign後にセッション状態がリセットされるので、純粋計測パターンは通常成立しない</strong>。ベンダー実装によっては成立する場合もあるが、原則「Init込み」で測る。</p>
+      <p style="font-size:0.9rem; margin-top:0.5rem;"><strong>※ 注：Sign後にセッション状態がリセットされるので、本処理だけを繰り返す形は通常そのままでは成立しない</strong>。製品によっては成立する場合もあるが、基本は「Init込み」で見る。</p>
     </div>
 
     <div class="cols-2">
       <div>
-        <h3><span class="marker">▸</span>測定すべき変数（マトリクス）</h3>
+        <h3><span class="marker">▸</span>変えてみると面白い所</h3>
         <ul>
           <li><strong>アルゴリズム</strong>：RSA / ECDSA / EdDSA / HMAC</li>
           <li><strong>鍵長</strong>：
@@ -956,39 +944,32 @@ t1 = <span class="fn-name">now</span>();
         </ul>
       </div>
       <div>
-        <h3><span class="marker">▸</span>取るべきメトリクス</h3>
+        <h3><span class="marker">▸</span>見ると分かること</h3>
         <ul>
-          <li><strong>レイテンシ分布</strong>：mean / p50 / p95 / p99 / max</li>
-          <li><strong>スループット</strong>：ops/sec（全スレッド合計）</li>
-          <li><strong>スレッド数によるスケール曲線</strong></li>
-          <li><strong>エラー率</strong>（過負荷時の失敗）</li>
-          <li><strong>HSM側CPU使用率</strong>（取れれば）</li>
+          <li>1回あたりの時間（平均・最小・最大）</li>
+          <li>1秒あたりの回数（全スレッド合計）</li>
+          <li>スレッドを増やすと回数がどう伸びるか</li>
+          <li>鍵長を上げると署名が重くなる度合い</li>
+          <li>RSA・EC・HMAC の重さの違い</li>
         </ul>
       </div>
     </div>
 
     <div class="card bordered-left">
-      <div class="card-title">期待される結果の目安</div>
-      <table class="tbl">
-        <tr><th>アルゴリズム</th><th>典型レイテンシ</th><th>典型TPS（単一）</th><th>備考</th></tr>
-        <tr><td>RSA-2048 PSS</td><td>5〜30 ms</td><td>30〜200 ops/s</td><td>最も一般的</td></tr>
-        <tr><td>RSA-4096 PSS</td><td>50〜300 ms</td><td>3〜20 ops/s</td><td>RSAは鍵長で激重</td></tr>
-        <tr><td>ECDSA P-256</td><td>2〜15 ms</td><td>70〜500 ops/s</td><td>RSAより軽い</td></tr>
-        <tr><td>HMAC-SHA256</td><td>0.5〜3 ms</td><td>300〜2000 ops/s</td><td>共通鍵で超軽い</td></tr>
-      </table>
-      <p style="font-size:0.85rem; color:var(--ink-muted); margin-top: 0.5rem;">※ ネットワーク型HSMの目安。HSMの世代、ネットワーク状態、データサイズで上下する</p>
+      <div class="card-title">SoftHSM で見えてくる傾向</div>
+      <p style="font-size:0.93rem">SoftHSM でも、<strong>RSA は鍵長を上げるほど署名が重くなる</strong>、<strong>EC は RSA より軽い</strong>、<strong>HMAC は共通鍵なのでさらに軽い</strong>、といった「方式ごとの重さの順番」ははっきり体感できる。具体的な秒数はマシン次第なので、絶対値ではなく<strong>方式どうしの相対差</strong>を見るのがコツ。</p>
     </div>
 
     <div class="card warn">
-      <div class="card-title">設計上の落とし穴</div>
+      <div class="card-title">見るときの落とし穴</div>
       <ul style="margin: 0.4rem 0;">
-        <li><strong>初回測定</strong>：TLSセッション確立、鍵キャッシュ展開で異常値が出る → ウォームアップ必須</li>
-        <li><strong>セッション枯渇</strong>：マルチスレッドでセッションを使い回さないとHSM側上限に達する</li>
-        <li><strong>同一データ署名</strong>：同じデータで連続署名するとPSSの場合は毎回違う署名になる（saltがランダム）→ ベンチには影響しないが検証時に注意</li>
+        <li><strong>初回</strong>：最初の1回は準備でぶれやすい → ならし運転してから見る</li>
+        <li><strong>セッションの数</strong>：マルチスレッドでセッションを使い回さないと頭打ちになる</li>
+        <li><strong>同一データ署名</strong>：PSSは同じデータでも毎回違う署名になる（saltがランダム）→ 時間には影響しないが検証時に注意</li>
       </ul>
     </div>
 
-    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2 §5.13</a><a href="#slide-21">[7] AWS CloudHSM Mechanisms</a><a href="#slide-21">[15] NIST FIPS 186-5</a></div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2 §5.13</a><a href="#slide-21">[6] SoftHSM2</a><a href="#slide-21">[15] NIST FIPS 186-5</a></div>
   </div>
 </section>
 
@@ -1044,7 +1025,7 @@ t1 = <span class="fn-name">now</span>();
       <p>鍵を作るには、その鍵がどう使えるか（署名用？暗号化用？）、いつまで存在するか（永続？揮発？）、外に出せるか（持ち出し禁止？）等を<strong>生成時に決めて</strong>HSMに伝える必要がある。これらの設定が「属性テンプレート」という名前の<strong>配列</strong>として渡される。</p>
     </div>
 
-    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2 §5.15 Key management</a><a href="#slide-21">[8] AWS CloudHSM Key attributes</a></div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2 §5.15 Key management</a></div>
   </div>
 </section>
 
@@ -1154,17 +1135,17 @@ t1 = <span class="fn-name">now</span>();
         <p style="font-size:0.85rem; color:var(--ink-muted); margin-top:0.5rem;">この3つの組み合わせで「秘密鍵が絶対にHSMから出ない」状態を作る</p>
       </div>
       <div class="card warn">
-        <div class="card-title">ベンダーごとの差</div>
+        <div class="card-title">製品ごとの差</div>
         <ul style="font-size:0.9rem">
-          <li>属性のデフォルト値はベンダーによって違う</li>
+          <li>属性のデフォルト値は製品によって違う</li>
           <li>必須属性も微妙に違う（CKA_IDなど）</li>
-          <li>一部の属性は組み合わせ禁止（例：<code>SENSITIVE=true</code>と<code>EXTRACTABLE=true</code>を同時指定すると拒否されるベンダーあり）</li>
-          <li>ベンダーマニュアル必読</li>
+          <li>一部の属性は組み合わせ禁止（例：<code>SENSITIVE=true</code>と<code>EXTRACTABLE=true</code>を同時指定すると拒否される製品あり）</li>
+          <li>使う製品のマニュアルは要確認</li>
         </ul>
       </div>
     </div>
 
-    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2 §10 Object types, §5.15</a><a href="#slide-21">[8] AWS CloudHSM Key attributes</a></div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2 §10 Object types, §5.15</a></div>
   </div>
 </section>
 
@@ -1257,7 +1238,7 @@ t1 = <span class="fn-name">now</span>();
 
     <div class="card warn">
       <div class="card-title">なぜ鍵生成は「ばらつき」が大きいか</div>
-      <p>RSAの素数生成は<strong>確率的アルゴリズム</strong>。Miller-Rabin判定で「合成数」と分かったら次の候補を試す。運悪く何度も外せば数十秒かかることもある。<strong>レイテンシのmaxはmeanの数十倍になる</strong>のが典型。</p>
+      <p>RSAの素数生成は<strong>確率的アルゴリズム</strong>。Miller-Rabin判定で「合成数」と分かったら次の候補を試す。運悪く何度も外せば時間が大きく延びることもある。<strong>最悪値が平均の何倍にもなる</strong>のが典型。</p>
     </div>
 
     <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2 §5.15.4</a><a href="#slide-21">[16] NIST FIPS 186-5 §A.1 RSA key generation</a></div>
@@ -1270,7 +1251,7 @@ t1 = <span class="fn-name">now</span>();
   <div class="slide-inner">
     <span class="slide-tag ch3">CHAPTER 3 · 鍵生成 · アルゴリズム別特性</span>
     <h2><span class="num">17</span>RSA / EC / AES — 全然違う3兄弟</h2>
-    <p class="lead">同じ「鍵生成」でも、アルゴリズムによって処理内容と所要時間が桁違いに変わる。性能評価ではこれらを<strong>別カテゴリで測る</strong>のが鉄則。</p>
+    <p class="lead">同じ「鍵生成」でも、アルゴリズムによって処理内容と所要時間が桁違いに変わる。時間を見るときは、これらを<strong>別々に分けて見る</strong>のが鉄則。</p>
 
     <div class="diagram">
       <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
@@ -1330,16 +1311,15 @@ t1 = <span class="fn-name">now</span>();
       </svg>
     </div>
 
-    <h3><span class="marker">▸</span>鍵長別の所要時間（典型値・ネットワーク型HSM）</h3>
+    <h3><span class="marker">▸</span>アルゴリズム別の「重さ」の関係</h3>
     <table class="tbl">
-      <tr><th>アルゴリズム / 鍵長</th><th>mean</th><th>p99</th><th>max</th><th>備考</th></tr>
-      <tr><td>AES-256</td><td>~1 ms</td><td>~3 ms</td><td>~10 ms</td><td>RTT支配</td></tr>
-      <tr><td>EC P-256</td><td>5〜10 ms</td><td>~20 ms</td><td>~40 ms</td><td>安定</td></tr>
-      <tr><td>EC P-384</td><td>10〜30 ms</td><td>~50 ms</td><td>~100 ms</td><td>安定</td></tr>
-      <tr><td>RSA-2048</td><td>200〜500 ms</td><td>~2 sec</td><td><strong style="color:var(--red)">数秒</strong></td><td>ばらつき大</td></tr>
-      <tr><td>RSA-3072</td><td>800ms〜2 sec</td><td>~10 sec</td><td><strong style="color:var(--red)">数十秒</strong></td><td>確率次第</td></tr>
-      <tr><td>RSA-4096</td><td>2〜5 sec</td><td>~30 sec</td><td><strong style="color:var(--red)">分単位</strong></td><td>運要素強い</td></tr>
+      <tr><th>アルゴリズム / 鍵長</th><th>相対的な重さ</th><th>ばらつき</th><th>備考</th></tr>
+      <tr><td>AES（対称鍵）</td><td>とても軽い</td><td>小さい</td><td>乱数取得＋属性付けだけ</td></tr>
+      <tr><td>EC P-256 / P-384</td><td>軽い〜中</td><td>小さい</td><td>毎回ほぼ一定で安定</td></tr>
+      <tr><td>RSA-2048</td><td>重い</td><td>大きい</td><td>素数探索の運で大きく変動</td></tr>
+      <tr><td>RSA-3072 / 4096</td><td><strong style="color:var(--red)">かなり重い</strong></td><td><strong style="color:var(--red)">非常に大きい</strong></td><td>たまに極端に時間がかかる</td></tr>
     </table>
+    <p style="font-size:0.85rem; color:var(--ink-muted); margin-top:0.4rem;">※ 具体的な秒数はマシン・実装で変わる。ここで覚えたいのは「<strong>AES ≪ EC ≪ RSA</strong>」という重さの順番と、RSAだけばらつきが大きいこと。SoftHSM で実際に回すと体感できる。</p>
 
     <div class="card warn">
       <div class="card-title">なぜRSA鍵生成は遅いか</div>
@@ -1450,23 +1430,23 @@ t1 = <span class="fn-name">now</span>();
       </ul>
     </div>
 
-    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2 §5.15.4</a><a href="#slide-21">[9] AWS CloudHSM Examples</a><a href="#slide-21">[13] cryptoki crate</a></div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2 §5.15.4</a><a href="#slide-21">[6] SoftHSM2</a><a href="#slide-21">[13] cryptoki crate</a></div>
   </div>
 </section>
 
-<!-- ====== SLIDE 19: KeyGen - Performance ====== -->
-<section class="slide" data-title="鍵生成 性能評価">
+<!-- ====== SLIDE 19: KeyGen - timing ====== -->
+<section class="slide" data-title="鍵生成 処理時間">
   <span class="slide-num">19 / 22</span>
   <div class="slide-inner">
-    <span class="slide-tag ch3">CHAPTER 3 · 鍵生成 · ★ 性能評価</span>
-    <h2><span class="num">19</span>性能評価ポイント</h2>
-    <p class="lead">鍵生成の性能評価は<strong>署名とは完全に別ベンチで実施</strong>するのが鉄則。レイテンシのばらつきが激しく、署名と同じスケールで測ると統計が壊れる。</p>
+    <span class="slide-tag ch3">CHAPTER 3 · 鍵生成 · ★ 処理時間</span>
+    <h2><span class="num">19</span>処理時間を見るポイント</h2>
+    <p class="lead">鍵生成の時間は<strong>署名とは分けて見る</strong>のが鉄則。1回ごとのばらつきが激しく、署名と同じ枠で見ると平均が引っ張られて読めなくなる。</p>
 
     <div class="card measure">
-      <div class="card-title">★ どこを測るか</div>
-      <p>計測対象は <code>C_GenerateKeyPair</code> (or <code>C_GenerateKey</code>) の全体。Init/Finalなしの単発関数なので、計測点はシンプル。</p>
+      <div class="card-title">★ どこを見るか</div>
+      <p>見るのは <code>C_GenerateKeyPair</code> (or <code>C_GenerateKey</code>) の全体。Init/Finalなしの単発関数なので、見る所はシンプル。</p>
       <div class="code-block c" style="margin-top: 1rem;">
-<span class="code-lang">疑似コード</span><pre><span class="com">// ★ 計測区間（テンプレート構築は事前に済ませる）</span>
+<span class="code-lang">疑似コード</span><pre><span class="com">// ★ ここの時間を見る（テンプレート構築は事前に済ませる）</span>
 t0 = <span class="fn-name">get_time_ns</span>();
 rv = pFuncs-><span class="fn-name">C_GenerateKeyPair</span>(
     hSession, &amp;mech,
@@ -1475,78 +1455,78 @@ rv = pFuncs-><span class="fn-name">C_GenerateKeyPair</span>(
     &amp;hPub, &amp;hPriv);
 t1 = <span class="fn-name">get_time_ns</span>();
 
-latency_ns = t1 - t0;
-<span class="com">// 生成した鍵は使い回さない場合 C_DestroyObject で削除</span></pre>
+elapsed_ns = t1 - t0;
+<span class="com">// 使い回さない鍵は C_DestroyObject で削除</span></pre>
       </div>
     </div>
 
     <div class="cols-2">
       <div>
-        <h3><span class="marker">▸</span>測定すべき変数</h3>
+        <h3><span class="marker">▸</span>変えてみると面白い所</h3>
         <ul>
           <li><strong>アルゴリズム × 鍵長</strong><br>
             RSA: 2048/3072/4096<br>
             EC: P-256/P-384/P-521<br>
             AES: 128/192/256</li>
           <li><strong>属性パターン</strong>：Token(永続) vs Session(揮発)</li>
-          <li><strong>並列度</strong>：注意 — HSM側の鍵生成同時実行数に上限あり</li>
+          <li><strong>並列度</strong>：注意 — HSM側で同時に作れる数に上限あり</li>
         </ul>
       </div>
       <div>
-        <h3><span class="marker">▸</span>取るべきメトリクス（署名と違う！）</h3>
+        <h3><span class="marker">▸</span>見ると分かること（署名と違う！）</h3>
         <ul>
-          <li><strong>レイテンシ分布</strong>：<strong style="color:var(--red)">max を必ず記録</strong></li>
-          <li><strong>p99 / p99.9</strong>：テールが長い</li>
-          <li><strong>標準偏差</strong>：ばらつきの大きさ</li>
-          <li><strong>スループットより1リクエストの最悪値</strong>を重視</li>
+          <li><strong style="color:var(--red)">最大値</strong>に注目（たまに極端に遅い回がある）</li>
+          <li>1回ごとの<strong>ばらつきの大きさ</strong></li>
+          <li>平均より<strong>1回の最悪ケース</strong>のほうが効いてくる</li>
+          <li>RSA と EC でばらつき方がまるで違うこと</li>
         </ul>
       </div>
     </div>
 
     <div class="card warn">
-      <div class="card-title">設計上の重要な注意</div>
+      <div class="card-title">見るときの注意</div>
       <ul style="margin: 0.4rem 0;">
-        <li><strong>署名と同じ枠で測るな</strong>：1回の鍵生成 = 数百〜数千回の署名相当。平均が壊れる</li>
-        <li><strong>HSM側の鍵格納上限</strong>：ベンチで作りすぎると枠を食う → 使い終わったら <code>C_DestroyObject</code> で削除</li>
-        <li><strong>並列度の罠</strong>：鍵生成は<strong>HSM側で並列実行されないことが多い</strong>（リソース集中型処理）。スレッドを増やしてもスループットが上がらない</li>
-        <li><strong>サンプル数を稼ぐ</strong>：RSAは20-30回でmean計算するとmaxを取り逃がす。<strong>1000回以上</strong>のサンプリングが必要</li>
+        <li><strong>署名と同じ枠で見ない</strong>：1回の鍵生成は署名の何百〜何千回ぶんに相当。混ぜると平均が壊れる</li>
+        <li><strong>作った鍵は片付ける</strong>：作りっぱなしだと枠を食う → 使い終わったら <code>C_DestroyObject</code> で削除</li>
+        <li><strong>並列度の罠</strong>：鍵生成は<strong>HSM側で同時に走らせにくい</strong>処理。スレッドを増やしても回数が伸びにくい</li>
+        <li><strong>回数を多めに</strong>：RSAは数回だと「遅い回」を取り逃がす。多めに回して最大値を見る</li>
       </ul>
     </div>
 
     <div class="card bordered-left">
-      <div class="card-title">推奨ベンチ設計（RSA鍵生成）</div>
+      <div class="card-title">SoftHSM で試すときの流れ（RSA鍵生成）</div>
       <div class="code-block c" style="margin-top:0.6rem">
-<span class="code-lang">疑似コード</span><pre><span class="com">// 1. 準備（測定外）</span>
+<span class="code-lang">疑似コード</span><pre><span class="com">// 1. 準備（時間を見る対象の外）</span>
 <span class="fn-name">setup_session_and_login</span>();
 
-<span class="com">// 2. ウォームアップ（5〜10回）</span>
+<span class="com">// 2. ならし運転（数回）</span>
 <span class="kw">for</span> i <span class="kw">in</span> <span class="num">0</span>..<span class="num">10</span> { <span class="fn-name">gen_and_destroy</span>(); }
 
-<span class="com">// 3. 計測 (1000サンプル / 数時間かかる)</span>
-<span class="kw">for</span> i <span class="kw">in</span> <span class="num">0</span>..<span class="num">1000</span> {
+<span class="com">// 3. 時間を見る（多めに回す）</span>
+<span class="kw">for</span> i <span class="kw">in</span> <span class="num">0</span>..<span class="num">N</span> {
     t0 = <span class="fn-name">now</span>();
     <span class="fn-name">C_GenerateKeyPair</span>(...);
     t1 = <span class="fn-name">now</span>();
-    latencies[i] = t1 - t0;
+    times[i] = t1 - t0;
     <span class="fn-name">C_DestroyObject</span>(hPub);
     <span class="fn-name">C_DestroyObject</span>(hPriv);
 }
 
-<span class="com">// 4. 集計：max, p99.9 を必ず確認</span></pre>
+<span class="com">// 4. まとめ：平均だけでなく最大値も見る</span></pre>
       </div>
     </div>
 
-    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2 §5.15</a><a href="#slide-21">[7] AWS CloudHSM PKCS#11 library</a><a href="#slide-21">[16] NIST FIPS 186-5</a></div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2 §5.15</a><a href="#slide-21">[6] SoftHSM2</a><a href="#slide-21">[16] NIST FIPS 186-5</a></div>
   </div>
 </section>
 
 <!-- ====== SLIDE 20: 3-way comparison ====== -->
-<section class="slide" data-title="3操作の性能特性比較">
+<section class="slide" data-title="3操作の特性比較">
   <span class="slide-num">20 / 22</span>
   <div class="slide-inner">
     <span class="slide-tag">CLOSING · 総合まとめ</span>
-    <h2><span class="num">20</span>3操作の性能特性 — 横断比較</h2>
-    <p class="lead">乱数・署名・鍵生成は<strong>「単発の重さ」と「呼び出し頻度」が桁違い</strong>。ベンチ設計を間違えると、片方の特性しか見えなくなる。</p>
+    <h2><span class="num">20</span>3操作の特性 — 横断比較</h2>
+    <p class="lead">乱数・署名・鍵生成は<strong>「単発の重さ」と「呼び出し頻度」が桁違い</strong>。一緒くたに時間を見ると、片方の特性しか見えなくなる。</p>
 
     <div class="diagram">
       <svg viewBox="0 0 760 360" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
@@ -1590,11 +1570,11 @@ latency_ns = t1 - t0;
         <text x="620" y="288" text-anchor="middle" font-size="10" fill="#a83a2b">超重・稀</text>
 
         <!-- Annotation -->
-        <text x="400" y="22" text-anchor="middle" font-size="10" fill="#6d7591" font-style="italic">3操作はスケールが桁違い → 別ベンチで測定</text>
+        <text x="400" y="22" text-anchor="middle" font-size="10" fill="#6d7591" font-style="italic">3操作はスケールが桁違い → 別々に分けて見る</text>
       </svg>
     </div>
 
-    <h3><span class="marker">▸</span>性能特性の対比表</h3>
+    <h3><span class="marker">▸</span>3操作の対比表</h3>
     <table class="tbl">
       <tr>
         <th style="width: 130px">観点</th>
@@ -1603,16 +1583,16 @@ latency_ns = t1 - t0;
         <th style="color:var(--red)">鍵生成</th>
       </tr>
       <tr>
-        <td>1回の所要時間</td>
-        <td>0.5〜数 ms</td>
-        <td>2〜30 ms (RSA-2048)</td>
-        <td>100ms〜数秒 (RSA-2048)</td>
+        <td>1回の重さ</td>
+        <td>とても軽い</td>
+        <td>中〜重い</td>
+        <td><strong style="color:var(--red)">とても重い</strong></td>
       </tr>
       <tr>
         <td>ばらつき</td>
         <td>小</td>
         <td>中</td>
-        <td><strong style="color:var(--red)">超大（max≫mean）</strong></td>
+        <td><strong style="color:var(--red)">超大（最大≫平均）</strong></td>
       </tr>
       <tr>
         <td>呼び出し頻度</td>
@@ -1621,16 +1601,16 @@ latency_ns = t1 - t0;
         <td>非常に低い</td>
       </tr>
       <tr>
-        <td>主ボトルネック</td>
-        <td>ネットワークRTT</td>
+        <td>時間がかかる主因</td>
+        <td>ネットワーク往復</td>
         <td>HSM内秘密鍵演算</td>
         <td>HSM内素数探索</td>
       </tr>
       <tr>
-        <td>並列スケール</td>
-        <td>セッション数倍までOK</td>
-        <td>HSM上限まで線形</td>
-        <td><strong style="color:var(--red)">ほぼスケールしない</strong></td>
+        <td>並列で伸びるか</td>
+        <td>セッション数ぶん伸びる</td>
+        <td>HSM上限まで伸びる</td>
+        <td><strong style="color:var(--red)">ほぼ伸びない</strong></td>
       </tr>
       <tr>
         <td>Init/Final</td>
@@ -1639,39 +1619,33 @@ latency_ns = t1 - t0;
         <td>なし（単発）</td>
       </tr>
       <tr>
-        <td>計測単位</td>
-        <td>ops/sec</td>
-        <td>ops/sec + p99</td>
-        <td>1回あたりmax</td>
-      </tr>
-      <tr>
-        <td>サンプル数目安</td>
-        <td>10,000+</td>
-        <td>1,000+</td>
-        <td>100〜1,000（時間かかる）</td>
+        <td>時間を見るとき注目する所</td>
+        <td>1秒あたりの回数</td>
+        <td>1秒あたりの回数＋遅い回</td>
+        <td>1回あたりの最大</td>
       </tr>
     </table>
 
     <div class="card bordered-left">
-      <div class="card-title">運用設計への含意</div>
+      <div class="card-title">設計に効いてくること</div>
       <ul style="font-size:0.92rem; margin: 0.4rem 0">
         <li><strong>鍵生成は事前に済ませる</strong>：本番リクエストの中で鍵生成しない（ユーザーを待たせる）</li>
-        <li><strong>署名のキャパが本番の上限</strong>：HSMの選定はTPS-署名を見る</li>
-        <li><strong>乱数は意外と詰まる</strong>：高負荷時はライブラリ側でPRNGを使うことも検討</li>
+        <li><strong>署名がいちばんよく呼ばれる</strong>：システム全体の速さは署名の速さに引っ張られやすい</li>
+        <li><strong>乱数は意外と詰まる</strong>：大量に取る場面では取り方を工夫する</li>
       </ul>
     </div>
 
-    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2</a><a href="#slide-21">[7] AWS CloudHSM</a><a href="#slide-21">[10] Thales Luna</a></div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2</a><a href="#slide-21">[6] SoftHSM2</a></div>
   </div>
 </section>
 
-<!-- ====== SLIDE 21: Benchmark design overall ====== -->
-<section class="slide" data-title="ベンチマーク設計の総合指針">
+<!-- ====== SLIDE 21: Timing harness overall ====== -->
+<section class="slide" data-title="処理時間を見るときの総合指針">
   <span class="slide-num">21 / 22</span>
   <div class="slide-inner">
     <span class="slide-tag">CLOSING · 総合まとめ</span>
-    <h2><span class="num">21</span>ベンチマーク設計の総合指針</h2>
-    <p class="lead">3操作を統一的に評価するための<strong>設計テンプレ</strong>。これに沿って組めば、結果の解釈が後で破綻しない。</p>
+    <h2><span class="num">21</span>処理時間を見るときの総合指針</h2>
+    <p class="lead">3操作を同じやり方で見るための<strong>段取りテンプレ</strong>。SoftHSM でこの型に沿って回すと、結果が後で読みやすい。</p>
 
     <div class="diagram">
       <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
@@ -1704,25 +1678,24 @@ latency_ns = t1 - t0;
         <rect x="390" y="40" width="140" height="200" fill="#faf6ec" stroke="#a83a2b" stroke-width="2.5"/>
         <text x="460" y="65" text-anchor="middle" font-size="12" fill="#a83a2b" font-weight="700" font-family="JetBrains Mono">★ MEASURE</text>
         <line x1="405" y1="73" x2="515" y2="73" stroke="#d6cdb7"/>
-        <text x="460" y="100" text-anchor="middle" font-size="10" fill="#3c4865" font-weight="600">N回繰り返し測定</text>
-        <text x="460" y="120" text-anchor="middle" font-size="10" fill="#3c4865">乱数: 10,000</text>
-        <text x="460" y="138" text-anchor="middle" font-size="10" fill="#3c4865">署名: 1,000</text>
-        <text x="460" y="156" text-anchor="middle" font-size="10" fill="#3c4865">鍵生成: 100+</text>
-        <text x="460" y="190" text-anchor="middle" font-size="9" fill="#a83a2b" font-weight="600">時刻はns精度</text>
-        <text x="460" y="208" text-anchor="middle" font-size="9" fill="#a83a2b" font-weight="600">各サンプル保存</text>
+        <text x="460" y="100" text-anchor="middle" font-size="10" fill="#3c4865" font-weight="600">N回くり返して時間を見る</text>
+        <text x="460" y="120" text-anchor="middle" font-size="10" fill="#3c4865">乱数: 多め</text>
+        <text x="460" y="138" text-anchor="middle" font-size="10" fill="#3c4865">署名: 中くらい</text>
+        <text x="460" y="156" text-anchor="middle" font-size="10" fill="#3c4865">鍵生成: 少なめ</text>
+        <text x="460" y="190" text-anchor="middle" font-size="9" fill="#a83a2b" font-weight="600">時刻はns精度で</text>
+        <text x="460" y="208" text-anchor="middle" font-size="9" fill="#a83a2b" font-weight="600">各回の値を残す</text>
 
         <path d="M 535 140 L 570 140" stroke="#18233a" stroke-width="1.5" marker-end="url(#arr-wf)"/>
 
         <rect x="575" y="40" width="140" height="200" fill="#fdfaf2" stroke="#6b8e5e" stroke-width="2"/>
         <text x="645" y="65" text-anchor="middle" font-size="12" fill="#6b8e5e" font-weight="700" font-family="JetBrains Mono">ANALYZE</text>
         <line x1="590" y1="73" x2="700" y2="73" stroke="#d6cdb7"/>
-        <text x="645" y="95" text-anchor="middle" font-size="10" fill="#3c4865">mean / stddev</text>
-        <text x="645" y="113" text-anchor="middle" font-size="10" fill="#3c4865">p50, p95, p99</text>
-        <text x="645" y="131" text-anchor="middle" font-size="10" fill="#3c4865">max を必ず</text>
-        <text x="645" y="149" text-anchor="middle" font-size="10" fill="#3c4865">ヒストグラム</text>
-        <text x="645" y="167" text-anchor="middle" font-size="10" fill="#3c4865">エラー率</text>
-        <text x="645" y="195" text-anchor="middle" font-size="9" fill="#6d7591" font-style="italic">CSV出力 +</text>
-        <text x="645" y="213" text-anchor="middle" font-size="9" fill="#6d7591" font-style="italic">グラフ化</text>
+        <text x="645" y="98" text-anchor="middle" font-size="10" fill="#3c4865">平均・最小・最大</text>
+        <text x="645" y="118" text-anchor="middle" font-size="10" fill="#3c4865">1秒あたりの回数</text>
+        <text x="645" y="138" text-anchor="middle" font-size="10" fill="#3c4865">遅い回がないか</text>
+        <text x="645" y="158" text-anchor="middle" font-size="10" fill="#3c4865">エラーの有無</text>
+        <text x="645" y="195" text-anchor="middle" font-size="9" fill="#6d7591" font-style="italic">表やグラフに</text>
+        <text x="645" y="213" text-anchor="middle" font-size="9" fill="#6d7591" font-style="italic">まとめる</text>
 
         <defs>
           <marker id="arr-wf" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto">
@@ -1731,45 +1704,43 @@ latency_ns = t1 - t0;
         </defs>
       </svg>
     </div>
-    <div class="diagram-caption">標準的なベンチマーク4フェーズ。3操作ともこの型で統一する</div>
+    <div class="diagram-caption">時間を見るときの4ステップ。3操作ともこの型でそろえる</div>
 
     <div class="cols-2">
       <div class="card bordered-left">
-        <div class="card-title">必ず記録すべき情報</div>
+        <div class="card-title">一緒に控えておくと良い情報</div>
         <ul style="font-size:0.9rem; margin:0.4rem 0">
-          <li>HSMのバージョン・FW・型番</li>
-          <li>PKCS#11ライブラリのバージョン</li>
-          <li>ネットワーク経路（同一LAN/別VPC等）</li>
-          <li>ベンチ実行ホストのスペック</li>
+          <li>動かしたマシンのスペック（CPU等）</li>
+          <li>SoftHSM / PKCS#11ライブラリのバージョン</li>
+          <li>cryptoki クレートのバージョン</li>
           <li>並列度・セッション数</li>
           <li>使用メカニズム・鍵長</li>
-          <li>テスト時刻（HSM側の他負荷影響）</li>
+          <li>くり返した回数</li>
         </ul>
       </div>
       <div class="card warn">
-        <div class="card-title">典型的な失敗パターン</div>
+        <div class="card-title">よくある失敗</div>
         <ul style="font-size:0.9rem; margin:0.4rem 0">
-          <li><strong>ウォームアップなし</strong> → 初回がp99に化けて全体歪む</li>
-          <li><strong>サンプル少なすぎ</strong> → maxを取り逃がし、テールリスク見落とし</li>
-          <li><strong>3操作を同じ枠で実行</strong> → 鍵生成1回が他をブロック</li>
-          <li><strong>セッション枯渇放置</strong> → 中盤からエラー多発で結果汚染</li>
-          <li><strong>HSM側ログを取り忘れ</strong> → ボトルネックの場所が特定できない</li>
+          <li><strong>ならし運転なし</strong> → 初回の遅い分が全体をゆがめる</li>
+          <li><strong>回数が少なすぎ</strong> → たまの「遅い回」を取り逃がす</li>
+          <li><strong>3操作を同じ枠で実行</strong> → 鍵生成1回が他を巻き込む</li>
+          <li><strong>セッションの使い回しをしない</strong> → 途中からエラーが出て結果が濁る</li>
         </ul>
       </div>
     </div>
 
     <div class="card measure">
-      <div class="card-title">★ 並列度設計のチェックリスト</div>
+      <div class="card-title">★ 並列で見るときのチェックリスト</div>
       <ul style="font-size:0.92rem; margin: 0.4rem 0">
         <li>スレッドごとに<strong>別セッション</strong>を持つ（セッションを共有しない）</li>
-        <li>並列度を<strong>1, 2, 4, 8, 16, 32, 64...</strong>と倍々で増やしてスケール曲線を描く</li>
-        <li><strong>飽和点</strong>を特定する：これ以上スレッドを増やしてもTPSが上がらない点</li>
-        <li>飽和点でのレイテンシ・エラー率を記録（運用上限の参考）</li>
-        <li>鍵生成は<strong>並列度1〜数</strong>で十分（スケールしないので）</li>
+        <li>並列度を<strong>1, 2, 4, 8, 16...</strong>と倍々に増やして、回数の伸び方を見る</li>
+        <li><strong>頭打ちになる点</strong>を探す：これ以上スレッドを増やしても回数が伸びない所</li>
+        <li>その点でのエラーの有無を控えておく</li>
+        <li>鍵生成は<strong>並列度1〜数</strong>で十分（伸びないので）</li>
       </ul>
     </div>
 
-    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2</a><a href="#slide-21">[3] PKCS#11 Usage Guide v3.2</a><a href="#slide-21">[7] AWS CloudHSM</a></div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-21">[1] PKCS#11 Spec v3.2</a><a href="#slide-21">[3] PKCS#11 Usage Guide v3.2</a><a href="#slide-21">[6] SoftHSM2</a></div>
   </div>
 </section>
 
@@ -1805,7 +1776,7 @@ latency_ns = t1 - t0;
         <li>
           <span class="ref-num">[4]</span>
           <span class="ref-title">PKCS #11 Specification Version 3.1</span>
-          <span class="ref-meta">OASIS Committee Specification 01. 11 August 2022. — 前バージョン（多くのベンダー実装が3.1ベース）</span>
+          <span class="ref-meta">OASIS Committee Specification 01. 11 August 2022. — 前バージョン（多くの実装が3.1ベース）</span>
           <a class="ref-url" href="https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/pkcs11-spec-v3.1.html" target="_blank" rel="noopener">docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/pkcs11-spec-v3.1.html</a>
         </li>
         <li>
@@ -1826,36 +1797,6 @@ latency_ns = t1 - t0;
           <span class="ref-meta">PKCS#11互換のソフトウェアHSM。学習・API動作確認に最適。Botan / OpenSSLバックエンド選択可</span>
           <a class="ref-url" href="https://www.opendnssec.org/softhsm/" target="_blank" rel="noopener">www.opendnssec.org/softhsm/</a><br>
           <a class="ref-url" href="https://github.com/softhsm/SoftHSMv2" target="_blank" rel="noopener">github.com/softhsm/SoftHSMv2</a>
-        </li>
-      </ul>
-    </div>
-
-    <div class="ref-section">
-      <div class="ref-section-title">▸ ベンダー実装ドキュメント（参考例）</div>
-      <ul class="ref-list">
-        <li>
-          <span class="ref-num">[7]</span>
-          <span class="ref-title">AWS CloudHSM — PKCS #11 library</span>
-          <span class="ref-meta">CloudHSM Client SDK 5の公式リファレンス。対応Mechanism、属性デフォルト値、ベンダー固有拡張</span>
-          <a class="ref-url" href="https://docs.aws.amazon.com/cloudhsm/latest/userguide/pkcs11-library.html" target="_blank" rel="noopener">docs.aws.amazon.com/cloudhsm/latest/userguide/pkcs11-library.html</a>
-        </li>
-        <li>
-          <span class="ref-num">[8]</span>
-          <span class="ref-title">AWS CloudHSM — Key attributes</span>
-          <span class="ref-meta">属性のデフォルト値とベンダー固有の挙動。<code>CKA_EXTRACTABLE</code>等の運用知見</span>
-          <a class="ref-url" href="https://docs.aws.amazon.com/cloudhsm/latest/userguide/pkcs11-attributes.html" target="_blank" rel="noopener">docs.aws.amazon.com/cloudhsm/latest/userguide/pkcs11-attributes.html</a>
-        </li>
-        <li>
-          <span class="ref-num">[9]</span>
-          <span class="ref-title">AWS CloudHSM PKCS#11 サンプルコード集</span>
-          <span class="ref-meta">署名・暗号化・鍵生成・鍵ラップの完全な動作サンプル（C言語）</span>
-          <a class="ref-url" href="https://github.com/aws-samples/aws-cloudhsm-pkcs11-examples" target="_blank" rel="noopener">github.com/aws-samples/aws-cloudhsm-pkcs11-examples</a>
-        </li>
-        <li>
-          <span class="ref-num">[10]</span>
-          <span class="ref-title">Thales Luna HSM — FIPS 140-3</span>
-          <span class="ref-meta">Luna Network / Luna PCIe HSM（FIPS 140-3 Level 3、NIST cert #4684）</span>
-          <a class="ref-url" href="https://cpl.thalesgroup.com/compliance/fips-140-3" target="_blank" rel="noopener">cpl.thalesgroup.com/compliance/fips-140-3</a>
         </li>
       </ul>
     </div>
@@ -1890,7 +1831,7 @@ latency_ns = t1 - t0;
         <li>
           <span class="ref-num">[16]</span>
           <span class="ref-title">NIST FIPS 186-5 Annex A — Key Generation Procedures</span>
-          <span class="ref-meta">特にA.1.5（RSA鍵生成の素数選定）が鍵生成性能の議論の根拠</span>
+          <span class="ref-meta">特にA.1.5（RSA鍵生成の素数選定）が、鍵生成のばらつきの背景</span>
           <a class="ref-url" href="https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-5.pdf" target="_blank" rel="noopener">nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-5.pdf</a>
         </li>
       </ul>
@@ -1902,7 +1843,7 @@ latency_ns = t1 - t0;
         <li>
           <span class="ref-num">[13]</span>
           <span class="ref-title">cryptoki — Rust binding for PKCS#11</span>
-          <span class="ref-meta">PKCS#11のRustラッパー。ベンダーの<code>.so</code>をFFI経由で呼ぶ高レベルAPI</span>
+          <span class="ref-meta">PKCS#11のRustラッパー。提供元の<code>.so</code>をFFI経由で呼ぶ高レベルAPI</span>
           <a class="ref-url" href="https://crates.io/crates/cryptoki" target="_blank" rel="noopener">crates.io/crates/cryptoki</a><br>
           <a class="ref-url" href="https://docs.rs/cryptoki/" target="_blank" rel="noopener">docs.rs/cryptoki/</a>
         </li>
@@ -1910,13 +1851,13 @@ latency_ns = t1 - t0;
     </div>
 
     <div class="card bordered-left" style="margin-top: 2rem;">
-      <div class="card-title">読み進めるときの推奨順（性能評価フォーカス）</div>
-      <p style="font-size: 0.92rem;"><strong>[3] Usage Guide §フロー例</strong> → 各操作の正しい呼び出し順を確認<br><strong>[1] Specification §5</strong> → 関数の戻り値・状態遷移を正確に把握<br><strong>[7]〜[10] ベンダー資料</strong> → 実機の制約・対応Mechanism・属性デフォルトを確認<br><strong>[14]〜[16] NIST資料</strong> → 性能特性の理論背景（特にRSA鍵生成のばらつき）<br><strong>[6] SoftHSM2 で先に試す</strong> → ベンチハーネス自体を検証してから本番HSMへ</p>
+      <div class="card-title">読み進めるときの推奨順</div>
+      <p style="font-size: 0.92rem;"><strong>[3] Usage Guide §フロー例</strong> → 各操作の正しい呼び出し順を確認<br><strong>[1] Specification §5</strong> → 関数の戻り値・状態遷移を正確に把握<br><strong>[14]〜[16] NIST資料</strong> → 操作の重さの理論背景（特にRSA鍵生成のばらつき）<br><strong>[6] SoftHSM2 で手を動かす</strong> → 実際に動かして処理時間を見る<br><strong>[13] cryptoki</strong> → Rust から呼ぶときの高レベルAPI</p>
     </div>
 
     <div style="text-align: center; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--line);">
       <p style="font-family: 'Shippori Mincho', serif; font-size: 1.1rem; color: var(--ink); font-style: italic;">
-        — 計測の質は、ベンチ設計の質を超えない —
+        — 手を動かして見えた時間が、いちばんの理解になる —
       </p>
       <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--ink-muted); letter-spacing: 0.15em; margin-top: 1rem;">
         END OF DOCUMENT

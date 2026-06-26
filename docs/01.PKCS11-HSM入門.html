@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HSM × PKCS#11 入門 — 性能評価に向けて</title>
+<title>HSM × PKCS#11 入門</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -40,12 +40,12 @@
     </h1>
     <div class="title-line"></div>
     <p class="subtitle">
-      ネットワーク型HSMの性能評価に向けて<br>
-      銀行金庫のたとえで理解する基礎概念
+      銀行金庫のたとえで理解する基礎概念<br>
+      SoftHSM を使って手元で動かしながら学ぶ
     </p>
     <div class="title-meta">
       <strong>対象</strong> :  HSMをこれから触る開発者<br>
-      <strong>到達点</strong> : 仕様書とベンダーマニュアルが読める状態<br>
+      <strong>到達点</strong> : 仕様書を自力で読める状態<br>
       <strong>進め方</strong> : 概念 → 構造 → 関数 → フロー
     </div>
   </div>
@@ -57,7 +57,7 @@
   <div class="slide-inner">
     <span class="slide-tag">CONTENTS</span>
     <h2>このドキュメントの構成</h2>
-    <p class="lead">概念から始めて、ライブラリ内部、関数、典型フロー、性能評価まで段階的に積み上げる。</p>
+    <p class="lead">概念から始めて、ライブラリ内部、関数、典型フローまで段階的に積み上げる。最後に SoftHSM で実際に動かす。</p>
     <div class="cols-2">
       <div>
         <div class="kv">
@@ -89,8 +89,8 @@
           <div class="kv-row"><div class="k">16</div><div class="v">完全ライフサイクル</div></div>
         </div>
         <div class="kv">
-          <div class="kv-row"><div class="k">PART V</div><div class="v">性能評価</div></div>
-          <div class="kv-row"><div class="k">17</div><div class="v">測定パターンとエラー処理</div></div>
+          <div class="kv-row"><div class="k">PART V</div><div class="v">SoftHSMで動かす</div></div>
+          <div class="kv-row"><div class="k">17</div><div class="v">処理時間の見方とエラー処理</div></div>
           <div class="kv-row"><div class="k">18</div><div class="v">次のステップ</div></div>
         </div>
       </div>
@@ -196,7 +196,7 @@
     <div class="cols-2">
       <div>
         <h3><span class="marker">▸</span>たとえると「統一注文書フォーマット」</h3>
-        <p>HSMメーカーは Thales、Utimaco、AWS、Yubico など多数あって中身はバラバラ。でも <strong>外向けの注文書だけは同じ書式で受け付けようや</strong> という業界合意。</p>
+        <p>HSM の製品はメーカーごとに多数あって中身はバラバラ。でも <strong>外向けの注文書だけは同じ書式で受け付けようや</strong> という業界合意。</p>
         <p>SuicaとICOCAとPASMOの関係に似てる。中身は違うけど、レジでの読み取り操作は同じ。</p>
       </div>
       <div>
@@ -219,16 +219,16 @@
 
             <!-- Vendors -->
             <rect x="20" y="170" width="80" height="50" fill="#fdfaf2" stroke="#18233a" stroke-width="1.2"/>
-            <text x="60" y="190" text-anchor="middle" font-size="11" fill="#18233a" font-weight="600">Thales</text>
-            <text x="60" y="205" text-anchor="middle" font-size="9" fill="#6d7591">Luna</text>
+            <text x="60" y="190" text-anchor="middle" font-size="11" fill="#18233a" font-weight="600">製品 A</text>
+            <text x="60" y="205" text-anchor="middle" font-size="9" fill="#6d7591">ネット型</text>
 
             <rect x="140" y="170" width="80" height="50" fill="#fdfaf2" stroke="#18233a" stroke-width="1.2"/>
-            <text x="180" y="190" text-anchor="middle" font-size="11" fill="#18233a" font-weight="600">AWS</text>
-            <text x="180" y="205" text-anchor="middle" font-size="9" fill="#6d7591">CloudHSM</text>
+            <text x="180" y="190" text-anchor="middle" font-size="11" fill="#18233a" font-weight="600">製品 B</text>
+            <text x="180" y="205" text-anchor="middle" font-size="9" fill="#6d7591">PCIe型</text>
 
             <rect x="260" y="170" width="80" height="50" fill="#fdfaf2" stroke="#18233a" stroke-width="1.2"/>
-            <text x="300" y="190" text-anchor="middle" font-size="11" fill="#18233a" font-weight="600">Utimaco</text>
-            <text x="300" y="205" text-anchor="middle" font-size="9" fill="#6d7591">CryptoServer</text>
+            <text x="300" y="190" text-anchor="middle" font-size="11" fill="#18233a" font-weight="600">SoftHSM</text>
+            <text x="300" y="205" text-anchor="middle" font-size="9" fill="#6d7591">ソフト型</text>
 
             <text x="180" y="250" text-anchor="middle" font-size="10" fill="#a83a2b" font-style="italic">中身は別物。でも入口は共通。</text>
           </svg>
@@ -238,7 +238,7 @@
 
     <div class="card bordered-left">
       <div class="card-title">アプリ開発者にとっての意味</div>
-      <p>ベンダー提供の <code>.so</code>（Linux）や <code>.dll</code>（Windows）を <strong>ロードして、決まった関数を呼ぶ</strong>。HSMメーカーを変えてもアプリ側のロジックは（基本的に）動く。<em>※ 実際はベンダーごとの方言あり</em></p>
+      <p>HSM 提供元の <code>.so</code>（Linux）や <code>.dll</code>（Windows）を <strong>ロードして、決まった関数を呼ぶ</strong>。HSM 製品を変えてもアプリ側のロジックは（基本的に）動く。<em>※ 実際は製品ごとの方言あり</em></p>
     </div>
     <div class="sources"><span class="src-label">出典：</span><a href="#slide-18">[1] PKCS#11 Spec v3.2</a><a href="#slide-18">[5] OASIS PKCS 11 TC</a></div>
   </div>
@@ -264,7 +264,7 @@
 
         <!-- Library layer -->
         <rect x="60" y="140" width="680" height="90" fill="#faf6ec" stroke="#b88a3c" stroke-width="1.5" rx="2"/>
-        <text x="80" y="168" font-size="13" fill="#18233a" font-weight="700">② PKCS#11ライブラリ <tspan font-family="JetBrains Mono" font-size="11" fill="#8b6a2a">（ベンダー提供の .so / .dll）</tspan></text>
+        <text x="80" y="168" font-size="13" fill="#18233a" font-weight="700">② PKCS#11ライブラリ <tspan font-family="JetBrains Mono" font-size="11" fill="#8b6a2a">（提供元の .so / .dll）</tspan></text>
         <text x="80" y="190" font-size="11" fill="#3c4865">受付係 ・ 帳簿係 ・ 翻訳係 ・ 配達係  の4つの仕事を内部でこなす</text>
         <text x="80" y="210" font-size="11" fill="#3c4865">標準API → HSM独自プロトコル に変換し、ネットワークを越えて通信</text>
         <text x="720" y="165" text-anchor="end" font-size="9" fill="#6d7591" font-family="JetBrains Mono">VENDOR LIB</text>
@@ -286,7 +286,7 @@
       </div>
       <div class="card">
         <div class="card-title">② ライブラリ</div>
-        <p style="font-size:0.9rem">ベンダーが書いて配る。<br>差し替えればHSMを変えられる。</p>
+        <p style="font-size:0.9rem">提供元が書いて配る。<br>差し替えればHSMを変えられる。</p>
       </div>
       <div class="card">
         <div class="card-title">③ HSM本体</div>
@@ -554,9 +554,9 @@ sign(key_handle, data)
 
     <div class="card warn">
       <div class="card-title">設計上のキーポイント</div>
-      <p><code>CKA_EXTRACTABLE</code> を <code>true</code> にすると、鍵を暗号化して外に出せる。<strong>用途次第やけど、本番運用では基本 <code>false</code></strong>。一度<code>false</code>にしたら原則戻せない（ベンダー差あり）。</p>
+      <p><code>CKA_EXTRACTABLE</code> を <code>true</code> にすると、鍵を暗号化して外に出せる。<strong>用途次第やけど、本番運用では基本 <code>false</code></strong>。一度<code>false</code>にしたら原則戻せない（製品差あり）。</p>
     </div>
-    <div class="sources"><span class="src-label">出典：</span><a href="#slide-18">[1] PKCS#11 Spec v3.2 §10 Object types</a><a href="#slide-18">[8] AWS CloudHSM Key attributes</a></div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-18">[1] PKCS#11 Spec v3.2 §10 Object types</a></div>
   </div>
 </section>
 
@@ -596,10 +596,10 @@ sign(key_handle, data)
     </div>
 
     <div class="card warn">
-      <div class="card-title"><span class="glyph">⚠</span>ベンダー差の罠</div>
+      <div class="card-title"><span class="glyph">⚠</span>製品差の罠</div>
       <p>仕様書に載ってるMechanismでも、<strong>HSMが対応してない場合がある</strong>。最新のEdDSAとか、PSSの細かいパラメータとか。事前に <code>C_GetMechanismList</code> で対応一覧を取って確認する。</p>
     </div>
-    <div class="sources"><span class="src-label">出典：</span><a href="#slide-18">[1] PKCS#11 Spec v3.2 §6 Mechanisms</a><a href="#slide-18">[7] CloudHSM Mechanisms</a></div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-18">[1] PKCS#11 Spec v3.2 §6 Mechanisms</a></div>
   </div>
 </section>
 
@@ -609,7 +609,7 @@ sign(key_handle, data)
   <div class="slide-inner">
     <span class="slide-tag">PART III — ライブラリの内側</span>
     <h2><span class="num">11</span>ライブラリ内部の4つの役割</h2>
-    <p class="lead">「窓口係」と一言で呼んできたけど、実際は<strong>4つの仕事を兼ねてる</strong>。性能を理解するにはこの分担を意識する。</p>
+    <p class="lead">「窓口係」と一言で呼んできたけど、実際は<strong>4つの仕事を兼ねてる</strong>。処理の流れと時間のかかり方を理解するにはこの分担を意識する。</p>
 
     <div class="diagram">
       <svg viewBox="0 0 720 360" xmlns="http://www.w3.org/2000/svg" font-family="Zen Kaku Gothic New, sans-serif">
@@ -652,7 +652,7 @@ sign(key_handle, data)
         <text x="200" y="260" font-size="10" fill="#6d7591" font-style="italic">①: 互換性を担保</text>
         <text x="200" y="278" font-size="10" fill="#6d7591" font-style="italic">②: マルチスレッド時にロック</text>
         <text x="200" y="296" font-size="10" fill="#6d7591" font-style="italic">③: シリアライズ処理</text>
-        <text x="200" y="314" font-size="10" fill="#6d7591" font-style="italic">④: 性能のボトルネックになりがち</text>
+        <text x="200" y="314" font-size="10" fill="#6d7591" font-style="italic">④: 時間がかかりがちな所</text>
 
         <!-- Output -->
         <path d="M 565 180 L 605 180" stroke="#18233a" stroke-width="1.5" marker-end="url(#arr4)"/>
@@ -674,11 +674,11 @@ sign(key_handle, data)
     <div class="cols-2">
       <div class="card bordered-left">
         <div class="card-title">① 受付係 / ② 帳簿係</div>
-        <p>標準APIの窓口と内部状態の管理。<strong>マルチスレッド性能はここの設計次第</strong>でスケールが決まる。</p>
+        <p>標準APIの窓口と内部状態の管理。<strong>マルチスレッドでのスケールはここの設計次第</strong>で決まる。</p>
       </div>
       <div class="card bordered-left">
         <div class="card-title">③ 翻訳係 / ④ 配達係</div>
-        <p>ネットワーク型HSMでは<strong>④の通信レイテンシが性能の大部分</strong>を占めることが多い。TLS接続は使い回しが必須。</p>
+        <p>ネットワーク型HSMでは<strong>④の通信往復にかかる時間が大半</strong>を占めることが多い。TLS接続は使い回しが必須。</p>
       </div>
     </div>
   </div>
@@ -690,50 +690,50 @@ sign(key_handle, data)
   <div class="slide-inner">
     <span class="slide-tag">PART III — ライブラリの内側</span>
     <h2><span class="num">12</span>実装パターン4種</h2>
-    <p class="lead">同じPKCS#11ライブラリでも、<strong>HSMとの通信手段によって性能特性がガラッと変わる</strong>。</p>
+    <p class="lead">同じPKCS#11ライブラリでも、<strong>HSMとの接続手段によって時間のかかり方がガラッと変わる</strong>。</p>
 
     <div class="cols-2">
       <div class="card">
-        <div class="card-title">A — ソフトウェアHSM</div>
-        <p style="font-size:0.9rem">例：<code>SoftHSM2</code>、<code>OpenSC</code></p>
+        <div class="card-title">A — ソフトウェアHSM <span style="color:var(--vault);font-size:0.85em">(★この資料で使う)</span></div>
+        <p style="font-size:0.9rem">ソフトウェアだけで PKCS#11 を実装したもの</p>
         <p style="font-size:0.9rem">アプリ → <code>.so</code> → ローカルファイル</p>
         <p style="color:var(--vault); font-size:0.88rem; margin-top:0.6rem"><strong>用途</strong>: 開発・学習・API動作確認</p>
-        <p style="color:var(--red); font-size:0.85rem">性能評価には使えない（CPUだけ測る形になる）</p>
+        <p style="font-size:0.85rem">ハード不要で手元に入れられる。処理時間は CPU 次第。</p>
       </div>
       <div class="card">
-        <div class="card-title">B — ネットワーク型HSM <span style="color:var(--vault);font-size:0.85em">(★今回の対象)</span></div>
-        <p style="font-size:0.9rem">例：<code>AWS CloudHSM</code>、<code>Thales Luna</code></p>
+        <div class="card-title">B — ネットワーク型HSM</div>
+        <p style="font-size:0.9rem">ネットワーク先のアプライアンスに接続</p>
         <p style="font-size:0.9rem">アプリ → <code>.so</code> → TLS → アプライアンス</p>
         <p style="color:var(--vault); font-size:0.88rem; margin-top:0.6rem"><strong>特徴</strong>: 1リクエストごとにネットワーク往復</p>
-        <p style="color:var(--red); font-size:0.85rem">レイテンシの大半がネットワーク。コネクション使い回し必須。</p>
+        <p style="font-size:0.85rem">往復にかかる時間が大きい。コネクション使い回しが効く。</p>
       </div>
       <div class="card">
         <div class="card-title">C — PCIeカード型</div>
-        <p style="font-size:0.9rem">例：<code>Thales ProtectServer</code>、<code>Marvell LiquidSecurity</code></p>
+        <p style="font-size:0.9rem">サーバに挿す拡張カード</p>
         <p style="font-size:0.9rem">アプリ → <code>.so</code> → ドライバ → PCIeバス</p>
-        <p style="color:var(--vault); font-size:0.88rem; margin-top:0.6rem"><strong>特徴</strong>: 超低レイテンシ</p>
+        <p style="color:var(--vault); font-size:0.88rem; margin-top:0.6rem"><strong>特徴</strong>: 往復が短く応答が速い</p>
         <p style="font-size:0.85rem">1台のサーバに数枚しか挿せない</p>
       </div>
       <div class="card">
         <div class="card-title">D — USBトークン型</div>
-        <p style="font-size:0.9rem">例：<code>YubiHSM</code>、スマートカード</p>
+        <p style="font-size:0.9rem">USB 接続の小型デバイス・スマートカード</p>
         <p style="font-size:0.9rem">アプリ → <code>.so</code> → libusb / PC/SC</p>
         <p style="color:var(--vault); font-size:0.88rem; margin-top:0.6rem"><strong>特徴</strong>: 個人/小規模向け、低コスト</p>
-        <p style="font-size:0.85rem">USBプロトコルのレイテンシが乗る</p>
+        <p style="font-size:0.85rem">USB通信ぶんの時間が乗る</p>
       </div>
     </div>
 
     <div class="card bordered-left">
-      <div class="card-title">性能ボトルネックの分布</div>
+      <div class="card-title">時間がどこにかかるか</div>
       <table class="tbl">
-        <tr><th>パターン</th><th>ボトルネック</th><th>備考</th></tr>
-        <tr><td>A (ソフト)</td><td>CPU・暗号演算</td><td>ライブラリ自体のオーバーヘッド測定に有用</td></tr>
-        <tr><td>B (ネット)</td><td>ネットワーク往復</td><td>RTTが支配的、並列化で稼ぐ</td></tr>
-        <tr><td>C (PCIe)</td><td>HSM内部演算</td><td>ほぼピュアな暗号演算性能が出る</td></tr>
-        <tr><td>D (USB)</td><td>USBプロトコル</td><td>シリアル通信に近い特性</td></tr>
+        <tr><th>パターン</th><th>主に時間がかかる所</th><th>備考</th></tr>
+        <tr><td>A (ソフト)</td><td>CPU・暗号演算</td><td>SoftHSM。手元で API の動きと処理時間を確かめられる</td></tr>
+        <tr><td>B (ネット)</td><td>ネットワーク往復</td><td>往復が支配的、並列化で稼ぐ</td></tr>
+        <tr><td>C (PCIe)</td><td>HSM内部演算</td><td>往復が短く演算そのものが見えやすい</td></tr>
+        <tr><td>D (USB)</td><td>USB通信</td><td>シリアル通信に近い特性</td></tr>
       </table>
     </div>
-    <div class="sources"><span class="src-label">出典：</span><a href="#slide-18">[6] SoftHSM2</a><a href="#slide-18">[7] AWS CloudHSM</a><a href="#slide-18">[10] Thales Luna</a><a href="#slide-18">[11] NIST CMVP</a></div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-18">[6] SoftHSM2</a><a href="#slide-18">[1] PKCS#11 Spec v3.2</a></div>
   </div>
 </section>
 
@@ -798,7 +798,7 @@ sign(key_handle, data)
     </div>
 
     <div class="card bordered-left">
-      <p>英語が読めれば関数名から動作を推測できる。<strong>これがPKCS#11の親切なところ</strong>。一度パターンを覚えたら、ベンダーが変わっても同じ関数名で書ける。</p>
+      <p>英語が読めれば関数名から動作を推測できる。<strong>これがPKCS#11の親切なところ</strong>。一度パターンを覚えたら、HSM 製品が変わっても同じ関数名で書ける。</p>
     </div>
   </div>
 </section>
@@ -809,7 +809,7 @@ sign(key_handle, data)
   <div class="slide-inner">
     <span class="slide-tag">PART IV — 関数と処理フロー</span>
     <h2><span class="num">14</span>機能カテゴリマップ</h2>
-    <p class="lead">PKCS#11の全関数は<strong>大きく7グループ</strong>に分類できる。性能評価で叩くのは主に⑥。</p>
+    <p class="lead">PKCS#11の全関数は<strong>大きく7グループ</strong>に分類できる。実際に手を動かすとき主に叩くのは⑥。</p>
 
     <table class="tbl">
       <tr><th style="width:120px">カテゴリ</th><th style="width:280px">代表的な関数</th><th>役割</th></tr>
@@ -841,7 +841,7 @@ sign(key_handle, data)
       <tr style="background: rgba(184, 138, 60, 0.06);">
         <td><strong style="color:var(--vault)">⑥ 暗号操作</strong></td>
         <td><code>C_Sign...</code> / <code>C_Verify...</code> / <code>C_Encrypt...</code> / <code>C_Decrypt...</code> / <code>C_Digest...</code> / <code>C_GenerateRandom</code></td>
-        <td><strong style="color:var(--vault)">★ 性能評価のメイン対象</strong></td>
+        <td><strong style="color:var(--vault)">★ 実際に動かして時間を見る主対象</strong></td>
       </tr>
       <tr>
         <td>⑦ その他</td>
@@ -851,8 +851,8 @@ sign(key_handle, data)
     </table>
 
     <div class="card bordered-left">
-      <div class="card-title">性能評価の設計指針</div>
-      <p>①〜⑤は<strong>準備フェーズ</strong>。⑥を繰り返し叩く部分が<strong>計測フェーズ</strong>。これをはっきり分けておくと、ベンチマーク結果の解釈が楽になる。</p>
+      <div class="card-title">処理時間を見るときの分け方</div>
+      <p>①〜⑤は<strong>準備フェーズ</strong>。⑥を繰り返し叩く部分が<strong>本処理フェーズ</strong>。これをはっきり分けておくと、SoftHSM で時間を測ったときの結果が読み取りやすい。</p>
     </div>
     <div class="sources"><span class="src-label">出典：</span><a href="#slide-18">[1] PKCS#11 Spec v3.2 §5 Function categories</a></div>
   </div>
@@ -942,7 +942,7 @@ sign(key_handle, data)
         <div class="num">00</div>
         <div>
           <div><strong>.so ファイルをロード</strong></div>
-          <div class="desc">動的ロード機能で <code>libcloudhsm.so</code> 等を読み込む</div>
+          <div class="desc">動的ロード機能で <code>libsofthsm2.so</code> 等を読み込む</div>
         </div>
       </div>
       <div class="flow-arrow">↓</div>
@@ -1013,7 +1013,7 @@ sign(key_handle, data)
         <div class="num" style="color: var(--red);">★10</div>
         <div>
           <div class="fn">C_Sign</div>
-          <div class="desc">データを渡して署名取得。<strong style="color:var(--red)">性能評価のメイン計測点</strong></div>
+          <div class="desc">データを渡して署名取得。<strong style="color:var(--red)">処理時間を見るときの主な対象</strong></div>
           <span class="bank">🏦 「この書類に押してください」</span>
         </div>
       </div>
@@ -1036,47 +1036,47 @@ sign(key_handle, data)
         </div>
       </div>
     </div>
-    <div class="sources"><span class="src-label">出典：</span><a href="#slide-18">[1] PKCS#11 Spec v3.2 §5</a><a href="#slide-18">[9] CloudHSM PKCS#11 Examples</a></div>
+    <div class="sources"><span class="src-label">出典：</span><a href="#slide-18">[1] PKCS#11 Spec v3.2 §5</a></div>
   </div>
 </section>
 
-<!-- ====== SLIDE 17: Perf evaluation ====== -->
-<section class="slide" data-title="性能評価パターン">
+<!-- ====== SLIDE 17: Observe timing with SoftHSM ====== -->
+<section class="slide" data-title="SoftHSMで処理時間を見る">
   <span class="slide-num">17 / 19</span>
   <div class="slide-inner">
-    <span class="slide-tag">PART V — 性能評価</span>
-    <h2><span class="num">17</span>性能評価の構造</h2>
-    <p class="lead">毎回フル14ステップやってたら準備時間ばかり測ることに。<strong>準備と片付けは1回、本処理だけループ</strong>が原則。</p>
+    <span class="slide-tag">PART V — SoftHSMで動かす</span>
+    <h2><span class="num">17</span>処理時間の見方</h2>
+    <p class="lead">SoftHSM を入れれば、ハード無しで各操作にどれくらい時間がかかるか手元で確かめられる。<strong>準備と片付けは1回、本処理だけループ</strong>して時間を見るのがコツ。</p>
 
     <div class="phase">
       <div class="phase-label">準備</div>
       <div class="phase-body">
-        <div style="color: var(--ink); font-weight: 600; margin-bottom: 0.3rem;">測定対象外</div>
+        <div style="color: var(--ink); font-weight: 600; margin-bottom: 0.3rem;">時間を見る対象の外</div>
         <code>.soロード → C_GetFunctionList → C_Initialize → C_GetSlotList → C_OpenSession → C_Login → C_FindObjects...</code>
       </div>
     </div>
     <div class="flow-arrow">↓</div>
     <div class="phase">
-      <div class="phase-label">ウォーム<br>アップ</div>
+      <div class="phase-label">ならし<br>運転</div>
       <div class="phase-body">
-        <div style="color: var(--ink); font-weight: 600; margin-bottom: 0.3rem;">測定対象外（初回キャッシュミス対策）</div>
+        <div style="color: var(--ink); font-weight: 600; margin-bottom: 0.3rem;">対象の外（初回だけ遅くなる分を外す）</div>
         <code>for i in 1..100: C_SignInit + C_Sign（空打ち）</code>
       </div>
     </div>
     <div class="flow-arrow">↓</div>
     <div class="phase" style="border-color: var(--red); background: rgba(168, 58, 43, 0.03);">
-      <div class="phase-label" style="color: var(--red);">★計測</div>
+      <div class="phase-label" style="color: var(--red);">★ここを見る</div>
       <div class="phase-body">
-        <div style="color: var(--red); font-weight: 600; margin-bottom: 0.3rem;">この区間だけ測る</div>
-        <code>for i in 1..N: t0 = now()  →  C_SignInit + C_Sign  →  t1 = now()  →  latency[i] = t1 - t0</code>
+        <div style="color: var(--red); font-weight: 600; margin-bottom: 0.3rem;">この区間の時間だけ見る</div>
+        <code>for i in 1..N: t0 = now()  →  C_SignInit + C_Sign  →  t1 = now()  →  time[i] = t1 - t0</code>
       </div>
     </div>
     <div class="flow-arrow">↓</div>
     <div class="phase">
-      <div class="phase-label">集計</div>
+      <div class="phase-label">まとめ</div>
       <div class="phase-body">
-        <div style="color: var(--ink); font-weight: 600; margin-bottom: 0.3rem;">統計量を計算</div>
-        <code>平均、p50、p95、p99、max、min、スループット（ops/sec）</code>
+        <div style="color: var(--ink); font-weight: 600; margin-bottom: 0.3rem;">ざっくり見るだけでも十分</div>
+        <code>平均・最小・最大・1秒あたりの回数</code>
       </div>
     </div>
     <div class="flow-arrow">↓</div>
@@ -1089,12 +1089,12 @@ sign(key_handle, data)
 
     <div class="cols-2" style="margin-top: 1.5rem">
       <div class="card warn">
-        <div class="card-title">よくある測定の歪み</div>
+        <div class="card-title">よくあるズレの原因</div>
         <ul style="font-size:0.9rem">
-          <li>ウォームアップ忘れで初回TLS確立が混入</li>
-          <li>戻り値チェック忘れでエラー結果も計測</li>
+          <li>ならし運転を忘れて初回の遅い分が混ざる</li>
+          <li>戻り値チェック忘れでエラーの回も数えてしまう</li>
           <li><code>C_Sign</code>を呼ぶ前に<code>C_SignInit</code>を忘れる</li>
-          <li>鍵生成と署名を同じ枠で測る（外れ値が出る）</li>
+          <li>鍵生成と署名を同じ枠で見る（極端に遅い値が混ざる）</li>
         </ul>
       </div>
       <div class="card bordered-left">
@@ -1119,7 +1119,7 @@ sign(key_handle, data)
       <div>
         <ul>
           <li>HSMの本質 = 鍵を出さず、処理だけ請け負う</li>
-          <li>PKCS#11 = ベンダー非依存の標準API</li>
+          <li>PKCS#11 = 製品に依存しない標準API</li>
           <li>5つの基本概念（Slot/Token/Session/Object/Mechanism）</li>
           <li>ハンドル方式の意味</li>
         </ul>
@@ -1129,12 +1129,12 @@ sign(key_handle, data)
           <li>ライブラリ内部の4つの役割分担</li>
           <li>関数の命名規則と7カテゴリ</li>
           <li>3段ロケット構造（Init → 本処理 → Final）</li>
-          <li>性能評価の測定設計</li>
+          <li>SoftHSMで処理時間を見るときの段取り</li>
         </ul>
       </div>
     </div>
 
-    <h3 style="margin-top: 2rem"><span class="marker">▸</span>性能評価PoCの推奨ステップ</h3>
+    <h3 style="margin-top: 2rem"><span class="marker">▸</span>SoftHSMで動かすときの推奨ステップ</h3>
     <div style="margin-top: 1rem;">
       <div class="flow-step">
         <div class="num">01</div>
@@ -1146,29 +1146,29 @@ sign(key_handle, data)
       <div class="flow-step">
         <div class="num">02</div>
         <div>
-          <div><strong>計測対象Mechanismを絞る</strong></div>
-          <div class="desc">仕様書v3.2 第10章とベンダーマニュアルを照合し、実運用で使う方式だけ抽出</div>
+          <div><strong>見たいMechanismを絞る</strong></div>
+          <div class="desc">仕様書v3.2 第10章を見ながら、実際に使う方式だけ抽出</div>
         </div>
       </div>
       <div class="flow-step">
         <div class="num">03</div>
         <div>
-          <div><strong>シングルスレッドで基準値を取る</strong></div>
-          <div class="desc">レイテンシのp50/p95/p99分布をMechanism別に把握</div>
+          <div><strong>シングルスレッドで目安をつかむ</strong></div>
+          <div class="desc">1回あたりの時間の平均・最大をMechanism別に把握</div>
         </div>
       </div>
       <div class="flow-step">
         <div class="num">04</div>
         <div>
-          <div><strong>スレッド数を増やしてスケーラビリティ測定</strong></div>
-          <div class="desc">セッション数・並列度を段階的に増やしてスループットの上限を探る</div>
+          <div><strong>スレッド数を増やして様子を見る</strong></div>
+          <div class="desc">セッション数・並列度を段階的に増やし、1秒あたりの回数がどう変わるか見る</div>
         </div>
       </div>
       <div class="flow-step">
         <div class="num">05</div>
         <div>
-          <div><strong>HSM側のリソース上限を観察</strong></div>
-          <div class="desc">同時セッション数、Slot単位の並列度、ベンダー固有の制限を確認</div>
+          <div><strong>HSM側の上限を観察</strong></div>
+          <div class="desc">同時セッション数、Slot単位の並列度、製品ごとの制限を確認</div>
         </div>
       </div>
     </div>
@@ -1176,7 +1176,7 @@ sign(key_handle, data)
     <div class="card bordered-left" style="margin-top: 2rem">
       <div class="card-title">深堀りの選択肢</div>
       <ul>
-        <li><strong>A</strong> Mechanismの種類整理（RSA系/EC系/AES系の使い分けと性能特性）</li>
+        <li><strong>A</strong> Mechanismの種類整理（RSA系/EC系/AES系の使い分けと特徴）</li>
         <li><strong>B</strong> 属性の世界の深掘り（CKA_*の細部、セキュリティ的意味）</li>
         <li><strong>C</strong> マルチスレッド設計の細部（セッションプール、HSM上限の見抜き方）</li>
         <li><strong>D</strong> SoftHSM2のセットアップと実コード</li>
@@ -1226,7 +1226,7 @@ sign(key_handle, data)
         <li>
           <span class="ref-num">[4]</span>
           <span class="ref-title">PKCS #11 Specification Version 3.1</span>
-          <span class="ref-meta">OASIS Committee Specification 01. 11 August 2022. — 前バージョン（多くのベンダー実装が3.1ベース）</span>
+          <span class="ref-meta">OASIS Committee Specification 01. 11 August 2022. — 前バージョン（多くの実装が3.1ベース）</span>
           <a class="ref-url" href="https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/pkcs11-spec-v3.1.html" target="_blank" rel="noopener">docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/pkcs11-spec-v3.1.html</a>
         </li>
         <li>
@@ -1252,46 +1252,16 @@ sign(key_handle, data)
     </div>
 
     <div class="ref-section">
-      <div class="ref-section-title">▸ ベンダー実装ドキュメント（参考例）</div>
-      <ul class="ref-list">
-        <li>
-          <span class="ref-num">[7]</span>
-          <span class="ref-title">AWS CloudHSM — PKCS #11 library</span>
-          <span class="ref-meta">CloudHSM Client SDK 5の公式リファレンス。対応Mechanism、属性デフォルト値、ベンダー固有拡張</span>
-          <a class="ref-url" href="https://docs.aws.amazon.com/cloudhsm/latest/userguide/pkcs11-library.html" target="_blank" rel="noopener">docs.aws.amazon.com/cloudhsm/latest/userguide/pkcs11-library.html</a>
-        </li>
-        <li>
-          <span class="ref-num">[8]</span>
-          <span class="ref-title">AWS CloudHSM — Key attributes</span>
-          <span class="ref-meta">属性のデフォルト値とベンダー固有の挙動。<code>CKA_EXTRACTABLE</code>等の運用知見</span>
-          <a class="ref-url" href="https://docs.aws.amazon.com/cloudhsm/latest/userguide/pkcs11-attributes.html" target="_blank" rel="noopener">docs.aws.amazon.com/cloudhsm/latest/userguide/pkcs11-attributes.html</a>
-        </li>
-        <li>
-          <span class="ref-num">[9]</span>
-          <span class="ref-title">AWS CloudHSM PKCS#11 サンプルコード集</span>
-          <span class="ref-meta">署名・暗号化・鍵生成・鍵ラップの完全な動作サンプル（C言語）</span>
-          <a class="ref-url" href="https://github.com/aws-samples/aws-cloudhsm-pkcs11-examples" target="_blank" rel="noopener">github.com/aws-samples/aws-cloudhsm-pkcs11-examples</a>
-        </li>
-        <li>
-          <span class="ref-num">[10]</span>
-          <span class="ref-title">Thales Luna HSM — FIPS 140-3</span>
-          <span class="ref-meta">Luna Network / Luna PCIe HSM（FIPS 140-3 Level 3、NIST cert #4684）</span>
-          <a class="ref-url" href="https://cpl.thalesgroup.com/compliance/fips-140-3" target="_blank" rel="noopener">cpl.thalesgroup.com/compliance/fips-140-3</a>
-        </li>
-      </ul>
-    </div>
-
-    <div class="ref-section">
       <div class="ref-section-title">▸ 認証規格・関連標準 (NIST)</div>
       <ul class="ref-list">
         <li>
-          <span class="ref-num">[11]</span>
+          <span class="ref-num">[7]</span>
           <span class="ref-title">NIST Cryptographic Module Validation Program (CMVP)</span>
           <span class="ref-meta">FIPS 140-3に基づく暗号モジュール認証プログラム。HSM認証の一次情報源</span>
           <a class="ref-url" href="https://csrc.nist.gov/projects/cryptographic-module-validation-program" target="_blank" rel="noopener">csrc.nist.gov/projects/cryptographic-module-validation-program</a>
         </li>
         <li>
-          <span class="ref-num">[12]</span>
+          <span class="ref-num">[8]</span>
           <span class="ref-title">FIPS 140-3 Implementation Guidance</span>
           <span class="ref-meta">FIPS 140-3 / ISO/IEC 19790:2012 の実装ガイダンス（NIST + CCCS）</span>
           <a class="ref-url" href="https://csrc.nist.gov/projects/cryptographic-module-validation-program/fips-140-3-standards" target="_blank" rel="noopener">csrc.nist.gov/projects/cryptographic-module-validation-program/fips-140-3-standards</a>
@@ -1303,9 +1273,9 @@ sign(key_handle, data)
       <div class="ref-section-title">▸ プログラミング言語バインディング</div>
       <ul class="ref-list">
         <li>
-          <span class="ref-num">[13]</span>
+          <span class="ref-num">[9]</span>
           <span class="ref-title">cryptoki — Rust binding for PKCS#11</span>
-          <span class="ref-meta">PKCS#11のRustラッパー。ベンダーの<code>.so</code>をFFI経由で呼ぶ高レベルAPI</span>
+          <span class="ref-meta">PKCS#11のRustラッパー。提供元の<code>.so</code>をFFI経由で呼ぶ高レベルAPI</span>
           <a class="ref-url" href="https://crates.io/crates/cryptoki" target="_blank" rel="noopener">crates.io/crates/cryptoki</a><br>
           <a class="ref-url" href="https://docs.rs/cryptoki/" target="_blank" rel="noopener">docs.rs/cryptoki/</a>
         </li>
@@ -1314,7 +1284,7 @@ sign(key_handle, data)
 
     <div class="card bordered-left" style="margin-top: 2rem;">
       <div class="card-title">読み進めるときの推奨順</div>
-      <p style="font-size: 0.92rem;"><strong>[3] Usage Guide</strong> → 全体感をつかむ・流れの理解<br><strong>[1] Specification</strong> → 関数・型・Mechanism の正確な定義の引き当て<br><strong>[7]〜[9] ベンダー資料</strong> → 自分が使うHSMの方言と制約を確認<br><strong>[6] SoftHSM2</strong> → 手を動かして触る</p>
+      <p style="font-size: 0.92rem;"><strong>[3] Usage Guide</strong> → 全体感をつかむ・流れの理解<br><strong>[1] Specification</strong> → 関数・型・Mechanism の正確な定義の引き当て<br><strong>[6] SoftHSM2</strong> → 手を動かして触る・処理時間を見る<br><strong>[9] cryptoki</strong> → Rust から呼ぶときの高レベルAPI</p>
     </div>
 
     <div style="text-align: center; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--line);">
