@@ -45,7 +45,7 @@
     </p>
     <div class="title-meta">
       <strong>レイヤー</strong> : libloading 生FFI（cryptoki の裏側）<br>
-      <strong>対応</strong> : 第2部の3操作（乱数・署名・鍵生成）をそのまま実装<br>
+      <strong>対応</strong> : 操作フロー詳解の3操作（乱数・署名・鍵生成）をそのまま実装<br>
       <strong>構成</strong> : 設計案（構造・型・シグネチャ）→ 本編コード
     </div>
   </div>
@@ -185,7 +185,7 @@
   <div class="slide-inner">
     <span class="slide-tag design">PART 1 · 設計案</span>
     <h2><span class="num">04</span>ファイル構成案</h2>
-    <p class="lead">関心ごとに3層に分ける。<strong>FFI境界（unsafe）・ライフサイクル管理・操作実装</strong>。第2部の3操作は <code>ops/</code> に1ファイルずつ対応させる。</p>
+    <p class="lead">関心ごとに3層に分ける。<strong>FFI境界（unsafe）・ライフサイクル管理・操作実装</strong>。操作フロー詳解の3操作は <code>ops/</code> に1ファイルずつ対応させる。</p>
 
     <div class="tree">
 <span class="dir">pkcs11-raw/</span>
@@ -200,7 +200,7 @@
    │  ├─ <span class="file">types.rs</span>        <span class="note"># CK_RV, CK_MECHANISM 等の型 (slide 9)</span>
    │  ├─ <span class="file">function_list.rs</span> <span class="hl"># ★ CK_FUNCTION_LIST 構造体 (slide 10)</span>
    │  └─ <span class="file">constants.rs</span>    <span class="note"># CKM_*, CKA_*, CKR_* 定数 (slide 11)</span>
-   └─ <span class="dir">ops/</span>               <span class="note"># ── 第2部の3操作に対応 ──</span>
+   └─ <span class="dir">ops/</span>               <span class="note"># ── 操作フロー詳解の3操作に対応 ──</span>
       ├─ <span class="file">mod.rs</span>
       ├─ <span class="file">random.rs</span>       <span class="hl"># Ch1 乱数生成 (slide 15)</span>
       ├─ <span class="file">sign.rs</span>         <span class="hl"># Ch2 署名 (slide 16)</span>
@@ -218,7 +218,7 @@
       </div>
       <div class="card bordered-left" style="margin-top:0">
         <div class="card-title" style="font-size:0.95rem">第3層：操作</div>
-        <p style="font-size:0.88rem"><code>ops/</code>配下。乱数・署名・鍵生成を<strong>安全な公開API</strong>として提供。第2部のフローと1対1。</p>
+        <p style="font-size:0.88rem"><code>ops/</code>配下。乱数・署名・鍵生成を<strong>安全な公開API</strong>として提供。操作フロー詳解のフローと1対1。</p>
       </div>
     </div>
 
@@ -306,7 +306,7 @@
       <ul style="margin:0.4rem 0">
         <li><strong>unsafeの局所化</strong>：<code>ffi/</code> と <code>loader.rs</code> 以外に <code>unsafe</code> を書かせない</li>
         <li><strong>テスト容易性</strong>：<code>ops/</code> は <code>Session</code> さえあれば単体で扱える</li>
-        <li><strong>第2部との対応</strong>：<code>ops/{random,sign,keygen}.rs</code> がフロー図と1対1</li>
+        <li><strong>操作フロー詳解との対応</strong>：<code>ops/{random,sign,keygen}.rs</code> がフロー図と1対1</li>
       </ul>
     </div>
 
@@ -360,7 +360,7 @@
     <div class="card warn">
       <div class="card-title">設計上の決定事項</div>
       <ul style="margin:0.4rem 0">
-        <li><strong>命名はC流を維持</strong>：<code>CK_MECHANISM</code> 等を <code>#[allow(non_camel_case_types)]</code> でそのまま使う。仕様書と突き合わせやすくするため（第2部の図とも一致）</li>
+        <li><strong>命名はC流を維持</strong>：<code>CK_MECHANISM</code> 等を <code>#[allow(non_camel_case_types)]</code> でそのまま使う。仕様書と突き合わせやすくするため（操作フロー詳解の図とも一致）</li>
         <li><strong>関数ポインタは <code>Option&lt;unsafe extern "C" fn(...)&gt;</code></strong>：Cでは<code>NULL</code>になり得るため、<code>Option</code>でNULL安全に表現</li>
         <li><strong>ハンドルは透過的</strong>：<code>CK_SESSION_HANDLE</code> 等は単なる整数だが、newtypeで包むかは好み。今回は素直に整数のまま</li>
       </ul>
@@ -478,7 +478,7 @@ libloading = <span class="str">"0.8"</span></pre>
         <span class="filename">src/ops/mod.rs</span>
         <div class="code-block">
 <span class="code-lang">Rust</span><pre><span class="com">// 各操作は Session の impl を生やす形で実装</span>
-<span class="com">// （第2部 Ch1/Ch2/Ch3 に対応）</span>
+<span class="com">// （操作フロー詳解 Ch1/Ch2/Ch3 に対応）</span>
 <span class="kw">pub mod</span> random;
 <span class="kw">pub mod</span> sign;
 <span class="kw">pub mod</span> keygen;</pre>
@@ -515,8 +515,8 @@ libloading = <span class="str">"0.8"</span></pre>
 <span class="kw">pub type</span> <span class="ty">CK_RV</span>              = c_ulong;   <span class="com">// 戻り値コード</span>
 <span class="kw">pub type</span> <span class="ty">CK_FLAGS</span>           = c_ulong;
 <span class="kw">pub type</span> <span class="ty">CK_SLOT_ID</span>         = c_ulong;
-<span class="kw">pub type</span> <span class="ty">CK_SESSION_HANDLE</span>  = c_ulong;   <span class="com">// 第2部の「セッション」</span>
-<span class="kw">pub type</span> <span class="ty">CK_OBJECT_HANDLE</span>   = c_ulong;   <span class="com">// 第2部の「預かり証」=鍵ハンドル</span>
+<span class="kw">pub type</span> <span class="ty">CK_SESSION_HANDLE</span>  = c_ulong;   <span class="com">// 操作フロー詳解の「セッション」</span>
+<span class="kw">pub type</span> <span class="ty">CK_OBJECT_HANDLE</span>   = c_ulong;   <span class="com">// 操作フロー詳解の「預かり証」=鍵ハンドル</span>
 <span class="kw">pub type</span> <span class="ty">CK_USER_TYPE</span>       = c_ulong;
 <span class="kw">pub type</span> <span class="ty">CK_MECHANISM_TYPE</span>  = c_ulong;   <span class="com">// CKM_*</span>
 <span class="kw">pub type</span> <span class="ty">CK_ATTRIBUTE_TYPE</span>  = c_ulong;   <span class="com">// CKA_*</span>
@@ -639,14 +639,14 @@ libloading = <span class="str">"0.8"</span></pre>
   <div class="slide-inner">
     <span class="slide-tag impl">PART 2 · 本編コード</span>
     <h2><span class="num">11</span>ffi/constants.rs — 定数</h2>
-    <p class="lead">第2部で登場した <code>CKR_*</code>（戻り値）・<code>CKM_*</code>（メカニズム）・<code>CKA_*</code>（属性）・<code>CKF_*</code>（フラグ）を数値で定義。値はPKCS#11仕様で固定されている。</p>
+    <p class="lead">操作フロー詳解で登場した <code>CKR_*</code>（戻り値）・<code>CKM_*</code>（メカニズム）・<code>CKA_*</code>（属性）・<code>CKF_*</code>（フラグ）を数値で定義。値はPKCS#11仕様で固定されている。</p>
 
     <span class="filename">src/ffi/constants.rs</span>
     <div class="code-block">
 <span class="code-lang">Rust</span><pre><span class="attr-c">#![allow(dead_code)]</span>
 <span class="kw">use</span> <span class="kw">super</span>::types::{CK_ULONG, CK_FLAGS, CK_USER_TYPE};
 
-<span class="com">// ── 戻り値 CK_RV（第2部「結果フェーズ」で頻出）──</span>
+<span class="com">// ── 戻り値 CK_RV（操作フロー詳解「結果フェーズ」で頻出）──</span>
 <span class="kw">pub const</span> <span class="ty">CKR_OK</span>:                  <span class="ty">CK_ULONG</span> = <span class="num">0x0000_0000</span>;
 <span class="kw">pub const</span> <span class="ty">CKR_ARGUMENTS_BAD</span>:       <span class="ty">CK_ULONG</span> = <span class="num">0x0000_0007</span>;
 <span class="kw">pub const</span> <span class="ty">CKR_SESSION_HANDLE_INVALID</span>: <span class="ty">CK_ULONG</span> = <span class="num">0x0000_00B3</span>;
@@ -664,7 +664,7 @@ libloading = <span class="str">"0.8"</span></pre>
 <span class="kw">pub const</span> <span class="ty">CKM_SHA256_RSA_PKCS</span>:       <span class="ty">CK_ULONG</span> = <span class="num">0x0000_0040</span>;  <span class="com">// Ch2 署名</span>
 <span class="kw">pub const</span> <span class="ty">CKM_AES_KEY_GEN</span>:           <span class="ty">CK_ULONG</span> = <span class="num">0x0000_1080</span>;
 
-<span class="com">// ── 属性 CKA_*（鍵生成テンプレートのキー。第2部 Ch3 の図と一致）──</span>
+<span class="com">// ── 属性 CKA_*（鍵生成テンプレートのキー。操作フロー詳解 Ch3 の図と一致）──</span>
 <span class="kw">pub const</span> <span class="ty">CKA_CLASS</span>:           <span class="ty">CK_ULONG</span> = <span class="num">0x0000_0000</span>;
 <span class="kw">pub const</span> <span class="ty">CKA_TOKEN</span>:           <span class="ty">CK_ULONG</span> = <span class="num">0x0000_0001</span>;  <span class="com">// 永続化</span>
 <span class="kw">pub const</span> <span class="ty">CKA_PRIVATE</span>:         <span class="ty">CK_ULONG</span> = <span class="num">0x0000_0002</span>;
@@ -750,7 +750,7 @@ libloading = <span class="str">"0.8"</span></pre>
 
     <div class="card bordered-left">
       <div class="card-title">この変換が「安全な層」の入口</div>
-      <p style="font-size:0.92rem"><code>check(rv)?</code> と書けば、エラーコードが自動で <code>Error::Pkcs11</code> に化けて伝播する。第2部で挙げた <code>CKR_SESSION_HANDLE_INVALID</code> 等は、すべてこの <code>Error::Pkcs11(0x...)</code> に集約される。</p>
+      <p style="font-size:0.92rem"><code>check(rv)?</code> と書けば、エラーコードが自動で <code>Error::Pkcs11</code> に化けて伝播する。操作フロー詳解で挙げた <code>CKR_SESSION_HANDLE_INVALID</code> 等は、すべてこの <code>Error::Pkcs11(0x...)</code> に集約される。</p>
     </div>
 
     <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[1] PKCS#11 Spec v3.2 §5.1 (戻り値)</a><a href="#slide-19">[6] Rust API Guidelines (C-GOOD-ERR)</a></div>
@@ -836,7 +836,7 @@ libloading = <span class="str">"0.8"</span></pre>
   <div class="slide-inner">
     <span class="slide-tag impl">PART 2 · 本編コード</span>
     <h2><span class="num">14</span>session.rs — ライフサイクル管理</h2>
-    <p class="lead">第2部の14ステップ・ライフサイクルのうち、<strong>Initialize → OpenSession → Login → (操作) → CloseSession → Finalize</strong> を RAII で安全に包む。<code>Drop</code>で後始末を自動化。</p>
+    <p class="lead">操作フロー詳解の14ステップ・ライフサイクルのうち、<strong>Initialize → OpenSession → Login → (操作) → CloseSession → Finalize</strong> を RAII で安全に包む。<code>Drop</code>で後始末を自動化。</p>
 
     <span class="filename">src/session.rs</span>
     <div class="code-block">
@@ -847,7 +847,7 @@ libloading = <span class="str">"0.8"</span></pre>
 <span class="kw">use</span> <span class="kw">crate</span>::error::{check, require, <span class="ty">Error</span>};
 
 <span class="kw">impl</span> <span class="ty">Module</span> {
-    <span class="com">// ライブラリ全体の初期化（第2部 step: C_Initialize）</span>
+    <span class="com">// ライブラリ全体の初期化（操作フロー詳解 step: C_Initialize）</span>
     <span class="kw">pub fn</span> <span class="fn-name">initialize</span>(&<span class="kw">self</span>) -> <span class="ty">Result</span>&lt;(), <span class="ty">Error</span>&gt; {
         <span class="kw">let</span> f = <span class="fn-name">require</span>(<span class="kw">self</span>.<span class="fn-name">funcs</span>().C_Initialize, <span class="str">"C_Initialize"</span>)?;
         <span class="com">// pInitArgs は NULL でOK（シングルスレッド既定）</span>
@@ -866,7 +866,7 @@ libloading = <span class="str">"0.8"</span></pre>
         slots.<span class="fn-name">first</span>().<span class="fn-name">copied</span>().<span class="fn-name">ok_or</span>(<span class="ty">Error</span>::<span class="ty">Pkcs11</span>(<span class="num">0</span>))
     }
 
-    <span class="com">// セッションを開く（第2部 step: C_OpenSession）</span>
+    <span class="com">// セッションを開く（操作フロー詳解 step: C_OpenSession）</span>
     <span class="kw">pub fn</span> <span class="fn-name">open_session</span>(&<span class="kw">self</span>, slot: <span class="ty">CK_SLOT_ID</span>) -> <span class="ty">Result</span>&lt;<span class="ty">Session</span>, <span class="ty">Error</span>&gt; {
         <span class="kw">let</span> f = <span class="fn-name">require</span>(<span class="kw">self</span>.<span class="fn-name">funcs</span>().C_OpenSession, <span class="str">"C_OpenSession"</span>)?;
         <span class="kw">let mut</span> h: <span class="ty">CK_SESSION_HANDLE</span> = <span class="num">0</span>;
@@ -885,7 +885,7 @@ libloading = <span class="str">"0.8"</span></pre>
 }
 
 <span class="kw">impl</span> <span class="ty">Session</span>&lt;<span class="lt">'_</span>&gt; {
-    <span class="com">// ログイン（第2部 step: C_Login）</span>
+    <span class="com">// ログイン（操作フロー詳解 step: C_Login）</span>
     <span class="kw">pub fn</span> <span class="fn-name">login</span>(&<span class="kw">self</span>, pin: &<span class="ty">str</span>) -> <span class="ty">Result</span>&lt;(), <span class="ty">Error</span>&gt; {
         <span class="kw">let</span> f = <span class="fn-name">require</span>(<span class="kw">self</span>.module.<span class="fn-name">funcs</span>().C_Login, <span class="str">"C_Login"</span>)?;
         <span class="kw">let</span> pin_bytes = pin.<span class="fn-name">as_bytes</span>();
@@ -916,8 +916,8 @@ libloading = <span class="str">"0.8"</span></pre>
   <span class="slide-num">15 / 20</span>
   <div class="slide-inner">
     <span class="slide-tag impl">PART 2 · 本編コード</span>
-    <h2><span class="num">15</span>ops/random.rs <span class="map-badge">第2部 Ch1 対応</span></h2>
-    <p class="lead">第2部Chapter 1の乱数生成フローを生FFIで実装。<strong>Init/Finalなしの単発呼び出し</strong>。バッファをRust側で確保し、ポインタを渡すだけ。</p>
+    <h2><span class="num">15</span>ops/random.rs <span class="map-badge">操作フロー詳解 Ch1 対応</span></h2>
+    <p class="lead">操作フロー詳解Chapter 1の乱数生成フローを生FFIで実装。<strong>Init/Finalなしの単発呼び出し</strong>。バッファをRust側で確保し、ポインタを渡すだけ。</p>
 
     <span class="filename">src/ops/random.rs</span>
     <div class="code-block">
@@ -926,7 +926,7 @@ libloading = <span class="str">"0.8"</span></pre>
 <span class="kw">use</span> <span class="kw">crate</span>::error::{check, require, <span class="ty">Error</span>};
 
 <span class="kw">impl</span> <span class="ty">Session</span>&lt;<span class="lt">'_</span>&gt; {
-    <span class="com">/// 乱数生成（第2部 Ch1）。C_GenerateRandom を1回呼ぶだけ。</span>
+    <span class="com">/// 乱数生成（操作フロー詳解 Ch1）。C_GenerateRandom を1回呼ぶだけ。</span>
     <span class="kw">pub fn</span> <span class="fn-name">generate_random</span>(&<span class="kw">self</span>, len: <span class="ty">usize</span>) -> <span class="ty">Result</span>&lt;<span class="ty">Vec</span>&lt;<span class="ty">u8</span>&gt;, <span class="ty">Error</span>&gt; {
         <span class="com">// (準備) 出力バッファを Rust 側で確保</span>
         <span class="kw">let mut</span> buf = <span class="fn-name">vec!</span>[<span class="num">0u8</span>; len];
@@ -952,7 +952,7 @@ libloading = <span class="str">"0.8"</span></pre>
 
     <div class="cols-2">
       <div class="card bordered-left">
-        <div class="card-title">第2部フローとの対応</div>
+        <div class="card-title">操作フロー詳解フローとの対応</div>
         <ul style="font-size:0.9rem; margin:0.3rem 0">
           <li><span class="step-badge">準備</span><code>vec![0u8; len]</code> でバッファ確保</li>
           <li><span class="step-badge">実行</span><code>f(handle, ptr, len)</code> でHSMのTRNG呼び出し</li>
@@ -974,8 +974,8 @@ libloading = <span class="str">"0.8"</span></pre>
   <span class="slide-num">16 / 20</span>
   <div class="slide-inner">
     <span class="slide-tag impl">PART 2 · 本編コード</span>
-    <h2><span class="num">16</span>ops/sign.rs <span class="map-badge">第2部 Ch2 対応</span></h2>
-    <p class="lead">第2部Chapter 2の署名フローを実装。<strong>C_SignInit → C_Sign の2段</strong>。さらに<strong>2-call convention</strong>（署名長を先に問い合わせ）も再現する。</p>
+    <h2><span class="num">16</span>ops/sign.rs <span class="map-badge">操作フロー詳解 Ch2 対応</span></h2>
+    <p class="lead">操作フロー詳解Chapter 2の署名フローを実装。<strong>C_SignInit → C_Sign の2段</strong>。さらに<strong>2-call convention</strong>（署名長を先に問い合わせ）も再現する。</p>
 
     <span class="filename">src/ops/sign.rs</span>
     <div class="code-block">
@@ -985,7 +985,7 @@ libloading = <span class="str">"0.8"</span></pre>
 <span class="kw">use</span> <span class="kw">crate</span>::error::{check, require, <span class="ty">Error</span>};
 
 <span class="kw">impl</span> <span class="ty">Session</span>&lt;<span class="lt">'_</span>&gt; {
-    <span class="com">/// 署名（第2部 Ch2）。SignInit → Sign(長さ取得) → Sign(本番) の流れ。</span>
+    <span class="com">/// 署名（操作フロー詳解 Ch2）。SignInit → Sign(長さ取得) → Sign(本番) の流れ。</span>
     <span class="kw">pub fn</span> <span class="fn-name">sign</span>(
         &<span class="kw">self</span>,
         mech: <span class="ty">CK_MECHANISM_TYPE</span>,
@@ -1026,14 +1026,14 @@ libloading = <span class="str">"0.8"</span></pre>
         <span class="com">// HSMが返した実際の長さに切り詰める</span>
         sig.<span class="fn-name">truncate</span>(sig_len <span class="kw">as</span> <span class="ty">usize</span>);
         <span class="ty">Ok</span>(sig)
-        <span class="com">// ※ C_Sign 完了でセッション状態は自動リセット（第2部参照）</span>
+        <span class="com">// ※ C_Sign 完了でセッション状態は自動リセット（操作フロー詳解参照）</span>
     }
 }</pre>
     </div>
 
     <div class="card warn">
       <div class="card-title">2-call convention を省略する場合</div>
-      <p style="font-size:0.92rem">RSA-2048なら署名長は常に256バイトと分かっているので、1回目を省いて固定サイズバッファで呼んでも動く。ただし<strong>鍵長やメカニズムが可変なら2回呼びが安全</strong>。第2部で触れた通り。</p>
+      <p style="font-size:0.92rem">RSA-2048なら署名長は常に256バイトと分かっているので、1回目を省いて固定サイズバッファで呼んでも動く。ただし<strong>鍵長やメカニズムが可変なら2回呼びが安全</strong>。操作フロー詳解で触れた通り。</p>
     </div>
 
     <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[1] PKCS#11 Spec v3.2 §5.13.1-5.13.2</a></div>
@@ -1045,8 +1045,8 @@ libloading = <span class="str">"0.8"</span></pre>
   <span class="slide-num">17 / 20</span>
   <div class="slide-inner">
     <span class="slide-tag impl">PART 2 · 本編コード</span>
-    <h2><span class="num">17</span>ops/keygen.rs <span class="map-badge">第2部 Ch3 対応</span></h2>
-    <p class="lead">第2部Chapter 3の鍵生成フローを実装。<strong>属性テンプレート配列を組んで C_GenerateKeyPair に渡す</strong>。slide 15（第2部）の公開鍵/秘密鍵テンプレート図がそのままコードになる。</p>
+    <h2><span class="num">17</span>ops/keygen.rs <span class="map-badge">操作フロー詳解 Ch3 対応</span></h2>
+    <p class="lead">操作フロー詳解Chapter 3の鍵生成フローを実装。<strong>属性テンプレート配列を組んで C_GenerateKeyPair に渡す</strong>。slide 15（操作フロー詳解）の公開鍵/秘密鍵テンプレート図がそのままコードになる。</p>
 
     <span class="filename">src/ops/keygen.rs</span>
     <div class="code-block">
@@ -1063,7 +1063,7 @@ libloading = <span class="str">"0.8"</span></pre>
 }
 
 <span class="kw">impl</span> <span class="ty">Session</span>&lt;<span class="lt">'_</span>&gt; {
-    <span class="com">/// RSA鍵ペア生成（第2部 Ch3）。(公開鍵ハンドル, 秘密鍵ハンドル) を返す。</span>
+    <span class="com">/// RSA鍵ペア生成（操作フロー詳解 Ch3）。(公開鍵ハンドル, 秘密鍵ハンドル) を返す。</span>
     <span class="kw">pub fn</span> <span class="fn-name">generate_rsa_keypair</span>(
         &<span class="kw">self</span>,
         modulus_bits: <span class="ty">CK_ULONG</span>,
@@ -1082,7 +1082,7 @@ libloading = <span class="str">"0.8"</span></pre>
         <span class="kw">let mut</span> no  = <span class="ty">CK_FALSE</span>;
         <span class="kw">let</span> b = |p: &<span class="kw">mut</span> <span class="ty">u8</span>| p <span class="kw">as</span> <span class="kw">*mut</span> _ <span class="kw">as</span> <span class="kw">*mut</span> c_void;
 
-        <span class="com">// (準備3) 公開鍵テンプレート（第2部 slide15 左側）</span>
+        <span class="com">// (準備3) 公開鍵テンプレート（操作フロー詳解 slide15 左側）</span>
         <span class="kw">let mut</span> pub_tpl = [
             <span class="fn-name">attr</span>(<span class="ty">CKA_TOKEN</span>,           <span class="fn-name">b</span>(&<span class="kw">mut</span> yes), <span class="num">1</span>),
             <span class="fn-name">attr</span>(<span class="ty">CKA_MODULUS_BITS</span>,    &<span class="kw">mut</span> bits <span class="kw">as</span> <span class="kw">*mut</span> _ <span class="kw">as</span> <span class="kw">*mut</span> c_void,
@@ -1091,7 +1091,7 @@ libloading = <span class="str">"0.8"</span></pre>
             <span class="fn-name">attr</span>(<span class="ty">CKA_VERIFY</span>,          <span class="fn-name">b</span>(&<span class="kw">mut</span> yes), <span class="num">1</span>),
         ];
 
-        <span class="com">// (準備4) 秘密鍵テンプレート（第2部 slide15 右側。★が要）</span>
+        <span class="com">// (準備4) 秘密鍵テンプレート（操作フロー詳解 slide15 右側。★が要）</span>
         <span class="kw">let mut</span> priv_tpl = [
             <span class="fn-name">attr</span>(<span class="ty">CKA_TOKEN</span>,       <span class="fn-name">b</span>(&<span class="kw">mut</span> yes), <span class="num">1</span>),
             <span class="fn-name">attr</span>(<span class="ty">CKA_PRIVATE</span>,     <span class="fn-name">b</span>(&<span class="kw">mut</span> yes), <span class="num">1</span>),
@@ -1129,7 +1129,7 @@ libloading = <span class="str">"0.8"</span></pre>
   <div class="slide-inner">
     <span class="slide-tag impl">PART 2 · 本編コード</span>
     <h2><span class="num">18</span>main.rs — 全体配線</h2>
-    <p class="lead">全部つなぐ。<strong>ロード → 初期化 → スロット選択 → セッション → ログイン → 3操作</strong>。第2部の14ステップ・ライフサイクルが、ここで1本の流れになる。</p>
+    <p class="lead">全部つなぐ。<strong>ロード → 初期化 → スロット選択 → セッション → ログイン → 3操作</strong>。操作フロー詳解の14ステップ・ライフサイクルが、ここで1本の流れになる。</p>
 
     <span class="filename">src/main.rs</span>
     <div class="code-block">
@@ -1162,7 +1162,7 @@ libloading = <span class="str">"0.8"</span></pre>
     <span class="kw">let</span> session = module.<span class="fn-name">open_session</span>(slot)?;
     session.<span class="fn-name">login</span>(<span class="str">"1234"</span>)?;
 
-    <span class="com">// ───── 第2部の3操作を実行 ─────</span>
+    <span class="com">// ───── 操作フロー詳解の3操作を実行 ─────</span>
 
     <span class="com">// Ch1: 乱数生成</span>
     <span class="kw">let</span> random = session.<span class="fn-name">generate_random</span>(<span class="num">32</span>)?;
@@ -1237,8 +1237,8 @@ signature: <span class="num">256</span> bytes</pre>
     </div>
 
     <div class="card bordered-left">
-      <div class="card-title">第2部（処理時間を見る）との接続</div>
-      <p style="font-size:0.92rem">処理時間を見たいなら、この<code>ops/</code>の各関数を<code>std::time::Instant</code>で挟むだけ。ただし第2部で述べた通り、<strong>鍵生成は署名と時間スケールが違うので分けて見る</strong>・<strong>ならし運転を入れる</strong>のを忘れずに。生FFIなら計りものの上乗せが最小なのも利点。</p>
+      <div class="card-title">操作フロー詳解（処理時間を見る）との接続</div>
+      <p style="font-size:0.92rem">処理時間を見たいなら、この<code>ops/</code>の各関数を<code>std::time::Instant</code>で挟むだけ。ただし操作フロー詳解で述べた通り、<strong>鍵生成は署名と時間スケールが違うので分けて見る</strong>・<strong>ならし運転を入れる</strong>のを忘れずに。生FFIなら計りものの上乗せが最小なのも利点。</p>
     </div>
 
     <div class="sources"><span class="src-label">出典：</span><a href="#slide-19">[3] libloading docs</a><a href="#slide-19">[5] cryptoki-sys</a><a href="#slide-19">[7] Rustonomicon (FFI/repr)</a></div>
@@ -1326,7 +1326,7 @@ signature: <span class="num">256</span> bytes</pre>
           </ul>
         </div>
         <div class="card rust-accent" style="margin-top:1rem">
-          <p style="font-size:0.86rem; margin:0">本シリーズ全3部：<strong>入門</strong> → <strong>操作フロー詳解</strong> → <strong>生FFI実装</strong>。本書のコードは第2部の3操作（乱数・署名・鍵生成）に1対1対応。</p>
+          <p style="font-size:0.86rem; margin:0">本シリーズ全3部：<strong>入門</strong> → <strong>操作フロー詳解</strong> → <strong>生FFI実装</strong>。本書のコードは操作フロー詳解の3操作（乱数・署名・鍵生成）に1対1対応。</p>
         </div>
       </div>
     </div>

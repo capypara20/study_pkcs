@@ -122,6 +122,9 @@
 );</pre>
         </div>
         <p style="font-size:0.88rem">引数は3つだけ。<strong>セッション・出力バッファ・サイズ</strong>。鍵もメカニズムも不要。</p>
+        <div class="code-block rust" style="margin-top:0.6rem">
+<span class="code-lang">Rust (cryptoki) ではこう書く</span><pre><span class="kw">let</span> buf = session.<span class="fn-name">generate_random_vec</span>(<span class="num">32</span>)?;</pre>
+        </div>
       </div>
       <div>
         <h3><span class="marker">▸</span>使われる用途</h3>
@@ -468,6 +471,10 @@ elapsed_ns = t1 - t0;</pre>
           <li><code>pSignature</code> — 署名結果を書き込むバッファ</li>
           <li><code>pulSignatureLen</code> — <strong>入出力兼用</strong>：バッファサイズ／実際の署名長</li>
         </ul>
+        <div class="code-block rust" style="margin-top:0.6rem">
+<span class="code-lang">Rust (cryptoki) ではこう書く</span><pre><span class="com">// Init と本体が 1 メソッドに合体する</span>
+<span class="kw">let</span> sig = session.<span class="fn-name">sign</span>(&amp;mech, priv_key, data)?;</pre>
+        </div>
       </div>
     </div>
 
@@ -1004,6 +1011,10 @@ t1 = <span class="fn-name">now</span>();
   <span class="ty">CK_OBJECT_HANDLE_PTR</span> phPubKey,
   <span class="ty">CK_OBJECT_HANDLE_PTR</span> phPrivKey
 );</pre>
+        </div>
+        <div class="code-block rust" style="margin-top:0.6rem">
+<span class="code-lang">Rust (cryptoki) ではこう書く</span><pre><span class="kw">let</span> (pubk, privk) = session.<span class="fn-name">generate_key_pair</span>(
+    &amp;mech, &amp;pub_t, &amp;priv_t)?;</pre>
         </div>
       </div>
       <div>

@@ -47,12 +47,12 @@
     <div class="title-line"></div>
     <p class="subtitle">概念 → コードの地図 → 使い方<br>SoftHSM2 などを cryptoki クレートで操作する「機能別セット」</p>
     <div class="title-meta">
-      <strong>対象</strong> : 生 FFI 学習(doc 03)を終え、実用的に書きたい人<br>
+      <strong>対象</strong> : 生 FFI 学習(doc 07)を終え、実用的に書きたい人<br>
       <strong>到達点</strong> : <code>src/</code> のどのファイルが何をするか分かる<br>
       <strong>前提</strong> : cryptoki 0.10 / edition 2024
     </div>
     <div class="card accent-left" style="margin-top:2rem;">
-      <p style="margin:0;">既存の <code>src/main.rs</code> は「生 FFI で C API を手で叩く学習用」(doc 03)。
+      <p style="margin:0;">既存の <code>src/main.rs</code> は「生 FFI で C API を手で叩く学習用」(doc 07)。
       こちらは「<strong>cryptoki クレートで実用的に書く版</strong>」。狙いが違う2本立て。</p>
     </div>
   </div>
@@ -121,7 +121,7 @@
     <div class="card accent-left">
       <div class="card-title">Drop で後始末が自動になる仕組み（RAII）</div>
       <p style="margin:0;">Rust では値がスコープを抜けると <code>Drop</code> が呼ばれる。cryptoki は <code>Session</code> の Drop で <code>C_Logout</code>＋<code>C_CloseSession</code>、<code>Pkcs11</code> の Drop で <code>C_Finalize</code> を自動で呼ぶ。
-      生 FFI(doc 03)では閉じ忘れ・二重解放が起きやすかったが、ここでは<strong>「開いたら閉じる」を型とスコープが保証</strong>してくれる。だから本体コードは下のように短くなる。</p>
+      生 FFI(doc 07)では閉じ忘れ・二重解放が起きやすかったが、ここでは<strong>「開いたら閉じる」を型とスコープが保証</strong>してくれる。だから本体コードは下のように短くなる。</p>
     </div>
 
     <h3>実際のコードの骨格（最小例）</h3>
@@ -239,7 +239,7 @@ get_slot_info()    → hardware_version  // ③ ハード版
 └── <span class="dir">bin/</span>
     └── <span class="hl">hsm.rs</span>        <span class="note">CLI 本体（サブコマンドで上記を呼び分け）</span></div>
     <p>ほぼ全コマンドは <code>cargo run --bin hsm -- help</code> で一覧表示。
-    各関数の C API 対応は <a class="ref-url" href="05.PKCS11-関数リファレンス.html">doc/05 関数リファレンス</a> を参照。</p>
+    各関数の C API 対応は <a class="ref-url" href="04.PKCS11-関数リファレンス.html">doc/04 関数リファレンス</a> を参照。</p>
     <p><strong>「署名したい → <code>ops/sign.rs</code>」「RSA 生成 → <code>ops/keygen.rs::rsa</code>」「取得系 → <code>ops/info.rs</code>」</strong>という対応で目的のコードにすぐ飛べる。</p>
   </div>
 </section>
@@ -263,7 +263,7 @@ get_slot_info()    → hardware_version  // ③ ハード版
     <div class="card accent-left">
       <div class="card-title">署名メカニズムの方針</div>
       <p style="margin:0;">本プログラムの RSA 署名は <code>Sha256RsaPkcs</code>（PKCS#1 v1.5）を採用。SoftHSM 等での確実な動作と学習簡略化のためで、
-      新規設計では <code>RsaPkcsPss</code>（PSS, 現代の推奨）が望ましい点は doc/01 §10 の通り。</p>
+      新規設計では <code>RsaPkcsPss</code>（PSS, 現代の推奨）が望ましい点は doc/02 §10 の通り。</p>
     </div>
   </div>
 </section>
@@ -343,10 +343,10 @@ Mechanisms: RsaPkcsKeyPairGen, EcKeyPairGen, Sha256RsaPkcs, ...</pre></div>
     <div class="card accent-left">
       <div class="card-title">関連ドキュメント</div>
       <p style="margin:0;">
-        <a class="ref-url" href="05.PKCS11-関数リファレンス.html">05 関数リファレンス</a> ／
+        <a class="ref-url" href="04.PKCS11-関数リファレンス.html">04 関数リファレンス</a> ／
         <a class="ref-url" href="06.鍵生成の詳解.html">06 鍵生成の詳解</a> ／
-        <a class="ref-url" href="07.ユーザ認証と情報取得.html">07 ユーザ認証と情報取得</a> ／
-        <a class="ref-url" href="08.用語・略語集.html">08 用語・略語集</a>
+        <a class="ref-url" href="03.ユーザ認証と情報取得.html">03 ユーザ認証と情報取得</a> ／
+        <a class="ref-url" href="01.用語・略語集.html">01 用語・略語集</a>
       </p>
     </div>
   </div>

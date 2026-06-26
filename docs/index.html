@@ -33,24 +33,29 @@
   <div class="home-head">
     <div class="title-mark">HSM × PKCS#11 · Documentation</div>
     <h1>HSM と <span class="accent">PKCS#11</span> 学習ドキュメント</h1>
-    <p>PKCS#11 と HSM の基礎を、銀行金庫のたとえで段階的に学ぶ資料集。
-    SoftHSM を使って手元で動かしながら、概念 → 操作フロー → 実装 → リファレンスの順に読める。</p>
+    <p>PKCS#11 と HSM を、銀行金庫のたとえで上流から下流へ段階的に学ぶ資料集。
+    用語 → 基礎概念 → 認証/情報取得 → 関数 → 操作フロー → 鍵生成 → Rust 実装の順で、だんだん細かく深くなる。
+    SoftHSM を使えば手元で動かしながら読める。</p>
   </div>
 
-  <div class="sec-label">Part 1 — 概念と操作（スライド）</div>
+  <div class="sec-label">Part 1 — 基礎（言葉と概念）</div>
   <div class="doc-grid">
-    <a class="doc-card" href="01.PKCS11-HSM入門.html"><div class="n">01</div><div class="t">PKCS#11 / HSM 入門</div><p class="d">Slot/Token/Session/Object/Attribute/Mechanism の基礎概念とライブラリ内部の地図</p></a>
-    <a class="doc-card" href="02.PKCS11-操作フロー詳解.html"><div class="n">02</div><div class="t">操作フロー詳解</div><p class="d">乱数・署名・鍵生成を「準備→実行→結果→確認」の5フェーズで深掘り</p></a>
-    <a class="doc-card" href="03.PKCS11-Rust生FFI実装.html"><div class="n">03</div><div class="t">Rust 生 FFI 実装</div><p class="d">libloading で .so を動的ロードし、C_GetFunctionList から関数ポインタを叩く</p></a>
+    <a class="doc-card" href="01.用語・略語集.html"><div class="n">01</div><div class="t">用語・略語集</div><p class="d">HSM/OID/DER/ECDH/RO/RW/CK* 接頭辞などの早見表。まず言葉に慣れる</p></a>
+    <a class="doc-card" href="02.PKCS11-HSM入門.html"><div class="n">02</div><div class="t">PKCS#11 / HSM 入門</div><p class="d">Slot/Token/Session/Object/Attribute/Mechanism の基礎概念とライブラリ内部の地図</p></a>
+    <a class="doc-card" href="03.ユーザ認証と情報取得.html"><div class="n">03</div><div class="t">ユーザ認証と情報取得</div><p class="d">User/SO・PIN・RO/RW・セッション5状態と情報取得系の各フィールド</p></a>
   </div>
 
-  <div class="sec-label">Part 2 — 実装とリファレンス</div>
+  <div class="sec-label">Part 2 — 関数と操作</div>
   <div class="doc-grid">
-    <a class="doc-card" href="04.cryptoki-セットプログラム解説.html"><div class="n">04</div><div class="t">cryptoki セットプログラム解説</div><p class="d">cryptoki 版の設計・C API 対応・ファイル構成・使い方</p></a>
-    <a class="doc-card" href="05.PKCS11-関数リファレンス.html"><div class="n">05</div><div class="t">関数リファレンス</div><p class="d">2.40 の 68 関数 ＋ 3.0/3.2 追加分の早見表（cryptoki 対応状況つき）</p></a>
+    <a class="doc-card" href="04.PKCS11-関数リファレンス.html"><div class="n">04</div><div class="t">関数リファレンス</div><p class="d">2.40 の 68 関数 ＋ 3.0/3.2 追加分の早見表（cryptoki 対応状況つき）</p></a>
+    <a class="doc-card" href="05.PKCS11-操作フロー詳解.html"><div class="n">05</div><div class="t">操作フロー詳解</div><p class="d">乱数・署名・鍵生成を「準備→実行→結果→確認」の5フェーズで深掘り（C と Rust の両方）</p></a>
     <a class="doc-card" href="06.鍵生成の詳解.html"><div class="n">06</div><div class="t">鍵生成の詳解</div><p class="d">属性の意味と RSA/EC/Ed25519/X25519/AES/HMAC の作り方・鍵→署名の対応</p></a>
-    <a class="doc-card" href="07.ユーザ認証と情報取得.html"><div class="n">07</div><div class="t">ユーザ認証と情報取得</div><p class="d">User/SO・PIN・RO/RW・セッション5状態と情報取得系の各フィールド</p></a>
-    <a class="doc-card" href="08.用語・略語集.html"><div class="n">08</div><div class="t">用語・略語集</div><p class="d">HSM/OID/DER/ECDH/RO/RW/CK* 接頭辞などの早見表</p></a>
+  </div>
+
+  <div class="sec-label">Part 3 — Rust 実装（仕組みの深掘り）</div>
+  <div class="doc-grid">
+    <a class="doc-card" href="07.PKCS11-Rust生FFI実装.html"><div class="n">07</div><div class="t">Rust 生 FFI 実装</div><p class="d">libloading で .so を動的ロードし、C_GetFunctionList から関数ポインタを叩く最下層</p></a>
+    <a class="doc-card" href="08.cryptoki-セットプログラム解説.html"><div class="n">08</div><div class="t">cryptoki セットプログラム解説</div><p class="d">cryptoki 版の設計・C API 対応・ファイル構成・使い方（実用的に書く版）</p></a>
   </div>
 
   <div style="text-align:center; margin-top:3rem; padding-top:1.5rem; border-top:1px solid var(--line);">
