@@ -9,9 +9,9 @@ SoftHSM2 の `.so` を動的ロードし、HSM の操作フローをコードで
 
 | ファイル | 内容 |
 |---|---|
-| [doc/01.PKCS11-HSM入門.html](doc/01.PKCS11-HSM入門.html) | HSM・PKCS#11 の基礎概念 (Slot/Token/Session/Object/Attribute/Mechanism) |
-| [doc/02.PKCS11-操作フロー詳解.html](doc/02.PKCS11-操作フロー詳解.html) | 乱数生成・署名・鍵生成の 3段ロケット操作フロー |
-| [doc/03.PKCS11-Rust生FFI実装.html](doc/03.PKCS11-Rust生FFI実装.html) | Rust モジュール構成・型マッピング・FFI 落とし穴 |
+| [docs/02.PKCS11-HSM入門.html](docs/02.PKCS11-HSM入門.html) | HSM・PKCS#11 の基礎概念 (Slot/Token/Session/Object/Attribute/Mechanism) |
+| [docs/05.PKCS11-操作フロー詳解.html](docs/05.PKCS11-操作フロー詳解.html) | 乱数生成・署名・鍵生成の 3段ロケット操作フロー |
+| [docs/07.PKCS11-Rust生FFI実装.html](docs/07.PKCS11-Rust生FFI実装.html) | Rust モジュール構成・型マッピング・FFI 落とし穴 |
 
 コードを書く前に必ずドキュメントを参照すること。
 
@@ -36,7 +36,7 @@ Rust edition **2024** を使用。
 
 ## プロジェクト構成（目標）
 
-[doc/03](doc/03.PKCS11-Rust生FFI実装.html) のモジュール設計に従うこと。
+[docs/07](docs/07.PKCS11-Rust生FFI実装.html) のモジュール設計に従うこと。
 
 ```
 src/

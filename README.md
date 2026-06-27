@@ -18,16 +18,18 @@ cargo run --bin hsm -- help     # cryptoki セットプログラム
 
 🌐 **Web 版（GitHub Pages）**: <https://capypara20.github.io/study_pkcs/>
 
+上流から下流へ、粒度がだんだん細かく深くなる順（**用語 → 基礎概念 → 認証/情報 → 関数 → 操作フロー → 鍵生成 → Rust 実装**）。
+
 | ファイル | 内容 |
 |---|---|
-| [docs/01.PKCS11-HSM入門.html](docs/01.PKCS11-HSM入門.html) | 基礎概念（Slot/Token/Session/Object/Attribute/Mechanism） |
-| [docs/02.PKCS11-操作フロー詳解.html](docs/02.PKCS11-操作フロー詳解.html) | 乱数・署名・鍵生成の 3 段ロケット |
-| [docs/03.PKCS11-Rust生FFI実装.html](docs/03.PKCS11-Rust生FFI実装.html) | 生 FFI 実装・型マッピング |
-| [docs/04.cryptoki-セットプログラム解説.html](docs/04.cryptoki-セットプログラム解説.html) | cryptoki 版の設計・C API 対応・使い方 |
-| [docs/05.PKCS11-関数リファレンス.html](docs/05.PKCS11-関数リファレンス.html) | **全関数の早見表**（2.40 の 68 関数 ＋ 3.0/3.2 追加分・実装状況つき） |
+| [docs/01.用語・略語集.html](docs/01.用語・略語集.html) | **略語・用語の早見表**（HSM/OID/DER/ECDH/RO/RW/CK* 接頭辞 など）。まず言葉に慣れる |
+| [docs/02.PKCS11-HSM入門.html](docs/02.PKCS11-HSM入門.html) | 基礎概念（Slot/Token/Session/Object/Attribute/Mechanism） |
+| [docs/03.ユーザ認証と情報取得.html](docs/03.ユーザ認証と情報取得.html) | **User/SO・PIN・RO/RW・セッション状態**と**情報取得系**（各フィールドの意味） |
+| [docs/04.PKCS11-関数リファレンス.html](docs/04.PKCS11-関数リファレンス.html) | **全関数の早見表**（2.40 の 68 関数 ＋ 3.0/3.2 追加分・cryptoki 対応状況つき） |
+| [docs/05.PKCS11-操作フロー詳解.html](docs/05.PKCS11-操作フロー詳解.html) | 乱数・署名・鍵生成の 3 段ロケット（C と Rust の両方） |
 | [docs/06.鍵生成の詳解.html](docs/06.鍵生成の詳解.html) | **鍵生成の深掘り**（属性の意味・RSA/EC/Ed25519/X25519/AES/HMAC の作り方・鍵→署名の対応） |
-| [docs/07.ユーザ認証と情報取得.html](docs/07.ユーザ認証と情報取得.html) | **User/SO・PIN・RO/RW・セッション状態**と**情報取得系**（各フィールドの意味） |
-| [docs/08.用語・略語集.html](docs/08.用語・略語集.html) | **略語・用語の早見表**（HSM/OID/DER/ECDH/RO/RW/CK* 接頭辞 など） |
+| [docs/07.PKCS11-Rust生FFI実装.html](docs/07.PKCS11-Rust生FFI実装.html) | 生 FFI 実装・型マッピング |
+| [docs/08.cryptoki-セットプログラム解説.html](docs/08.cryptoki-セットプログラム解説.html) | cryptoki 版の設計・C API 対応・使い方 |
 
 ---
 
@@ -115,7 +117,7 @@ softhsm2-util --init-token --slot 0 --label "test" --so-pin 1234 --pin 1234
 
 **`cryptoki` 0.10 がラッパーを提供する関数はほぼ全て実装済み。**
 未実装で残るのは「cryptoki がそもそも安全ラッパーを用意していない関数」だけ（＝生 FFI でしか呼べない）。
-関数ごとの詳細は [docs/05](docs/05.PKCS11-関数リファレンス.html) を参照。
+関数ごとの詳細は [docs/04](docs/04.PKCS11-関数リファレンス.html) を参照。
 
 | カテゴリ | 実装済み | 未実装（cryptoki 0.10 にラッパー無し） |
 |---|---|---|
@@ -129,7 +131,7 @@ softhsm2-util --init-token --slot 0 --label "test" --so-pin 1234 --pin 1234
 | 暗号/復号 | `C_Encrypt(Init)` `C_Decrypt(Init)` `C_*Update` `C_*Final` | — |
 | ダイジェスト | `C_Digest(Init)` `C_DigestUpdate` `C_DigestFinal` `C_DigestKey` | — |
 | 乱数 | `C_GenerateRandom` `C_SeedRandom` | — |
-| 複合操作 | — | `C_DigestEncryptUpdate` 他 4 種（旧式・性能最適化用） |
+| 複合操作 | — | `C_DigestEncryptUpdate` 他 4 種（旧式・2処理を1パスでまとめる用） |
 
 > 未実装の `*Recover` / `*OperationState` / 複合操作 / `GetFunctionStatus` / `CancelFunction` / `GetObjectSize` /
 > `CloseAllSessions` は、cryptoki 0.10 に安全ラッパーが無いもの。必要なら `src/main.rs` 側の生 FFI 方式で叩く。

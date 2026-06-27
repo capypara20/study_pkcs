@@ -5,7 +5,7 @@ applyTo: "src/**/*.rs"
 # PKCS#11 Rust 生 FFI — コーディング規約
 
 このプロジェクトは PKCS#11 を Rust 生 FFI で一から実装して学ぶ。
-コードを書く前に [doc/03.PKCS11-Rust生FFI実装.html](../../doc/03.PKCS11-Rust生FFI実装.html) を参照すること。
+コードを書く前に [docs/07.PKCS11-Rust生FFI実装.html](../../docs/07.PKCS11-Rust生FFI実装.html) を参照すること。
 
 ---
 
@@ -54,7 +54,7 @@ applyTo: "src/**/*.rs"
 
 ## 操作フロー（3段ロケット）
 
-詳細は [doc/02.PKCS11-操作フロー詳解.html](../../doc/02.PKCS11-操作フロー詳解.html) を参照。
+詳細は [docs/05.PKCS11-操作フロー詳解.html](../../docs/05.PKCS11-操作フロー詳解.html) を参照。
 
 ```
 Initialize → OpenSession → Login
