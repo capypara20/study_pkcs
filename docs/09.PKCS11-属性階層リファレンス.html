@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PKCS#11 属性階層リファレンス — 定義の系譜ツリー</title>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Shippori+Mincho:wght@500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#fdfaf2; --paper-2:#faf6ec; --ink:#18233a; --ink-muted:#6d7591;
+  --line:#d6cdb7; --line-soft:#e6dcc4;
+  --red:#a83a2b; --blue:#5e88a6; --amber:#a5741f; --gray:#6d7591; --purple:#6f4d86;
+  --mono:'JetBrains Mono',monospace; --sans:'Zen Kaku Gothic New',sans-serif; --serif:'Shippori Mincho',serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.65;padding:2.5rem 1.2rem 5rem}
+.wrap{max-width:980px;margin:0 auto}
+
+/* ---------- header ---------- */
+.doc-tag{font-family:var(--mono);font-size:.72rem;letter-spacing:.22em;color:var(--ink-muted);text-transform:uppercase}
+h1{font-family:var(--serif);font-size:clamp(1.6rem,4vw,2.2rem);font-weight:700;margin:.4rem 0 .3rem}
+.subtitle{color:var(--ink-muted);font-size:.95rem;max-width:46em}
+.header-rule{border:none;border-top:1px solid var(--line);margin:1.6rem 0}
+
+/* ---------- caveat ---------- */
+.caveat{border:1px solid var(--red);background:rgba(168,58,43,.05);padding:1rem 1.2rem;margin:1.4rem 0;border-radius:2px}
+.caveat .t{font-family:var(--mono);font-size:.72rem;letter-spacing:.18em;color:var(--red);font-weight:700;margin-bottom:.35rem}
+.caveat p{font-size:.9rem}
+.caveat code{font-family:var(--mono);font-size:.85em;background:var(--paper-2);padding:0 .3em;border:1px solid var(--line-soft)}
+
+/* ---------- legend + controls ---------- */
+.panel{display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-start;justify-content:space-between;margin:1.6rem 0 1rem;padding:1rem 1.2rem;background:var(--paper-2);border:1px solid var(--line)}
+.legend{display:flex;flex-wrap:wrap;gap:.5rem .9rem;font-size:.82rem}
+.legend .item{display:flex;align-items:center;gap:.4rem}
+.controls{display:flex;gap:.5rem;flex-wrap:wrap}
+button.ctl{font-family:var(--mono);font-size:.75rem;padding:.45rem .8rem;background:var(--paper);border:1px solid var(--ink);color:var(--ink);cursor:pointer;letter-spacing:.05em}
+button.ctl:hover{background:var(--ink);color:var(--paper)}
+button.ctl:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+button.ctl.active{background:var(--red);border-color:var(--red);color:#fff}
+
+/* ---------- markers ---------- */
+.mk{font-family:var(--mono);font-size:.68rem;font-weight:700;padding:.05rem .38rem;border-radius:2px;white-space:nowrap;border:1px solid}
+.mk-w{color:var(--red);border-color:var(--red);background:rgba(168,58,43,.07)}
+.mk-d{color:var(--amber);border-color:var(--amber);background:rgba(165,116,31,.08)}
+.mk-g{color:var(--blue);border-color:var(--blue);background:rgba(94,136,166,.09)}
+.mk-r{color:var(--gray);border-color:var(--gray);background:rgba(109,117,145,.08)}
+.mk-s{color:var(--purple);border-color:var(--purple);background:rgba(111,77,134,.08)}
+
+/* ---------- tree ---------- */
+.tree{margin-top:1.2rem}
+details.node{position:relative;margin:.35rem 0}
+details.node>summary{list-style:none;cursor:pointer;display:flex;align-items:baseline;gap:.6rem;padding:.5rem .8rem;background:var(--paper-2);border:1px solid var(--line);user-select:none}
+details.node>summary::-webkit-details-marker{display:none}
+details.node>summary:hover{border-color:var(--ink)}
+details.node>summary:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+.tw{font-family:var(--mono);font-size:.7rem;color:var(--ink-muted);width:1em;flex:none;transition:transform .15s}
+details[open]>summary .tw{transform:rotate(90deg)}
+.node-title{font-family:var(--serif);font-weight:700;font-size:1.02rem}
+.node-cko{font-family:var(--mono);font-size:.74rem;color:var(--ink-muted)}
+.node-note{font-size:.78rem;color:var(--ink-muted);margin-left:auto;text-align:right}
+.node-note.alert{color:var(--red);font-weight:500}
+
+/* depth colors on the left edge */
+details.d0>summary{border-left:4px solid var(--ink)}
+details.d1>summary{border-left:4px solid var(--blue)}
+details.d2>summary{border-left:4px solid var(--red)}
+details.d3>summary{border-left:4px solid var(--amber)}
+
+/* connector lines */
+.children{margin-left:1.35rem;padding-left:1.15rem;border-left:1px solid var(--line)}
+
+/* ---------- attribute rows ---------- */
+.attrs{margin:.4rem 0 .7rem}
+.attr{display:grid;grid-template-columns:minmax(190px,240px) auto 1fr;gap:.35rem .8rem;align-items:baseline;padding:.32rem .6rem;border-bottom:1px solid var(--line-soft);font-size:.86rem;transition:opacity .18s}
+.attr:last-child{border-bottom:none}
+.attr .name{font-family:var(--mono);font-size:.8rem;font-weight:600;word-break:break-all}
+.attr .badges{display:flex;gap:.3rem;flex-wrap:wrap}
+.attr .desc{color:var(--ink-muted);font-size:.82rem}
+.attr .desc strong{color:var(--ink)}
+.attr .desc em{color:var(--red);font-style:normal;font-weight:500}
+.attr.hl-req .name{color:var(--red)}
+@media (max-width:640px){.attr{grid-template-columns:1fr;gap:.15rem}}
+
+/* [書]-only filter mode */
+body.writable-only .attr:not(.w){opacity:.18}
+body.writable-only .attr.w{background:rgba(168,58,43,.045)}
+
+/* section headers inside a node */
+.grp{font-family:var(--mono);font-size:.68rem;letter-spacing:.15em;color:var(--ink-muted);margin:.7rem .6rem .15rem;text-transform:uppercase}
+
+/* sticky arrows */
+.sticky-note{font-family:var(--mono);font-size:.74rem;color:var(--purple);margin:.3rem .6rem .5rem;padding:.4rem .6rem;background:rgba(111,77,134,.05);border-left:2px solid var(--purple)}
+
+/* footer */
+.sources{margin-top:2.5rem;padding-top:1.2rem;border-top:1px solid var(--line);font-size:.8rem;color:var(--ink-muted)}
+.sources a{color:var(--blue)}
+.honesty{margin-top:1.2rem;border:1px dashed var(--line);padding:.9rem 1.1rem;font-size:.82rem;color:var(--ink-muted)}
+.honesty .t{font-family:var(--mono);font-size:.7rem;letter-spacing:.18em;color:var(--ink);margin-bottom:.3rem}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<span class="doc-tag">PKCS#11 STUDY SERIES · 03 — REFERENCE</span>
+<h1>属性階層リファレンス — 定義の系譜ツリー</h1>
+<p class="subtitle">全属性を「どのクラス層で定義され、継承されるか」の系譜で並べた引き表。各属性には <strong>誰が値を決めるか</strong> のマーカーを付す。OASIS PKCS#11 v3.0 base / v3.2 spec 準拠。</p>
+
+<hr class="header-rule">
+
+<div class="caveat">
+  <div class="t">⚠ 読む前の注意 — これは「定義の系譜」であって「格納構造」ではない</div>
+  <p>この階層は<strong>仕様書上で属性がどの層で定義・継承されるか</strong>を表す。実行時の各オブジェクトは、継承ぶんも含めた全属性を<strong>フラットな属性バッグ</strong>として持つ。<code>C_GetAttributeValue</code> に階層をたどる操作は存在せず、どの属性も直接指定して読む。ツリーは「探す場所の地図」であって「データの形」ではない。</p>
+</div>
+
+<div class="panel">
+  <div class="legend">
+    <span class="item"><span class="mk mk-w">書</span>あなたがテンプレートで指定</span>
+    <span class="item"><span class="mk mk-d">黙</span>デフォルトあり（省略可）</span>
+    <span class="item"><span class="mk mk-g">生</span>トークンが生成（書けない）</span>
+    <span class="item"><span class="mk mk-r">読</span>読取専用・トークン付与</span>
+    <span class="item"><span class="mk mk-s">粘</span>粘着性（一方通行の変更）</span>
+  </div>
+  <div class="controls">
+    <button class="ctl" id="btn-writable" aria-pressed="false">［書］だけ表示</button>
+    <button class="ctl" id="btn-expand">全展開</button>
+    <button class="ctl" id="btn-collapse">全折りたたみ</button>
+  </div>
+</div>
+
+<div class="tree">
+
+<!-- ================= ROOT: Object ================= -->
+<details class="node d0" open>
+  <summary><span class="tw">▸</span><span class="node-title">Object</span><span class="node-cko">— 全オブジェクトの根</span><span class="node-note">CKA_CLASS が型を決める第1識別子</span></summary>
+  <div class="attrs">
+    <div class="attr w hl-req"><span class="name">CKA_CLASS</span><span class="badges"><span class="mk mk-w">書</span></span><span class="desc"><strong>オブジェクトの種類</strong>（CKO_*）。生成後は不変。テンプレートの事実上の必須第一属性</span></div>
+  </div>
+
+  <div class="children">
+
+  <!-- ================= Storage ================= -->
+  <details class="node d1" open>
+    <summary><span class="tw">▸</span><span class="node-title">Storage — 保存オブジェクト共通</span><span class="node-cko">Data / Certificate / Key が継承</span><span class="node-note">可視性・永続性・寿命を司る層</span></summary>
+    <div class="attrs">
+      <div class="attr w"><span class="name">CKA_TOKEN</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">永続(true) / セッション限り(false)。<strong>デフォルトは CK_FALSE</strong>＝揮発</span></div>
+      <div class="attr w"><span class="name">CKA_PRIVATE</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">要ログイン(true)か。デフォルトはトークン依存（他属性に連動しうる）</span></div>
+      <div class="attr w"><span class="name">CKA_MODIFIABLE</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">変更可か。デフォルト CK_TRUE。生成時のみ指定可</span></div>
+      <div class="attr w"><span class="name">CKA_LABEL</span><span class="badges"><span class="mk mk-w">書</span></span><span class="desc">人間可読ラベル。<strong>生成後に実質的に変更できるのはほぼこれだけ</strong>。検索キーとして多用</span></div>
+      <div class="attr w"><span class="name">CKA_COPYABLE</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">C_CopyObject で複製できるか。<em>true→false の一方通行</em>（v2.40〜）</span></div>
+      <div class="attr w"><span class="name">CKA_DESTROYABLE</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">C_DestroyObject で消せるか。デフォルト CK_TRUE</span></div>
+      <div class="attr"><span class="name">CKA_UNIQUE_ID</span><span class="badges"><span class="mk mk-r">読</span></span><span class="desc">トークンが振る一意ID。<strong>v3.0で追加</strong>。テンプレートに入れると CKR_ATTRIBUTE_READ_ONLY</span></div>
+    </div>
+
+    <div class="children">
+
+    <!-- ================= Data ================= -->
+    <details class="node d2">
+      <summary><span class="tw">▸</span><span class="node-title">Data</span><span class="node-cko">CKO_DATA</span><span class="node-note">最小構成。用途フラグも保護属性もない</span></summary>
+      <div class="attrs">
+        <div class="attr w"><span class="name">CKA_APPLICATION</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">管理アプリケーションの記述（RFC 2279 文字列）</span></div>
+        <div class="attr w"><span class="name">CKA_OBJECT_ID</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">DER符号化 OID による分類</span></div>
+        <div class="attr w"><span class="name">CKA_VALUE</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">中身のバイト列そのもの（デフォルトは空）</span></div>
+      </div>
+    </details>
+
+    <!-- ================= Certificate ================= -->
+    <details class="node d2">
+      <summary><span class="tw">▸</span><span class="node-title">Certificate — 証明書共通</span><span class="node-cko">CKO_CERTIFICATE</span><span class="node-note alert">用途フラグ・保護属性なし＝「公開が前提の入れ物」</span></summary>
+      <div class="attrs">
+        <div class="attr w hl-req"><span class="name">CKA_CERTIFICATE_TYPE</span><span class="badges"><span class="mk mk-w">書</span></span><span class="desc"><strong>第2の識別子</strong>（CKC_X_509 等）。生成後不変</span></div>
+        <div class="attr w"><span class="name">CKA_TRUSTED</span><span class="badges"><span class="mk mk-w">書</span></span><span class="desc"><em>SO ログイン時のみ true に設定可</em>。トラストアンカーの印</span></div>
+        <div class="attr w"><span class="name">CKA_CERTIFICATE_CATEGORY</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">未指定 / トークン利用者 / CA / その他エンティティ の分類</span></div>
+        <div class="attr"><span class="name">CKA_CHECK_VALUE</span><span class="badges"><span class="mk mk-r">読</span></span><span class="desc">証明書の検査値（SHA-1ハッシュ先頭3バイト）</span></div>
+        <div class="attr w"><span class="name">CKA_START_DATE / CKA_END_DATE</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">有効期間（デフォルトは空）</span></div>
+        <div class="attr"><span class="name">CKA_PUBLIC_KEY_INFO</span><span class="badges"><span class="mk mk-d">黙</span><span class="mk mk-r">読</span></span><span class="desc">DER符号化 SubjectPublicKeyInfo</span></div>
+      </div>
+
+      <div class="children">
+      <details class="node d3">
+        <summary><span class="tw">▸</span><span class="node-title">X.509 公開鍵証明書</span><span class="node-cko">CKC_X_509</span><span class="node-note">SUBJECT と VALUE が必須</span></summary>
+        <div class="attrs">
+          <div class="attr w hl-req"><span class="name">CKA_SUBJECT</span><span class="badges"><span class="mk mk-w">書</span></span><span class="desc"><strong>必須</strong>。DER符号化 subject 名</span></div>
+          <div class="attr w hl-req"><span class="name">CKA_VALUE</span><span class="badges"><span class="mk mk-w">書</span></span><span class="desc"><strong>必須</strong>。BER符号化の証明書まるごと（CKA_URL 利用時は空も可）</span></div>
+          <div class="attr w"><span class="name">CKA_ID</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc"><strong>鍵ペア・証明書を束ねる紐付けキー</strong>。同一 CKA_ID で三点セットを結ぶ</span></div>
+          <div class="attr w"><span class="name">CKA_ISSUER</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">DER符号化 issuer 名</span></div>
+          <div class="attr w"><span class="name">CKA_SERIAL_NUMBER</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">DER符号化シリアル番号</span></div>
+          <div class="attr w"><span class="name">CKA_URL</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">証明書本体を外部URLに置く場合の参照</span></div>
+          <div class="attr w"><span class="name">CKA_HASH_OF_SUBJECT_PUBLIC_KEY</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">subject 公開鍵のハッシュ（URL運用時に照合用）</span></div>
+          <div class="attr w"><span class="name">CKA_HASH_OF_ISSUER_PUBLIC_KEY</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">issuer 公開鍵のハッシュ</span></div>
+          <div class="attr w"><span class="name">CKA_NAME_HASH_ALGORITHM</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">上記ハッシュのアルゴリズム。デフォルト SHA-1</span></div>
+          <div class="attr w"><span class="name">CKA_JAVA_MIDP_SECURITY_DOMAIN</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">Java MIDP 用ドメイン分類（レガシー・通常は未指定）</span></div>
+        </div>
+      </details>
+      </div>
+    </details>
+
+    <!-- ================= Key ================= -->
+    <details class="node d2" open>
+      <summary><span class="tw">▸</span><span class="node-title">Key — 鍵3クラス共通</span><span class="node-cko">公開鍵 / 秘密鍵 / 共通鍵 が継承</span><span class="node-note">アルゴリズム識別と鍵ライフサイクルの層</span></summary>
+      <div class="attrs">
+        <div class="attr w hl-req"><span class="name">CKA_KEY_TYPE</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc"><strong>アルゴリズム</strong>（CKK_RSA / CKK_EC / CKK_AES …）。CKA_CLASS（役割）とは独立の軸。鍵生成ではメカニズムから確定することが多い</span></div>
+        <div class="attr w"><span class="name">CKA_ID</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">公開鍵・秘密鍵・証明書をペア紐付けするキー</span></div>
+        <div class="attr w"><span class="name">CKA_START_DATE / CKA_END_DATE</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">鍵の有効期間</span></div>
+        <div class="attr w"><span class="name">CKA_DERIVE</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">この鍵から別の鍵を導出できるか。デフォルト CK_FALSE</span></div>
+        <div class="attr"><span class="name">CKA_LOCAL</span><span class="badges"><span class="mk mk-r">読</span></span><span class="desc">トークン内で生成されたか。外から入れた鍵は false。<strong>鍵の出自証明</strong></span></div>
+        <div class="attr"><span class="name">CKA_KEY_GEN_MECHANISM</span><span class="badges"><span class="mk mk-r">読</span></span><span class="desc">どのメカニズムで生成されたか（非ローカル鍵は CK_UNAVAILABLE_INFORMATION）</span></div>
+        <div class="attr w"><span class="name">CKA_ALLOWED_MECHANISMS</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">この鍵で使えるメカニズムをホワイトリスト限定</span></div>
+      </div>
+
+      <div class="children">
+
+      <!-- ===== Public Key ===== -->
+      <details class="node d3">
+        <summary><span class="tw">▸</span><span class="node-title">公開鍵</span><span class="node-cko">CKO_PUBLIC_KEY</span><span class="node-note alert">SENSITIVE / EXTRACTABLE は存在しない</span></summary>
+        <div class="grp">用途フラグ</div>
+        <div class="attrs">
+          <div class="attr w"><span class="name">CKA_ENCRYPT</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">暗号化に使えるか</span></div>
+          <div class="attr w"><span class="name">CKA_VERIFY</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">署名検証に使えるか（署名が付録のタイプ）</span></div>
+          <div class="attr w"><span class="name">CKA_VERIFY_RECOVER</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">データ回復付き検証に使えるか</span></div>
+          <div class="attr w"><span class="name">CKA_WRAP</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">他鍵をラップ（暗号化して包む）できるか</span></div>
+        </div>
+        <div class="grp">信頼・制約</div>
+        <div class="attrs">
+          <div class="attr w"><span class="name">CKA_SUBJECT</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">DER符号化 subject 名</span></div>
+          <div class="attr w"><span class="name">CKA_TRUSTED</span><span class="badges"><span class="mk mk-w">書</span></span><span class="desc"><em>SO のみ true 化可</em>。WRAP_WITH_TRUSTED 鍵のラップ先として信頼される</span></div>
+          <div class="attr w"><span class="name">CKA_WRAP_TEMPLATE</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">この鍵でラップできる鍵の属性条件を制限</span></div>
+          <div class="attr"><span class="name">CKA_PUBLIC_KEY_INFO</span><span class="badges"><span class="mk mk-d">黙</span><span class="mk mk-r">読</span></span><span class="desc">DER符号化 SubjectPublicKeyInfo</span></div>
+        </div>
+        <div class="children">
+          <details class="node d3">
+            <summary><span class="tw">▸</span><span class="node-title">RSA 公開鍵</span><span class="node-cko">CKK_RSA</span><span class="node-note">鍵ペアの鍵長はここで決まる</span></summary>
+            <div class="attrs">
+              <div class="attr"><span class="name">CKA_MODULUS</span><span class="badges"><span class="mk mk-g">生</span></span><span class="desc">法 n（鍵生成時はトークンが生成）</span></div>
+              <div class="attr w"><span class="name">CKA_MODULUS_BITS</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-g">生</span></span><span class="desc"><strong>鍵ペア生成時に公開鍵テンプレートで指定</strong>（例: 2048）。生成後は読取専用</span></div>
+              <div class="attr w"><span class="name">CKA_PUBLIC_EXPONENT</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">公開指数 e。<strong>省略時はメカニズムが 0x10001 (65537) を補う</strong></span></div>
+            </div>
+          </details>
+          <details class="node d3">
+            <summary><span class="tw">▸</span><span class="node-title">EC 公開鍵</span><span class="node-cko">CKK_EC</span><span class="node-note"></span></summary>
+            <div class="attrs">
+              <div class="attr w"><span class="name">CKA_EC_PARAMS</span><span class="badges"><span class="mk mk-w">書</span></span><span class="desc"><strong>曲線の指定</strong>（DER符号化。鍵ペア生成時は公開鍵テンプレートで指定）</span></div>
+              <div class="attr"><span class="name">CKA_EC_POINT</span><span class="badges"><span class="mk mk-g">生</span></span><span class="desc">公開点 Q（DER符号化）</span></div>
+            </div>
+          </details>
+        </div>
+      </details>
+
+      <!-- ===== Private Key ===== -->
+      <details class="node d3" open>
+        <summary><span class="tw">▸</span><span class="node-title">秘密鍵</span><span class="node-cko">CKO_PRIVATE_KEY</span><span class="node-note alert">保護属性の本丸。「HSMから出せない」を構成する層</span></summary>
+        <div class="grp">用途フラグ</div>
+        <div class="attrs">
+          <div class="attr w"><span class="name">CKA_DECRYPT</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">復号に使えるか</span></div>
+          <div class="attr w"><span class="name">CKA_SIGN</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">署名に使えるか</span></div>
+          <div class="attr w"><span class="name">CKA_SIGN_RECOVER</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">データ回復付き署名に使えるか</span></div>
+          <div class="attr w"><span class="name">CKA_UNWRAP</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">ラップされた鍵を取り込めるか</span></div>
+        </div>
+        <div class="grp">保護属性 — 粘着ペア</div>
+        <div class="attrs">
+          <div class="attr w"><span class="name">CKA_SENSITIVE</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-s">粘</span></span><span class="desc"><strong>true で秘密値を C_GetAttributeValue で読めなくする</strong>。<em>false → true のみ</em>。戻せない</span></div>
+          <div class="attr w"><span class="name">CKA_EXTRACTABLE</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-s">粘</span></span><span class="desc"><strong>false でラップによる持ち出しも禁止</strong>。<em>true → false のみ</em>。戻せない</span></div>
+          <div class="attr"><span class="name">CKA_ALWAYS_SENSITIVE</span><span class="badges"><span class="mk mk-r">読</span></span><span class="desc">生まれてから一度も SENSITIVE=false だったことがないか。履歴の証明</span></div>
+          <div class="attr"><span class="name">CKA_NEVER_EXTRACTABLE</span><span class="badges"><span class="mk mk-r">読</span></span><span class="desc">生まれてから一度も EXTRACTABLE=true だったことがないか</span></div>
+        </div>
+        <div class="sticky-note">粘着の向き： SENSITIVE: false ──→ true（不可逆） ／ EXTRACTABLE: true ──→ false（不可逆）。この2本の一方通行が「鍵の非可逆な封印」を構成する。</div>
+        <div class="grp">追加の防御・認証</div>
+        <div class="attrs">
+          <div class="attr w"><span class="name">CKA_WRAP_WITH_TRUSTED</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span><span class="mk mk-s">粘</span></span><span class="desc">CKA_TRUSTED=true の鍵でしかラップさせない。<em>false → true のみ</em></span></div>
+          <div class="attr w"><span class="name">CKA_ALWAYS_AUTHENTICATE</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">使用のたびに再認証（C_Login CKU_CONTEXT_SPECIFIC）を要求</span></div>
+          <div class="attr w"><span class="name">CKA_UNWRAP_TEMPLATE</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">この鍵でアンラップして生まれる鍵に強制する属性条件</span></div>
+          <div class="attr w"><span class="name">CKA_SUBJECT</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">DER符号化 subject 名</span></div>
+          <div class="attr"><span class="name">CKA_PUBLIC_KEY_INFO</span><span class="badges"><span class="mk mk-d">黙</span><span class="mk mk-r">読</span></span><span class="desc">対応する公開鍵の SubjectPublicKeyInfo。<strong>v2.40以降、秘密鍵から公開鍵を復元できる建付け</strong></span></div>
+        </div>
+        <div class="children">
+          <details class="node d3">
+            <summary><span class="tw">▸</span><span class="node-title">RSA 秘密鍵</span><span class="node-cko">CKK_RSA</span><span class="node-note alert">MODULUS_BITS は指定しない（罠①）</span></summary>
+            <div class="attrs">
+              <div class="attr"><span class="name">CKA_MODULUS</span><span class="badges"><span class="mk mk-g">生</span></span><span class="desc">法 n。トークンが必ず返せる2属性のうち1つ</span></div>
+              <div class="attr"><span class="name">CKA_PRIVATE_EXPONENT</span><span class="badges"><span class="mk mk-g">生</span></span><span class="desc">秘密指数 d。もう1つの必須保持属性（SENSITIVE=true なら読めない）</span></div>
+              <div class="attr"><span class="name">CKA_PUBLIC_EXPONENT</span><span class="badges"><span class="mk mk-g">生</span></span><span class="desc">e。v2.40以降トークンは必ず保持（公開鍵復元のため）</span></div>
+              <div class="attr"><span class="name">CKA_PRIME_1 / CKA_PRIME_2</span><span class="badges"><span class="mk mk-g">生</span></span><span class="desc">素数 p, q（CRT用。保持はトークン次第）</span></div>
+              <div class="attr"><span class="name">CKA_EXPONENT_1 / CKA_EXPONENT_2</span><span class="badges"><span class="mk mk-g">生</span></span><span class="desc">d mod (p−1), d mod (q−1)</span></div>
+              <div class="attr"><span class="name">CKA_COEFFICIENT</span><span class="badges"><span class="mk mk-g">生</span></span><span class="desc">q⁻¹ mod p</span></div>
+            </div>
+            <div class="sticky-note" style="color:var(--red);border-color:var(--red);background:rgba(168,58,43,.05)">罠①の裏付け：秘密鍵テンプレートに CKA_MODULUS_BITS は書かない。秘密鍵はペアの一部としてのみ生成され、鍵長は公開鍵側の CKA_MODULUS_BITS で決まる。</div>
+          </details>
+          <details class="node d3">
+            <summary><span class="tw">▸</span><span class="node-title">EC 秘密鍵</span><span class="node-cko">CKK_EC</span><span class="node-note"></span></summary>
+            <div class="attrs">
+              <div class="attr"><span class="name">CKA_EC_PARAMS</span><span class="badges"><span class="mk mk-g">生</span></span><span class="desc">曲線（ペア生成では公開鍵側の指定から引き継がれる）</span></div>
+              <div class="attr"><span class="name">CKA_VALUE</span><span class="badges"><span class="mk mk-g">生</span></span><span class="desc">秘密値 d（ANSI X9.62整数）</span></div>
+            </div>
+          </details>
+        </div>
+      </details>
+
+      <!-- ===== Secret Key ===== -->
+      <details class="node d3">
+        <summary><span class="tw">▸</span><span class="node-title">共通鍵</span><span class="node-cko">CKO_SECRET_KEY</span><span class="node-note">公開/秘密の両側の用途を1つの鍵が担う</span></summary>
+        <div class="grp">用途フラグ — 両側ぶんを持つ</div>
+        <div class="attrs">
+          <div class="attr w"><span class="name">CKA_ENCRYPT / CKA_DECRYPT</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">暗号化・復号</span></div>
+          <div class="attr w"><span class="name">CKA_SIGN / CKA_VERIFY</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">MAC の生成・検証（共通鍵では「署名」＝MAC）</span></div>
+          <div class="attr w"><span class="name">CKA_WRAP / CKA_UNWRAP</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">他鍵のラップ・アンラップ（KEK 用途）</span></div>
+        </div>
+        <div class="grp">保護属性 — 秘密鍵と同じ体系</div>
+        <div class="attrs">
+          <div class="attr w"><span class="name">CKA_SENSITIVE</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-s">粘</span></span><span class="desc"><em>false → true のみ</em>。一度「秘匿」にした鍵を平文可視には戻せない</span></div>
+          <div class="attr w"><span class="name">CKA_EXTRACTABLE</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-s">粘</span></span><span class="desc"><em>true → false のみ</em></span></div>
+          <div class="attr"><span class="name">CKA_ALWAYS_SENSITIVE / CKA_NEVER_EXTRACTABLE</span><span class="badges"><span class="mk mk-r">読</span></span><span class="desc">履歴の証明（生成時からの導出）</span></div>
+          <div class="attr w"><span class="name">CKA_WRAP_WITH_TRUSTED</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span><span class="mk mk-s">粘</span></span><span class="desc">信頼済み鍵限定ラップ。<em>false → true のみ</em></span></div>
+        </div>
+        <div class="grp">共通鍵だけの追加分</div>
+        <div class="attrs">
+          <div class="attr"><span class="name">CKA_CHECK_VALUE</span><span class="badges"><span class="mk mk-r">読</span></span><span class="desc">鍵検査値（KCV）。鍵の同一性確認に使う</span></div>
+          <div class="attr w"><span class="name">CKA_TRUSTED</span><span class="badges"><span class="mk mk-w">書</span></span><span class="desc"><em>SO のみ</em>。ラップ先として信頼される共通鍵</span></div>
+          <div class="attr w"><span class="name">CKA_WRAP_TEMPLATE / CKA_UNWRAP_TEMPLATE</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">ラップ／アンラップ対象の属性条件を強制</span></div>
+          <div class="attr w"><span class="name">CKA_DERIVE_TEMPLATE</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">この鍵から導出される鍵に強制する属性条件。<strong>v3.0で追加</strong></span></div>
+        </div>
+        <div class="children">
+          <details class="node d3">
+            <summary><span class="tw">▸</span><span class="node-title">AES 鍵</span><span class="node-cko">CKK_AES</span><span class="node-note"></span></summary>
+            <div class="attrs">
+              <div class="attr w"><span class="name">CKA_VALUE_LEN</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-g">生</span></span><span class="desc"><strong>鍵長（16/24/32バイト）。C_GenerateKey 時にテンプレートで指定</strong>。生成後は読取専用</span></div>
+              <div class="attr"><span class="name">CKA_VALUE</span><span class="badges"><span class="mk mk-g">生</span></span><span class="desc">鍵バイトそのもの（C_GenerateKey ではトークンが生成。C_CreateObject での持ち込み時のみ自分で書く）</span></div>
+            </div>
+          </details>
+        </div>
+      </details>
+
+      </div><!-- /key children -->
+    </details>
+
+    </div><!-- /storage children -->
+  </details>
+
+  </div><!-- /root children -->
+</details>
+
+</div><!-- /tree -->
+
+<div class="honesty">
+  <div class="t">▸ 裏取りの範囲（正直な明示）</div>
+  <p>粘着性（SENSITIVE の false→true 一方通行）、RSA秘密鍵での MODULUS_BITS 不在、PUBLIC_EXPONENT デフォルト 65537、CKA_UNIQUE_ID の v3.0 追加は一次仕様の原文で確認済み。一方、<strong>属性のクラス層への割り当て全体はこちらで構成した整理</strong>であり、DH/DSA/GOST 等の鍵種別、CKO_MECHANISM / CKO_HW_FEATURE / CKO_PROFILE といった非保存系オブジェクトは意図的にスコープ外。実装前は v3.2 spec §4（Objects）§6（Mechanisms）の該当表と突き合わせること。デフォルト値と粘着の強制はベンダー差があり、SoftHSM2 と本番HSMで挙動が違いうる。</p>
+</div>
+
+<div class="sources">
+  出典：
+  <a href="https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.2/pkcs11-spec-v3.2.html" target="_blank" rel="noopener">[1] OASIS PKCS#11 Specification v3.2 §4 Objects（2025-11-14）</a> ·
+  <a href="https://docs.oasis-open.org/pkcs11/pkcs11-curr/v3.0/os/pkcs11-curr-v3.0-os.html" target="_blank" rel="noopener">[2] PKCS#11 Current Mechanisms v3.0 §2.1 RSA / §2.3 EC / §2.8 AES</a> ·
+  <a href="https://docs.oasis-open.org/pkcs11/pkcs11-base/v3.0/csprd01/pkcs11-base-v3.0-csprd01.html" target="_blank" rel="noopener">[3] PKCS#11 Base Specification v3.0 §4.4–4.9</a>
+</div>
+
+</div><!-- /wrap -->
+
+<script>
+(function(){
+  const body=document.body;
+  const btnW=document.getElementById('btn-writable');
+  btnW.addEventListener('click',()=>{
+    const on=body.classList.toggle('writable-only');
+    btnW.classList.toggle('active',on);
+    btnW.setAttribute('aria-pressed',on?'true':'false');
+    btnW.textContent=on?'すべて表示に戻す':'［書］だけ表示';
+    if(on){document.querySelectorAll('details.node').forEach(d=>d.open=true);}
+  });
+  document.getElementById('btn-expand').addEventListener('click',()=>{
+    document.querySelectorAll('details.node').forEach(d=>d.open=true);
+  });
+  document.getElementById('btn-collapse').addEventListener('click',()=>{
+    document.querySelectorAll('details.node').forEach(d=>{if(!d.classList.contains('d0'))d.open=false;});
+  });
+})();
+</script>
+</body>
+</html>
