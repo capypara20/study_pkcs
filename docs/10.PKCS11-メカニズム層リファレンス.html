@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PKCS#11 メカニズム層リファレンス — 鍵生成と“生”属性の接続表</title>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Shippori+Mincho:wght@500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#fdfaf2; --paper-2:#faf6ec; --ink:#18233a; --ink-muted:#6d7591;
+  --line:#d6cdb7; --line-soft:#e6dcc4;
+  --red:#a83a2b; --blue:#5e88a6; --amber:#a5741f; --gray:#6d7591; --purple:#6f4d86;
+  --green:#4a7a4d;
+  --mono:'JetBrains Mono',monospace; --sans:'Zen Kaku Gothic New',sans-serif; --serif:'Shippori Mincho',serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.65;padding:2.5rem 1.2rem 5rem}
+.wrap{max-width:980px;margin:0 auto}
+
+/* ---------- header ---------- */
+.doc-tag{font-family:var(--mono);font-size:.72rem;letter-spacing:.22em;color:var(--ink-muted);text-transform:uppercase}
+h1{font-family:var(--serif);font-size:clamp(1.6rem,4vw,2.2rem);font-weight:700;margin:.4rem 0 .3rem}
+.subtitle{color:var(--ink-muted);font-size:.95rem;max-width:46em}
+.header-rule{border:none;border-top:1px solid var(--line);margin:1.6rem 0}
+
+/* ---------- caveat ---------- */
+.caveat{border:1px solid var(--red);background:rgba(168,58,43,.05);padding:1rem 1.2rem;margin:1.4rem 0;border-radius:2px}
+.caveat .t{font-family:var(--mono);font-size:.72rem;letter-spacing:.18em;color:var(--red);font-weight:700;margin-bottom:.35rem}
+.caveat p{font-size:.9rem}
+.caveat code{font-family:var(--mono);font-size:.85em;background:var(--paper-2);padding:0 .3em;border:1px solid var(--line-soft)}
+
+/* ---------- legend + controls ---------- */
+.panel{display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-start;justify-content:space-between;margin:1.6rem 0 1rem;padding:1rem 1.2rem;background:var(--paper-2);border:1px solid var(--line)}
+.legend{display:flex;flex-wrap:wrap;gap:.5rem .9rem;font-size:.82rem}
+.legend .item{display:flex;align-items:center;gap:.4rem}
+.controls{display:flex;gap:.5rem;flex-wrap:wrap}
+button.ctl{font-family:var(--mono);font-size:.75rem;padding:.45rem .8rem;background:var(--paper);border:1px solid var(--ink);color:var(--ink);cursor:pointer;letter-spacing:.05em}
+button.ctl:hover{background:var(--ink);color:var(--paper)}
+button.ctl:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+button.ctl.active{background:var(--red);border-color:var(--red);color:#fff}
+
+/* ---------- markers（09と同じ体系） ---------- */
+.mk{font-family:var(--mono);font-size:.68rem;font-weight:700;padding:.05rem .38rem;border-radius:2px;white-space:nowrap;border:1px solid}
+.mk-w{color:var(--red);border-color:var(--red);background:rgba(168,58,43,.07)}
+.mk-d{color:var(--amber);border-color:var(--amber);background:rgba(165,116,31,.08)}
+.mk-g{color:var(--blue);border-color:var(--blue);background:rgba(94,136,166,.09)}
+.mk-r{color:var(--gray);border-color:var(--gray);background:rgba(109,117,145,.08)}
+.mk-s{color:var(--purple);border-color:var(--purple);background:rgba(111,77,134,.08)}
+
+/* ---------- availability chips（10 で追加） ---------- */
+.av{font-family:var(--mono);font-size:.68rem;font-weight:700;padding:.05rem .38rem;border-radius:2px;white-space:nowrap;border:1px solid}
+.av-ok{color:var(--green);border-color:var(--green);background:rgba(74,122,77,.08)}
+.av-warn{color:var(--amber);border-color:var(--amber);background:rgba(165,116,31,.08)}
+.av-ng{color:var(--red);border-color:var(--red);background:rgba(168,58,43,.07)}
+
+/* ---------- quick matrix ---------- */
+.matrix-scroll{overflow-x:auto;border:1px solid var(--line);margin:1.2rem 0}
+table.matrix{border-collapse:collapse;width:100%;min-width:900px;font-size:.78rem}
+table.matrix th{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-muted);background:var(--paper-2);border-bottom:1px solid var(--line);padding:.5rem .55rem;text-align:left;white-space:nowrap}
+table.matrix td{border-bottom:1px solid var(--line-soft);padding:.45rem .55rem;vertical-align:top}
+table.matrix tr:last-child td{border-bottom:none}
+table.matrix td.m{font-family:var(--mono);font-size:.72rem;font-weight:600;white-space:nowrap}
+table.matrix td .sub{display:block;color:var(--ink-muted);font-size:.72rem}
+table.matrix code{font-family:var(--mono);font-size:.92em}
+body.ready-only table.matrix tr.mech:not(.ready){opacity:.22}
+
+/* ---------- 系統カード ---------- */
+.sys-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.sys{border:1px solid var(--line);background:var(--paper-2);padding:.7rem .9rem}
+.sys .k{font-family:var(--mono);font-size:.72rem;font-weight:700;color:var(--red)}
+.sys p{font-size:.8rem;color:var(--ink-muted);margin-top:.15rem}
+.sys p strong{color:var(--ink)}
+
+/* ---------- tree（09 流用） ---------- */
+.tree{margin-top:1.2rem}
+details.node{position:relative;margin:.35rem 0}
+details.node>summary{list-style:none;cursor:pointer;display:flex;align-items:baseline;gap:.6rem;padding:.5rem .8rem;background:var(--paper-2);border:1px solid var(--line);user-select:none;flex-wrap:wrap}
+details.node>summary::-webkit-details-marker{display:none}
+details.node>summary:hover{border-color:var(--ink)}
+details.node>summary:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+.tw{font-family:var(--mono);font-size:.7rem;color:var(--ink-muted);width:1em;flex:none;transition:transform .15s}
+details[open]>summary .tw{transform:rotate(90deg)}
+.node-title{font-family:var(--serif);font-weight:700;font-size:1.02rem}
+.node-cko{font-family:var(--mono);font-size:.74rem;color:var(--ink-muted)}
+.node-note{font-size:.78rem;color:var(--ink-muted);margin-left:auto;text-align:right;display:flex;gap:.3rem;align-items:center}
+.node-note.alert{color:var(--red);font-weight:500}
+
+details.d0>summary{border-left:4px solid var(--ink)}
+details.d1>summary{border-left:4px solid var(--blue)}
+details.d2>summary{border-left:4px solid var(--red)}
+details.d3>summary{border-left:4px solid var(--amber)}
+
+.children{margin-left:1.35rem;padding-left:1.15rem;border-left:1px solid var(--line)}
+
+/* ---------- attribute rows（09 流用） ---------- */
+.attrs{margin:.4rem 0 .7rem}
+.attr{display:grid;grid-template-columns:minmax(190px,240px) auto 1fr;gap:.35rem .8rem;align-items:baseline;padding:.32rem .6rem;border-bottom:1px solid var(--line-soft);font-size:.86rem;transition:opacity .18s}
+.attr:last-child{border-bottom:none}
+.attr .name{font-family:var(--mono);font-size:.8rem;font-weight:600;word-break:break-all}
+.attr .badges{display:flex;gap:.3rem;flex-wrap:wrap}
+.attr .desc{color:var(--ink-muted);font-size:.82rem}
+.attr .desc strong{color:var(--ink)}
+.attr .desc em{color:var(--red);font-style:normal;font-weight:500}
+.attr.hl-req .name{color:var(--red)}
+@media (max-width:640px){.attr{grid-template-columns:1fr;gap:.15rem}}
+
+/* いま叩ける行だけフィルタ */
+body.ready-only details.mech:not(.ready){opacity:.22}
+
+.grp{font-family:var(--mono);font-size:.68rem;letter-spacing:.15em;color:var(--ink-muted);margin:.7rem .6rem .15rem;text-transform:uppercase}
+.sticky-note{font-family:var(--mono);font-size:.74rem;color:var(--purple);margin:.3rem .6rem .5rem;padding:.4rem .6rem;background:rgba(111,77,134,.05);border-left:2px solid var(--purple)}
+
+/* ---------- 本文セクション ---------- */
+h2.sec{font-family:var(--serif);font-size:1.25rem;font-weight:700;margin:2.4rem 0 .6rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+.prose{font-size:.9rem;max-width:52em}
+.prose p{margin:.5rem 0}
+.prose code{font-family:var(--mono);font-size:.85em;background:var(--paper-2);padding:0 .3em;border:1px solid var(--line-soft)}
+.prose strong{color:var(--ink)}
+.prose em{color:var(--red);font-style:normal;font-weight:500}
+
+/* footer */
+.sources{margin-top:2.5rem;padding-top:1.2rem;border-top:1px solid var(--line);font-size:.8rem;color:var(--ink-muted)}
+.sources a{color:var(--blue)}
+.honesty{margin-top:1.2rem;border:1px dashed var(--line);padding:.9rem 1.1rem;font-size:.82rem;color:var(--ink-muted)}
+.honesty .t{font-family:var(--mono);font-size:.7rem;letter-spacing:.18em;color:var(--ink);margin-bottom:.3rem}
+.honesty ul{margin:.3rem 0 .3rem 1.2rem}
+.honesty li{margin:.25rem 0}
+.honesty strong{color:var(--ink)}
+.honesty em{color:var(--red);font-style:normal;font-weight:500}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<span class="doc-tag">PKCS#11 STUDY SERIES · 04 — REFERENCE</span>
+<h1>メカニズム層リファレンス — “生”を埋める鍵生成機構の引き表</h1>
+<p class="subtitle">鍵生成メカニズム（CKM_*）を並べ、<a href="09.PKCS11-属性階層リファレンス.html" style="color:var(--blue)">09 属性階層リファレンス</a>の <span class="mk mk-g">生</span>（トークンが生成）属性が<strong>どの機構で埋まるか</strong>を接続する引き表。あわせて SoftHSM2 / rust-cryptoki 安全層での「いま叩けるか」を付す。OASIS PKCS#11 v3.1 / v3.2 spec 準拠。</p>
+
+<hr class="header-rule">
+
+<div class="caveat">
+  <div class="t">⚠ 読む前の注意 — これは「鍵生成メカニズム」だけの表</div>
+  <p>PKCS#11 のメカニズムは鍵生成のほかに 暗号化・署名・導出・ラップ など多数あるが、この表は <code>C_GenerateKey</code> / <code>C_GenerateKeyPair</code> に渡す<strong>生成系機構のみ</strong>を扱う。09 のツリーが「属性を探す場所の地図」だったのに対し、10 は「その属性に<strong>値を書き込む主体</strong>（呼出側テンプレートか、機構か）の地図」。可否列は<strong>ソースコード確認ベース</strong>であり、実行時の <code>C_GetMechanismList</code> はビルドオプションと crypto バックエンドに依存して変わる。</p>
+</div>
+
+<div class="panel">
+  <div class="legend">
+    <span class="item"><span class="mk mk-w">書</span>呼出側がテンプレートで指定</span>
+    <span class="item"><span class="mk mk-d">黙</span>省略可（機構が既定を補う）</span>
+    <span class="item"><span class="mk mk-g">生</span>機構がトークン側で生成・寄与</span>
+    <span class="item"><span class="mk mk-r">読</span>読取専用・トークン付与</span>
+    <span class="item"><span class="av av-ok">✓</span>あり</span>
+    <span class="item"><span class="av av-warn">△</span>条件つき</span>
+    <span class="item"><span class="av av-ng">✗</span>なし</span>
+  </div>
+  <div class="controls">
+    <button class="ctl" id="btn-ready" aria-pressed="false">いま叩ける行だけ</button>
+    <button class="ctl" id="btn-expand">全展開</button>
+    <button class="ctl" id="btn-collapse">全折りたたみ</button>
+  </div>
+</div>
+
+<p class="prose" style="font-size:.8rem;color:var(--ink-muted)">「いま叩ける」＝ apt 版 SoftHSM2 (2.6.x) にあり、かつ本リポジトリ採用の cryptoki 0.10 安全層に enum がある行。09 の <span class="mk mk-s">粘</span>（粘着性）は生成後のライフサイクルの話なので本表には登場しない。</p>
+
+<!-- ================= quick matrix ================= -->
+<h2 class="sec">早見マトリクス — 11機構 × 7列</h2>
+<div class="matrix-scroll">
+<table class="matrix">
+<thead><tr>
+  <th>機構 CKM_*</th><th>強度/サイズ指定</th><th>テンプレで指定 <span class="mk mk-w">書</span></th><th>機構が寄与する“生” <span class="mk mk-g">生</span></th><th>鍵型 CKK_*</th><th>SoftHSM2</th><th>cryptoki 安全層</th>
+</tr></thead>
+<tbody>
+<tr class="mech ready"><td class="m">RSA_PKCS_KEY_PAIR_GEN</td><td><code>MODULUS_BITS</code>（ビット数）</td><td>MODULUS_BITS ＋ 任意で PUBLIC_EXPONENT<span class="sub">省略時は既定 0x10001</span></td><td>公: MODULUS, PUBLIC_EXPONENT<span class="sub">私: PRIVATE_EXPONENT ほか CRT成分（may）</span></td><td>CKK_RSA</td><td><span class="av av-ok">✓</span> apt 2.6.x</td><td><span class="av av-ok">✓</span> RsaPkcsKeyPairGen</td></tr>
+<tr class="mech ready"><td class="m">EC_KEY_PAIR_GEN</td><td><code>EC_PARAMS</code>（曲線OID）</td><td>EC_PARAMS（公開鍵Tpl）</td><td>公: EC_POINT<span class="sub">私: EC_PARAMS, VALUE</span></td><td>CKK_EC</td><td><span class="av av-ok">✓</span> WITH_ECC</td><td><span class="av av-ok">✓</span> EccKeyPairGen</td></tr>
+<tr class="mech ready"><td class="m">EC_EDWARDS_KEY_PAIR_GEN</td><td><code>EC_PARAMS</code>（edwards25519/448）</td><td>EC_PARAMS（公開鍵Tpl）</td><td>公: EC_POINT<span class="sub">私: EC_PARAMS, VALUE</span></td><td>CKK_EC_EDWARDS</td><td><span class="av av-ok">✓</span> WITH_EDDSA</td><td><span class="av av-ok">✓</span> EccEdwardsKeyPairGen</td></tr>
+<tr class="mech"><td class="m">EC_MONTGOMERY_KEY_PAIR_GEN</td><td><code>EC_PARAMS</code>（curve25519/448）</td><td>EC_PARAMS（公開鍵Tpl）</td><td>公: EC_POINT<span class="sub">私: EC_PARAMS, VALUE</span></td><td>CKK_EC_MONTGOMERY</td><td><span class="av av-ng">✗</span> 未実装※</td><td><span class="av av-ok">✓</span> EccMontgomeryKeyPairGen</td></tr>
+<tr class="mech ready"><td class="m">AES_KEY_GEN</td><td><code>VALUE_LEN</code>（16/24/32 バイト）</td><td>VALUE_LEN 必須</td><td>VALUE</td><td>CKK_AES</td><td><span class="av av-ok">✓</span> 16/24/32 受理</td><td><span class="av av-ok">✓</span> AesKeyGen</td></tr>
+<tr class="mech ready"><td class="m">DES / DES2 / DES3_KEY_GEN</td><td>なし（固定長 8/16/24 バイト）</td><td>—（VALUE_LEN 不要）</td><td>VALUE</td><td>CKK_DES / DES2 / DES3</td><td><span class="av av-ok">✓</span></td><td><span class="av av-ok">✓</span> Des/Des2/Des3KeyGen</td></tr>
+<tr class="mech"><td class="m">DH_PKCS_KEY_PAIR_GEN</td><td>ドメインパラメタ <code>PRIME, BASE</code></td><td>公Tpl: PRIME, BASE<span class="sub">私Tpl: 任意で VALUE_BITS</span></td><td>公: VALUE（y）<span class="sub">私: PRIME, BASE, VALUE（x）＋未指定なら VALUE_BITS</span></td><td>CKK_DH</td><td><span class="av av-ok">✓</span></td><td><span class="av av-ng">✗</span> → 生 sys/FFI</td></tr>
+<tr class="mech"><td class="m">DSA_KEY_PAIR_GEN</td><td>ドメインパラメタ <code>PRIME, SUBPRIME, BASE</code></td><td>公Tpl: 左の3属性</td><td>公: VALUE<span class="sub">私: PRIME, SUBPRIME, BASE, VALUE</span></td><td>CKK_DSA</td><td><span class="av av-ok">✓</span></td><td><span class="av av-ng">✗</span> → 生 sys/FFI</td></tr>
+<tr class="mech"><td class="m">ML_KEM_KEY_PAIR_GEN</td><td><code>PARAMETER_SET</code>（512/768/1024）</td><td>PARAMETER_SET（公開鍵Tpl）</td><td>公: VALUE<span class="sub">私: PARAMETER_SET, SEED, VALUE</span></td><td>CKK_ML_KEM</td><td><span class="av av-warn">△</span> 要ソースビルド</td><td><span class="av av-warn">△</span> 0.11.0〜</td></tr>
+<tr class="mech"><td class="m">ML_DSA_KEY_PAIR_GEN</td><td><code>PARAMETER_SET</code>（44/65/87）</td><td>PARAMETER_SET（公開鍵Tpl）</td><td>公: VALUE<span class="sub">私: PARAMETER_SET, SEED, VALUE</span></td><td>CKK_ML_DSA</td><td><span class="av av-warn">△</span> 要ソースビルド</td><td><span class="av av-warn">△</span> 0.11.0〜</td></tr>
+<tr class="mech"><td class="m">SLH_DSA_KEY_PAIR_GEN</td><td><code>PARAMETER_SET</code>（SHA2/SHAKE × 128/192/256 × S/F ＝ 12種）</td><td>PARAMETER_SET（公開鍵Tpl）</td><td>公: VALUE<span class="sub">私: PARAMETER_SET, VALUE（SEED なし）</span></td><td>CKK_SLH_DSA</td><td><span class="av av-ng">✗</span> develop にも無い</td><td><span class="av av-warn">△</span> 0.11.0〜</td></tr>
+<tr class="mech ready"><td class="m">GENERIC_SECRET_KEY_GEN</td><td><code>VALUE_LEN</code>（バイト長）</td><td>VALUE_LEN 必須</td><td>VALUE</td><td>CKK_GENERIC_SECRET</td><td><span class="av av-ok">✓</span></td><td><span class="av av-ok">✓</span> GenericSecretKeyGen</td></tr>
+</tbody>
+</table>
+</div>
+<p class="prose" style="font-size:.78rem;color:var(--ink-muted)">※ SoftHSM2 は <code>CKM_EC_MONTGOMERY_KEY_PAIR_GEN</code> を実装せず、X25519 鍵を <code>CKM_EC_EDWARDS_KEY_PAIR_GEN</code> ＋ EC_PARAMS に PrintableString <code>"curve25519"</code> という<em>規格外の組み合わせ</em>で生成する（同プロジェクトのテストコードで確認。spec は Montgomery 曲線を他機構で生成すると CKR_CURVE_NOT_SUPPORTED と規定）。</p>
+
+<!-- ================= 背骨1 ================= -->
+<h2 class="sec">背骨① — 「強度の指定方法」は6系統に分かれる</h2>
+<div class="prose">
+<p>09 の <span class="mk mk-g">生</span> リーフ（MODULUS / EC_POINT / VALUE …）と機構をつなぐ軸は、<strong>呼出側が鍵の強度・サイズを何で伝えるか</strong>。全生成機構は次の6系統のどれかに落ちる。</p>
+</div>
+<div class="sys-grid">
+  <div class="sys"><span class="k">① ビット数 — CKA_MODULUS_BITS</span><p><strong>RSA</strong> 専用。公開鍵テンプレートに 2048 等を書く。私鍵側に書くのは 09 の罠①</p></div>
+  <div class="sys"><span class="k">② 曲線 — CKA_EC_PARAMS</span><p><strong>EC / Edwards / Montgomery</strong>。DER 符号化の曲線OID（または curveName）。数値でなく「どの曲線か」で強度が決まる</p></div>
+  <div class="sys"><span class="k">③ バイト長 — CKA_VALUE_LEN</span><p><strong>AES / GENERIC_SECRET</strong>。可変長の共通鍵はこれが必須。AES は 16/24/32 のみ</p></div>
+  <div class="sys"><span class="k">④ 固定長 — 指定なし</span><p><strong>DES / DES2 / DES3</strong>。長さがアルゴリズム定義で 8/16/24 バイトに固定。VALUE_LEN を<em>書かない</em>（要求するのは AES/CAST 等の可変長側）</p></div>
+  <div class="sys"><span class="k">⑤ ドメインパラメタ — PRIME 等</span><p><strong>DH</strong>（PRIME, BASE）/ <strong>DSA</strong>（PRIME, SUBPRIME, BASE）。群そのものをテンプレートに書き込む。素数長＝強度</p></div>
+  <div class="sys"><span class="k">⑥ パラメタセット — CKA_PARAMETER_SET</span><p><strong>ML-KEM / ML-DSA / SLH-DSA</strong>（v3.2 追加）。FIPS 203/204/205 が定めた離散メニューから1つ選ぶ。数値指定の自由度は無い</p></div>
+</div>
+
+<!-- ================= tree ================= -->
+<h2 class="sec">系統別ツリー — 各機構の「書く属性」と「埋まる属性」</h2>
+
+<div class="tree">
+
+<details class="node d0" open>
+  <summary><span class="tw">▸</span><span class="node-title">鍵生成メカニズム</span><span class="node-cko">C_GenerateKey / C_GenerateKeyPair</span><span class="node-note">全機構に共通する寄与から始まる</span></summary>
+  <div class="attrs">
+    <div class="attr"><span class="name">CKA_CLASS / CKA_KEY_TYPE</span><span class="badges"><span class="mk mk-g">生</span><span class="mk mk-d">黙</span></span><span class="desc"><strong>全生成機構が寄与</strong>（spec の contributes 列挙に必ず含まれる）。テンプレートに書いた場合は機構と矛盾すると CKR_TEMPLATE_INCONSISTENT</span></div>
+    <div class="attr"><span class="name">CKA_LOCAL</span><span class="badges"><span class="mk mk-r">読</span></span><span class="desc">生成機構経由なら <strong>CK_TRUE</strong> が付く。鍵の出自証明（09 の Key 共通層のリーフがここで埋まる）</span></div>
+    <div class="attr"><span class="name">CKA_KEY_GEN_MECHANISM</span><span class="badges"><span class="mk mk-r">読</span></span><span class="desc">使った CKM_* がそのまま記録される。CKA_LOCAL=false の鍵では CK_UNAVAILABLE_INFORMATION</span></div>
+  </div>
+  <div class="sticky-note">この表の各機構で「寄与」と書くのは上記共通分を除いた<strong>型固有の“生”属性</strong>。用途フラグ（CKA_SIGN 等）は全機構共通でテンプレート指定または既定値。</div>
+
+  <div class="children">
+
+  <!-- ===== ① MODULUS_BITS ===== -->
+  <details class="node d1" open>
+    <summary><span class="tw">▸</span><span class="node-title">① ビット数系 — MODULUS_BITS</span><span class="node-cko">RSA</span><span class="node-note">数値1つで強度を指定する唯一の非対称系</span></summary>
+    <div class="children">
+    <details class="node d2 mech ready" open>
+      <summary><span class="tw">▸</span><span class="node-title">RSA 鍵ペア生成</span><span class="node-cko">CKM_RSA_PKCS_KEY_PAIR_GEN → CKK_RSA</span><span class="node-note"><span class="av av-ok">SoftHSM2 ✓</span><span class="av av-ok">cryptoki ✓</span></span></summary>
+      <div class="grp">呼出側が書く（公開鍵テンプレート）</div>
+      <div class="attrs">
+        <div class="attr hl-req"><span class="name">CKA_MODULUS_BITS</span><span class="badges"><span class="mk mk-w">書</span></span><span class="desc"><strong>必須</strong>。法 n のビット長（例 2048）。私鍵テンプレートには書かない（09 罠①）</span></div>
+        <div class="attr"><span class="name">CKA_PUBLIC_EXPONENT</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc">省略時は<strong>機構が既定 0x10001 (65537) を補う</strong>。0x10001 を使えないトークンは別値（乱数含む）でも可、供給値を使えなければ CKR_TEMPLATE_INCONSISTENT — spec 原文で確認</span></div>
+      </div>
+      <div class="grp">機構が埋める（公開鍵）</div>
+      <div class="attrs">
+        <div class="attr"><span class="name">CKA_MODULUS</span><span class="badges"><span class="mk mk-g">生</span></span><span class="desc">法 n。09 の RSA 公開鍵リーフ</span></div>
+        <div class="attr"><span class="name">CKA_PUBLIC_EXPONENT</span><span class="badges"><span class="mk mk-g">生</span></span><span class="desc">e（テンプレート供給時はコピー）</span></div>
+      </div>
+      <div class="grp">機構が埋める（私鍵）</div>
+      <div class="attrs">
+        <div class="attr"><span class="name">CKA_MODULUS / CKA_PUBLIC_EXPONENT / CKA_PRIVATE_EXPONENT</span><span class="badges"><span class="mk mk-g">生</span></span><span class="desc">spec 上は「<strong>may also contribute</strong>」だが、v2.40 以降 MODULUS と PRIVATE_EXPONENT はトークンが必ず返せる建付け（09 参照）</span></div>
+        <div class="attr"><span class="name">CKA_PRIME_1/2, CKA_EXPONENT_1/2, CKA_COEFFICIENT</span><span class="badges"><span class="mk mk-g">生</span></span><span class="desc">CRT 成分。保持はトークン次第（may contribute）</span></div>
+      </div>
+    </details>
+    </div>
+  </details>
+
+  <!-- ===== ② EC_PARAMS ===== -->
+  <details class="node d1" open>
+    <summary><span class="tw">▸</span><span class="node-title">② 曲線系 — EC_PARAMS</span><span class="node-cko">EC / Edwards / Montgomery</span><span class="node-note">3機構とも寄与の形は同一。違いは許される曲線だけ</span></summary>
+    <div class="attrs">
+      <div class="attr hl-req"><span class="name">CKA_EC_PARAMS</span><span class="badges"><span class="mk mk-w">書</span></span><span class="desc"><strong>公開鍵テンプレートに必須</strong>（DER 符号化の曲線OID または curveName）。機構はこれを私鍵側にもコピーして寄与する</span></div>
+      <div class="attr"><span class="name">CKA_EC_POINT（公開鍵）</span><span class="badges"><span class="mk mk-g">生</span></span><span class="desc">公開点 Q。3機構共通の公開側寄与</span></div>
+      <div class="attr"><span class="name">CKA_EC_PARAMS ＋ CKA_VALUE（私鍵）</span><span class="badges"><span class="mk mk-g">生</span></span><span class="desc">秘密値 d。3機構共通の私鍵側寄与（spec 原文で3節とも同文を確認）</span></div>
+    </div>
+    <div class="children">
+    <details class="node d2 mech ready">
+      <summary><span class="tw">▸</span><span class="node-title">短ヴァイエルシュトラス EC</span><span class="node-cko">CKM_EC_KEY_PAIR_GEN → CKK_EC</span><span class="node-note"><span class="av av-ok">SoftHSM2 ✓</span><span class="av av-ok">cryptoki ✓</span></span></summary>
+      <div class="attrs">
+        <div class="attr"><span class="name">曲線</span><span class="badges"><span class="mk mk-w">書</span></span><span class="desc">P-256 / P-384 / P-521 等（ANSI X9.62）。SoftHSM2 は <code>#ifdef WITH_ECC</code> 配下（configure <code>--enable-ecc</code>、既定 detect＝バックエンド対応があれば有効）。cryptoki は EccKeyPairGen（0.10 で利用可）</span></div>
+      </div>
+    </details>
+    <details class="node d2 mech ready">
+      <summary><span class="tw">▸</span><span class="node-title">Edwards 曲線（署名系）</span><span class="node-cko">CKM_EC_EDWARDS_KEY_PAIR_GEN → CKK_EC_EDWARDS</span><span class="node-note"><span class="av av-ok">SoftHSM2 ✓</span><span class="av av-ok">cryptoki ✓</span></span></summary>
+      <div class="attrs">
+        <div class="attr"><span class="name">曲線</span><span class="badges"><span class="mk mk-w">書</span></span><span class="desc">edwards25519 / edwards448（RFC 8032）または id-Ed25519 / id-Ed448（RFC 8410）<strong>のみ</strong>。他機構でこれらの曲線を指定すると CKR_CURVE_NOT_SUPPORTED。SoftHSM2 は <code>WITH_EDDSA</code> 配下（<code>--enable-eddsa</code>、既定 detect）</span></div>
+      </div>
+    </details>
+    <details class="node d2 mech">
+      <summary><span class="tw">▸</span><span class="node-title">Montgomery 曲線（鍵交換系）</span><span class="node-cko">CKM_EC_MONTGOMERY_KEY_PAIR_GEN → CKK_EC_MONTGOMERY</span><span class="node-note"><span class="av av-ng">SoftHSM2 ✗</span><span class="av av-ok">cryptoki ✓</span></span></summary>
+      <div class="attrs">
+        <div class="attr"><span class="name">曲線</span><span class="badges"><span class="mk mk-w">書</span></span><span class="desc">curve25519 / curve448（RFC 7748）または id-X25519 / id-X448。cryptoki には EccMontgomeryKeyPairGen が 0.10 からある</span></div>
+        <div class="attr"><span class="name">SoftHSM2 の代替経路</span><span class="badges"><span class="mk mk-r">読</span></span><span class="desc"><em>本機構は 2.6.x にも develop にも未実装</em>。SoftHSM2 で X25519 鍵を作るには CKM_EC_EDWARDS_KEY_PAIR_GEN ＋ CKK_EC_EDWARDS ＋ EC_PARAMS=PrintableString "curve25519" という<strong>規格から外れたベンダー流儀</strong>を使う（公式テストコードの流儀）</span></div>
+      </div>
+    </details>
+    </div>
+  </details>
+
+  <!-- ===== ③ VALUE_LEN ===== -->
+  <details class="node d1" open>
+    <summary><span class="tw">▸</span><span class="node-title">③ バイト長系 — VALUE_LEN</span><span class="node-cko">AES / GENERIC_SECRET</span><span class="node-note">可変長の共通鍵。09 の CKA_VALUE_LEN リーフがここで埋まる</span></summary>
+    <div class="children">
+    <details class="node d2 mech ready">
+      <summary><span class="tw">▸</span><span class="node-title">AES 鍵生成</span><span class="node-cko">CKM_AES_KEY_GEN → CKK_AES</span><span class="node-note"><span class="av av-ok">SoftHSM2 ✓</span><span class="av av-ok">cryptoki ✓</span></span></summary>
+      <div class="attrs">
+        <div class="attr hl-req"><span class="name">CKA_VALUE_LEN</span><span class="badges"><span class="mk mk-w">書</span></span><span class="desc"><strong>必須</strong>。16 / 24 / 32 バイト（AES-128/192/256）。SoftHSM2 はソース上3値とも受理（<code>keyLen != 16 && != 24 && != 32</code> で弾く判定を 2.6.1 と develop の両方で確認 — 192bit も可）</span></div>
+        <div class="attr"><span class="name">CKA_VALUE</span><span class="badges"><span class="mk mk-g">生</span></span><span class="desc">鍵バイト列。spec: contributes CKA_CLASS, CKA_KEY_TYPE, CKA_VALUE</span></div>
+      </div>
+    </details>
+    <details class="node d2 mech ready">
+      <summary><span class="tw">▸</span><span class="node-title">汎用シークレット鍵生成</span><span class="node-cko">CKM_GENERIC_SECRET_KEY_GEN → CKK_GENERIC_SECRET</span><span class="node-note"><span class="av av-ok">SoftHSM2 ✓</span><span class="av av-ok">cryptoki ✓</span></span></summary>
+      <div class="attrs">
+        <div class="attr hl-req"><span class="name">CKA_VALUE_LEN</span><span class="badges"><span class="mk mk-w">書</span></span><span class="desc"><strong>必須</strong>（spec: must specify）。HMAC 鍵の素材づくりに使う。CK_MECHANISM_INFO の min/max は<strong>ビット単位</strong>という注意書きあり</span></div>
+        <div class="attr"><span class="name">CKA_VALUE</span><span class="badges"><span class="mk mk-g">生</span></span><span class="desc">乱数バイト列。※この機構の節には他と違い contributes の明示列挙が無い（spec の記述ムラ）。VALUE を埋めるのは動作として自明だが原文の言質は無い点に注意</span></div>
+      </div>
+    </details>
+    </div>
+  </details>
+
+  <!-- ===== ④ 固定長 ===== -->
+  <details class="node d1" open>
+    <summary><span class="tw">▸</span><span class="node-title">④ 固定長系 — 指定なし</span><span class="node-cko">DES / DES2 / DES3</span><span class="node-note alert">VALUE_LEN を書いてはいけない側</span></summary>
+    <div class="children">
+    <details class="node d2 mech ready">
+      <summary><span class="tw">▸</span><span class="node-title">DES 系鍵生成（レガシー）</span><span class="node-cko">CKM_DES_KEY_GEN / DES2 / DES3 → CKK_DES / DES2 / DES3</span><span class="node-note"><span class="av av-ok">SoftHSM2 ✓</span><span class="av av-ok">cryptoki ✓</span></span></summary>
+      <div class="attrs">
+        <div class="attr"><span class="name">強度指定</span><span class="badges"></span><span class="desc"><strong>なし</strong>。鍵長はアルゴリズム定義で固定 — DES: 8 / DES2: 16 / DES3: 24 バイト（DES3 の CKA_VALUE は「always 24 bytes long」と属性表で確認）。CK_MECHANISM_INFO の min/max も「not used」</span></div>
+        <div class="attr"><span class="name">CKA_VALUE</span><span class="badges"><span class="mk mk-g">生</span></span><span class="desc">contributes CKA_CLASS, CKA_KEY_TYPE, CKA_VALUE（パリティビットは FIPS 46-3 準拠で機構が正しく設定）。<strong>VALUE_LEN を要求するのは CAST 等の可変長側</strong>という対比が spec 原文にある</span></div>
+        <div class="attr"><span class="name">仕様上の現在地</span><span class="badges"><span class="mk mk-r">読</span></span><span class="desc">単長 DES の生成節は現行 spec 本文から<strong>歴史的機構（hist）付録へ移動済み</strong>。DES2 の生成節は本文に残るが、DES3_KEY_GEN は機構表への掲載のみで専用の散文節が無い（DES2 節からの類推になる）</span></div>
+      </div>
+    </details>
+    </div>
+  </details>
+
+  <!-- ===== ⑤ ドメインパラメタ ===== -->
+  <details class="node d1" open>
+    <summary><span class="tw">▸</span><span class="node-title">⑤ ドメインパラメタ系 — PRIME / BASE</span><span class="node-cko">DH / DSA</span><span class="node-note alert">SoftHSM2 にはあるが cryptoki 安全層に無い側</span></summary>
+    <div class="children">
+    <details class="node d2 mech">
+      <summary><span class="tw">▸</span><span class="node-title">DH 鍵ペア生成（PKCS #3）</span><span class="node-cko">CKM_DH_PKCS_KEY_PAIR_GEN → CKK_DH</span><span class="node-note"><span class="av av-ok">SoftHSM2 ✓</span><span class="av av-ng">cryptoki ✗</span></span></summary>
+      <div class="grp">呼出側が書く</div>
+      <div class="attrs">
+        <div class="attr hl-req"><span class="name">CKA_PRIME / CKA_BASE</span><span class="badges"><span class="mk mk-w">書</span></span><span class="desc"><strong>公開鍵テンプレートに必須</strong>（p と g。PKCS #3 の phase I）。SoftHSM2 は欠けると CKR_TEMPLATE_INCOMPLETE</span></div>
+        <div class="attr"><span class="name">CKA_VALUE_BITS</span><span class="badges"><span class="mk mk-w">書</span><span class="mk mk-d">黙</span></span><span class="desc"><strong>私鍵テンプレートに任意</strong>。指定すると秘密値 x のビット長を制限。未指定なら機構が実際の x のビット長を書き込む（SoftHSM2 のコードでも確認）</span></div>
+      </div>
+      <div class="grp">機構が埋める</div>
+      <div class="attrs">
+        <div class="attr"><span class="name">CKA_VALUE（公開鍵）</span><span class="badges"><span class="mk mk-g">生</span></span><span class="desc">公開値 y</span></div>
+        <div class="attr"><span class="name">CKA_PRIME, CKA_BASE, CKA_VALUE（私鍵）</span><span class="badges"><span class="mk mk-g">生</span></span><span class="desc">秘密値 x ＋ ドメインパラメタのコピー（＋未指定時 VALUE_BITS）。「other attributes required … must be specified」と、他属性の既定値補完を約束<em>しない</em>文体なのも DH/DSA の特徴</span></div>
+      </div>
+    </details>
+    <details class="node d2 mech">
+      <summary><span class="tw">▸</span><span class="node-title">DSA 鍵ペア生成（FIPS 186-4）</span><span class="node-cko">CKM_DSA_KEY_PAIR_GEN → CKK_DSA</span><span class="node-note"><span class="av av-ok">SoftHSM2 ✓</span><span class="av av-ng">cryptoki ✗</span></span></summary>
+      <div class="attrs">
+        <div class="attr hl-req"><span class="name">CKA_PRIME / CKA_SUBPRIME / CKA_BASE</span><span class="badges"><span class="mk mk-w">書</span></span><span class="desc"><strong>公開鍵テンプレートに必須</strong>（p, q, g）。DH との違いは SUBPRIME が1本増えること</span></div>
+        <div class="attr"><span class="name">CKA_VALUE（公開鍵 y／私鍵 x）</span><span class="badges"><span class="mk mk-g">生</span></span><span class="desc">私鍵側には PRIME, SUBPRIME, BASE もコピーされて寄与（spec 原文確認）</span></div>
+      </div>
+    </details>
+    </div>
+  </details>
+
+  <!-- ===== ⑥ PARAMETER_SET ===== -->
+  <details class="node d1" open>
+    <summary><span class="tw">▸</span><span class="node-title">⑥ パラメタセット系 — PARAMETER_SET</span><span class="node-cko">ML-KEM / ML-DSA / SLH-DSA（v3.2 追加）</span><span class="node-note alert">cryptoki 0.11〜 にはあるが apt 版 SoftHSM2 に無い側</span></summary>
+    <div class="attrs">
+      <div class="attr hl-req"><span class="name">CKA_PARAMETER_SET</span><span class="badges"><span class="mk mk-w">書</span></span><span class="desc"><strong>公開鍵テンプレートに必須</strong>。v3.2 で追加された属性（0x061d）。v3.1 のヘッダには存在しない — 3.01/3.02 の公式ヘッダ比較で確認。cryptoki では Attribute::ParameterSet(ParameterSetType)</span></div>
+    </div>
+    <div class="children">
+    <details class="node d2 mech">
+      <summary><span class="tw">▸</span><span class="node-title">ML-KEM 鍵ペア生成（FIPS 203）</span><span class="node-cko">CKM_ML_KEM_KEY_PAIR_GEN → CKK_ML_KEM</span><span class="node-note"><span class="av av-warn">SoftHSM2 △</span><span class="av av-warn">cryptoki △</span></span></summary>
+      <div class="attrs">
+        <div class="attr"><span class="name">CKA_PARAMETER_SET</span><span class="badges"><span class="mk mk-w">書</span></span><span class="desc">CKP_ML_KEM_<strong>512 / 768 / 1024</strong>（spec と cryptoki MlKemParameterSetType の両方で確認）</span></div>
+        <div class="attr"><span class="name">CKA_VALUE（公開鍵）</span><span class="badges"><span class="mk mk-g">生</span></span><span class="desc">カプセル化鍵（encapsulation key）</span></div>
+        <div class="attr"><span class="name">CKA_PARAMETER_SET, CKA_SEED, CKA_VALUE（私鍵）</span><span class="badges"><span class="mk mk-g">生</span></span><span class="desc"><strong>CKA_SEED も寄与</strong>（FIPS 203 の鍵は seed から再構成できるため）。古典機構に無い新顔の“生”リーフ</span></div>
+        <div class="attr"><span class="name">可否</span><span class="badges"><span class="mk mk-r">読</span></span><span class="desc">SoftHSM2: develop ブランチ ＋ <code>WITH_ML_KEM</code>（<code>--enable-mlkem</code>、既定 detect）で対応 — <em>apt の 2.6.x には無い＝要ソースビルド</em>。cryptoki: MlKemKeyPairGen は <strong>0.11.0 から</strong>（本リポジトリ固定の 0.10 には無い→クレート更新が必要）</span></div>
+      </div>
+    </details>
+    <details class="node d2 mech">
+      <summary><span class="tw">▸</span><span class="node-title">ML-DSA 鍵ペア生成（FIPS 204）</span><span class="node-cko">CKM_ML_DSA_KEY_PAIR_GEN → CKK_ML_DSA</span><span class="node-note"><span class="av av-warn">SoftHSM2 △</span><span class="av av-warn">cryptoki △</span></span></summary>
+      <div class="attrs">
+        <div class="attr"><span class="name">CKA_PARAMETER_SET</span><span class="badges"><span class="mk mk-w">書</span></span><span class="desc">CKP_ML_DSA_<strong>44 / 65 / 87</strong></span></div>
+        <div class="attr"><span class="name">公: VALUE ／ 私: PARAMETER_SET, SEED, VALUE</span><span class="badges"><span class="mk mk-g">生</span></span><span class="desc">寄与の形は ML-KEM と同型（SEED あり）</span></div>
+        <div class="attr"><span class="name">可否</span><span class="badges"><span class="mk mk-r">読</span></span><span class="desc">SoftHSM2: develop ＋ <code>WITH_ML_DSA</code>（<code>--enable-mldsa</code>）＝要ソースビルド。cryptoki: MlDsaKeyPairGen は 0.11.0 から</span></div>
+      </div>
+    </details>
+    <details class="node d2 mech">
+      <summary><span class="tw">▸</span><span class="node-title">SLH-DSA 鍵ペア生成（FIPS 205）</span><span class="node-cko">CKM_SLH_DSA_KEY_PAIR_GEN → CKK_SLH_DSA</span><span class="node-note"><span class="av av-ng">SoftHSM2 ✗</span><span class="av av-warn">cryptoki △</span></span></summary>
+      <div class="attrs">
+        <div class="attr"><span class="name">CKA_PARAMETER_SET</span><span class="badges"><span class="mk mk-w">書</span></span><span class="desc">CKP_SLH_DSA_{<strong>SHA2 | SHAKE</strong>}_{<strong>128 | 192 | 256</strong>}{<strong>S | F</strong>} の <strong>12種</strong>（S=小さい署名/F=速い生成）。spec と cryptoki SlhDsaParameterSetType の両方で確認 — 「名称要確認」は解消</span></div>
+        <div class="attr"><span class="name">公: VALUE ／ 私: PARAMETER_SET, VALUE</span><span class="badges"><span class="mk mk-g">生</span></span><span class="desc">ML 系と違い <strong>CKA_SEED は寄与しない</strong>（spec 原文の contributes 列挙に無い）</span></div>
+        <div class="attr"><span class="name">可否</span><span class="badges"><span class="mk mk-r">読</span></span><span class="desc"><em>SoftHSM2 には develop ブランチにも実装が無い</em>（ソース全文 grep で 0 件）。ローカルでのテスト経路が現状存在しない唯一の行。cryptoki: SlhDsaKeyPairGen は 0.11.0 から</span></div>
+      </div>
+    </details>
+    </div>
+  </details>
+
+  </div><!-- /root children -->
+</details>
+
+</div><!-- /tree -->
+
+<!-- ================= 背骨2 ================= -->
+<h2 class="sec">背骨② — 非対称ギャップ：族ごとに「どちらのライブラリで叩くか」が決まる</h2>
+<div class="prose">
+<p>可否2列を突き合わせると、<strong>仕様には揃っているのに実装側で互い違いに欠ける</strong>構図が見える。</p>
+<p><strong>古典側の欠け（DH / DSA）</strong>：spec にも SoftHSM2（apt 2.6.x）にもあるが、rust-cryptoki 安全層には <code>Mechanism</code> enum の variant が<em>どのリリースにも無い</em>（0.10 / 0.11 / 0.12 / main を確認）。叩くには <code>cryptoki-sys</code> の生 FFI か libloading 直叩きが必須。</p>
+<p><strong>PQC 側の欠け（ML-KEM / ML-DSA / SLH-DSA）</strong>：cryptoki 安全層は 0.11.0 で3機構とも揃えたが、SoftHSM2 は ML 系が develop ブランチのソースビルド限定（apt 2.6.x に無し）、SLH-DSA に至っては <em>develop にも実装が無い</em>。さらに本リポジトリは <code>cryptoki = "0.10"</code> 固定なので、PQC を書くにはまずクレート更新が要る。</p>
+<p>つまり「cryptoki（安全層）＋ libloading（生FFI）」の二刀流は好みの問題ではなく、<strong>DH/DSA をやるなら生FFI しか無く、PQC をやるなら安全層（0.11+）しか無い</strong>という消去法で決まる。本プロジェクトの構成（src/main.rs=生FFI ／ src/bin/hsm.rs=cryptoki）はこのギャップにそのまま対応している。</p>
+</div>
+
+<!-- ================= 09接続 ================= -->
+<h2 class="sec">09 との接続 — “生”リーフの出どころ対応</h2>
+<div class="prose">
+<p>09 のツリーで <span class="mk mk-g">生</span> が付いたリーフは、この表の機構が埋める：RSA 公開鍵の <code>MODULUS</code>・私鍵の <code>PRIVATE_EXPONENT</code> 以下 CRT 成分 → ①、EC の <code>EC_POINT</code>／<code>VALUE</code> → ②、AES の <code>VALUE</code> → ③。逆方向に見ると、<strong>09 の属性ツリーに未掲載の鍵型</strong>が本表から浮かび上がる — 古典系では <code>CKK_DH</code>（PRIME / BASE / VALUE / VALUE_BITS）と <code>CKK_DSA</code>（PRIME / SUBPRIME / BASE / VALUE）の2型のみ（EC は 09 に既出、DES は CKA_VALUE 以外の型固有属性を持たない）。加えて v3.2 の PQC 3型（PARAMETER_SET / SEED / VALUE）も 09 のスコープ外。09 を増補するならこの5型が候補になる。</p>
+</div>
+
+<!-- ================= honesty ================= -->
+<div class="honesty">
+  <div class="t">▸ 裏取りの範囲（正直な明示）</div>
+  <ul>
+    <li><strong>一次確認済み</strong>：各機構の「テンプレートで指定する属性」「contributes（寄与）する属性」の全行は OASIS 仕様の原文（機構ごとの節）と突き合わせた。RSA の PUBLIC_EXPONENT 既定 0x10001（不可なら別値可）、DH の VALUE_BITS 補完、ML 系私鍵への CKA_SEED 寄与、SLH-DSA に SEED が無いこと、PARAMETER_SET 定数の全名称（ML-KEM 512/768/1024・ML-DSA 44/65/87・SLH-DSA 12種）、CKA_PARAMETER_SET / CKK_ML_* が v3.1 ヘッダに無く v3.2 ヘッダにあることも原文・公式ヘッダで確認。実装可否は rust-cryptoki（タグ 0.10.0/0.11.0/0.12.0 と main の Mechanism enum）、SoftHSMv2（タグ 2.6.1 と develop の SoftHSM.cpp / configure）のソースで確認した。</li>
+    <li><strong>確認手段の注記</strong>：docs.oasis-open.org が本セッションから到達不能だったため、仕様原文は OASIS TC の公式 GitHub リポジトリ（oasis-tcs/pkcs11）の spec ソース（現行ワーキング版 Markdown）＋公式公開ヘッダ（published/3-01, 3-02）で検証した。公開版 HTML との節番号の照合は行っていない。また本セッション環境に SoftHSM2 が無く、実機での <code>C_GetMechanismList</code> 実行確認は行っていない（可否列はソース確認ベース）。</li>
+    <li><strong>下書きからの訂正3点</strong>：(1) <em>SLH-DSA は SoftHSMv2 に develop 含め未実装</em>（「要ソースビルド」ですらない）。(2) <em>CKM_EC_MONTGOMERY_KEY_PAIR_GEN も SoftHSMv2 未実装</em> — X25519 は Edwards 機構＋curveName という規格外流儀で代替。(3) <em>cryptoki 安全層の PQC 対応は 0.11.0 から</em>で、本リポジトリの 0.10 には無い。また configure フラグの既定は「on」ではなく <em>detect</em>（バックエンド検出）。</li>
+    <li><strong>独自整理</strong>：「強度指定6系統」の分類軸と、機構→09 の“生”リーフの対応付けはこちらで構成した整理。DES3_KEY_GEN の寄与は専用節が spec に無いため DES2 節と DES3 属性表（VALUE 固定 24B）からの類推。GENERIC_SECRET_KEY_GEN は spec に contributes の明示列挙が無く、VALUE 寄与は動作からの推定。</li>
+    <li><strong>スコープ外</strong>：導出（CKM_*_DERIVE / HKDF / KBKDF）、ラップ、ドメインパラメタ生成（CKM_DSA/DH_PKCS_PARAMETER_GEN）、GOST、SHA*_KEY_GEN、HSS/XMSS。ベンダー差（鍵長上限、既定値、PQC の中身の実装品質）は本番 HSM で必ず再確認のこと。</li>
+  </ul>
+</div>
+
+<div class="sources">
+  出典：
+  <a href="https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.html" target="_blank" rel="noopener">[1] OASIS PKCS#11 Specification v3.1 §6（各鍵生成機構の節）</a> ·
+  <a href="https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.2/pkcs11-spec-v3.2.html" target="_blank" rel="noopener">[2] OASIS PKCS#11 Specification v3.2（ML-KEM / ML-DSA / SLH-DSA, CKA_PARAMETER_SET）</a> ·
+  <a href="https://github.com/oasis-tcs/pkcs11" target="_blank" rel="noopener">[3] oasis-tcs/pkcs11（spec ソース Markdown・公式ヘッダ 3-01/3-02 — 本表の検証に使用）</a> ·
+  <a href="https://github.com/parallaxsecond/rust-cryptoki" target="_blank" rel="noopener">[4] rust-cryptoki: cryptoki/src/mechanism/mod.rs（Mechanism enum）・object.rs（ParameterSetType）</a> ·
+  <a href="https://github.com/softhsm/SoftHSMv2" target="_blank" rel="noopener">[5] SoftHSMv2: src/lib/SoftHSM.cpp・m4/acx_crypto_backend.m4（2.6.1 / develop）</a>
+</div>
+
+</div><!-- /wrap -->
+
+<script>
+(function(){
+  const body=document.body;
+  const btnR=document.getElementById('btn-ready');
+  btnR.addEventListener('click',()=>{
+    const on=body.classList.toggle('ready-only');
+    btnR.classList.toggle('active',on);
+    btnR.setAttribute('aria-pressed',on?'true':'false');
+    btnR.textContent=on?'すべて表示に戻す':'いま叩ける行だけ';
+    if(on){document.querySelectorAll('details.node').forEach(d=>d.open=true);}
+  });
+  document.getElementById('btn-expand').addEventListener('click',()=>{
+    document.querySelectorAll('details.node').forEach(d=>d.open=true);
+  });
+  document.getElementById('btn-collapse').addEventListener('click',()=>{
+    document.querySelectorAll('details.node').forEach(d=>{if(!d.classList.contains('d0'))d.open=false;});
+  });
+})();
+</script>
+</body>
+</html>
