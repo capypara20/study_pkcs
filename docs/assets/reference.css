@@ -1,0 +1,133 @@
+/* =========================================================
+   reference.css — リファレンス系ドキュメント（09, 10, …）共有スタイル
+   紙面テーマ変数 / マーカー(書黙生読粘) / 可否チップ(✓△✗) /
+   details ツリー / 属性行グリッド / 早見マトリクス / 系統カード /
+   凡例パネル / 裏取り・出典セクション / 表示フィルタ
+   ページ固有の色調整が要る場合は各 HTML 側の <style> で上書きする
+   ========================================================= */
+:root{
+  --paper:#fdfaf2; --paper-2:#faf6ec; --ink:#18233a; --ink-muted:#6d7591;
+  --line:#d6cdb7; --line-soft:#e6dcc4;
+  --red:#a83a2b; --blue:#5e88a6; --amber:#a5741f; --gray:#6d7591; --purple:#6f4d86;
+  --green:#4a7a4d;
+  --mono:'JetBrains Mono',monospace; --sans:'Zen Kaku Gothic New',sans-serif; --serif:'Shippori Mincho',serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.65;padding:2.5rem 1.2rem 5rem}
+.wrap{max-width:980px;margin:0 auto}
+
+/* ---------- header ---------- */
+.doc-tag{font-family:var(--mono);font-size:.72rem;letter-spacing:.22em;color:var(--ink-muted);text-transform:uppercase}
+h1{font-family:var(--serif);font-size:clamp(1.6rem,4vw,2.2rem);font-weight:700;margin:.4rem 0 .3rem}
+.subtitle{color:var(--ink-muted);font-size:.95rem;max-width:46em}
+.header-rule{border:none;border-top:1px solid var(--line);margin:1.6rem 0}
+
+/* ---------- caveat ---------- */
+.caveat{border:1px solid var(--red);background:rgba(168,58,43,.05);padding:1rem 1.2rem;margin:1.4rem 0;border-radius:2px}
+.caveat .t{font-family:var(--mono);font-size:.72rem;letter-spacing:.18em;color:var(--red);font-weight:700;margin-bottom:.35rem}
+.caveat p{font-size:.9rem}
+.caveat code{font-family:var(--mono);font-size:.85em;background:var(--paper-2);padding:0 .3em;border:1px solid var(--line-soft)}
+
+/* ---------- legend + controls ---------- */
+.panel{display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-start;justify-content:space-between;margin:1.6rem 0 1rem;padding:1rem 1.2rem;background:var(--paper-2);border:1px solid var(--line)}
+.legend{display:flex;flex-wrap:wrap;gap:.5rem .9rem;font-size:.82rem}
+.legend .item{display:flex;align-items:center;gap:.4rem}
+.controls{display:flex;gap:.5rem;flex-wrap:wrap}
+button.ctl{font-family:var(--mono);font-size:.75rem;padding:.45rem .8rem;background:var(--paper);border:1px solid var(--ink);color:var(--ink);cursor:pointer;letter-spacing:.05em}
+button.ctl:hover{background:var(--ink);color:var(--paper)}
+button.ctl:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+button.ctl.active{background:var(--red);border-color:var(--red);color:#fff}
+
+/* ---------- markers（09と同じ体系） ---------- */
+.mk{font-family:var(--mono);font-size:.68rem;font-weight:700;padding:.05rem .38rem;border-radius:2px;white-space:nowrap;border:1px solid}
+.mk-w{color:var(--red);border-color:var(--red);background:rgba(168,58,43,.07)}
+.mk-d{color:var(--amber);border-color:var(--amber);background:rgba(165,116,31,.08)}
+.mk-g{color:var(--blue);border-color:var(--blue);background:rgba(94,136,166,.09)}
+.mk-r{color:var(--gray);border-color:var(--gray);background:rgba(109,117,145,.08)}
+.mk-s{color:var(--purple);border-color:var(--purple);background:rgba(111,77,134,.08)}
+
+/* ---------- availability chips（10 で追加） ---------- */
+.av{font-family:var(--mono);font-size:.68rem;font-weight:700;padding:.05rem .38rem;border-radius:2px;white-space:nowrap;border:1px solid}
+.av-ok{color:var(--green);border-color:var(--green);background:rgba(74,122,77,.08)}
+.av-warn{color:var(--amber);border-color:var(--amber);background:rgba(165,116,31,.08)}
+.av-ng{color:var(--red);border-color:var(--red);background:rgba(168,58,43,.07)}
+
+/* ---------- quick matrix ---------- */
+.matrix-scroll{overflow-x:auto;border:1px solid var(--line);margin:1.2rem 0}
+table.matrix{border-collapse:collapse;width:100%;min-width:900px;font-size:.78rem}
+table.matrix th{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-muted);background:var(--paper-2);border-bottom:1px solid var(--line);padding:.5rem .55rem;text-align:left;white-space:nowrap}
+table.matrix td{border-bottom:1px solid var(--line-soft);padding:.45rem .55rem;vertical-align:top}
+table.matrix tr:last-child td{border-bottom:none}
+table.matrix td.m{font-family:var(--mono);font-size:.72rem;font-weight:600;white-space:nowrap}
+table.matrix td .sub{display:block;color:var(--ink-muted);font-size:.72rem}
+table.matrix code{font-family:var(--mono);font-size:.92em}
+body.ready-only table.matrix tr.mech:not(.ready){opacity:.22}
+
+/* ---------- 系統カード ---------- */
+.sys-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.sys{border:1px solid var(--line);background:var(--paper-2);padding:.7rem .9rem}
+.sys .k{font-family:var(--mono);font-size:.72rem;font-weight:700;color:var(--red)}
+.sys p{font-size:.8rem;color:var(--ink-muted);margin-top:.15rem}
+.sys p strong{color:var(--ink)}
+
+/* ---------- tree（09 流用） ---------- */
+.tree{margin-top:1.2rem}
+details.node{position:relative;margin:.35rem 0}
+details.node>summary{list-style:none;cursor:pointer;display:flex;align-items:baseline;gap:.6rem;padding:.5rem .8rem;background:var(--paper-2);border:1px solid var(--line);user-select:none;flex-wrap:wrap}
+details.node>summary::-webkit-details-marker{display:none}
+details.node>summary:hover{border-color:var(--ink)}
+details.node>summary:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+.tw{font-family:var(--mono);font-size:.7rem;color:var(--ink-muted);width:1em;flex:none;transition:transform .15s}
+details[open]>summary .tw{transform:rotate(90deg)}
+.node-title{font-family:var(--serif);font-weight:700;font-size:1.02rem}
+.node-cko{font-family:var(--mono);font-size:.74rem;color:var(--ink-muted)}
+.node-note{font-size:.78rem;color:var(--ink-muted);margin-left:auto;text-align:right;display:flex;gap:.3rem;align-items:center}
+.node-note.alert{color:var(--red);font-weight:500}
+
+details.d0>summary{border-left:4px solid var(--ink)}
+details.d1>summary{border-left:4px solid var(--blue)}
+details.d2>summary{border-left:4px solid var(--red)}
+details.d3>summary{border-left:4px solid var(--amber)}
+
+.children{margin-left:1.35rem;padding-left:1.15rem;border-left:1px solid var(--line)}
+
+/* ---------- attribute rows（09 流用） ---------- */
+.attrs{margin:.4rem 0 .7rem}
+.attr{display:grid;grid-template-columns:minmax(190px,240px) auto 1fr;gap:.35rem .8rem;align-items:baseline;padding:.32rem .6rem;border-bottom:1px solid var(--line-soft);font-size:.86rem;transition:opacity .18s}
+.attr:last-child{border-bottom:none}
+.attr .name{font-family:var(--mono);font-size:.8rem;font-weight:600;word-break:break-all}
+.attr .badges{display:flex;gap:.3rem;flex-wrap:wrap}
+.attr .desc{color:var(--ink-muted);font-size:.82rem}
+.attr .desc strong{color:var(--ink)}
+.attr .desc em{color:var(--red);font-style:normal;font-weight:500}
+.attr.hl-req .name{color:var(--red)}
+@media (max-width:640px){.attr{grid-template-columns:1fr;gap:.15rem}}
+
+/* ---------- 表示フィルタ（body クラスで切替。reference.js の data-toggle と対） ---------- */
+/* 09: ［書］だけ表示 */
+body.writable-only .attr:not(.w){opacity:.18}
+body.writable-only .attr.w{background:rgba(168,58,43,.045)}
+/* 10: いま叩ける行だけ */
+body.ready-only details.mech:not(.ready){opacity:.22}
+
+.grp{font-family:var(--mono);font-size:.68rem;letter-spacing:.15em;color:var(--ink-muted);margin:.7rem .6rem .15rem;text-transform:uppercase}
+.sticky-note{font-family:var(--mono);font-size:.74rem;color:var(--purple);margin:.3rem .6rem .5rem;padding:.4rem .6rem;background:rgba(111,77,134,.05);border-left:2px solid var(--purple)}
+
+/* ---------- 本文セクション ---------- */
+h2.sec{font-family:var(--serif);font-size:1.25rem;font-weight:700;margin:2.4rem 0 .6rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+.prose{font-size:.9rem;max-width:52em}
+.prose p{margin:.5rem 0}
+.prose code{font-family:var(--mono);font-size:.85em;background:var(--paper-2);padding:0 .3em;border:1px solid var(--line-soft)}
+.prose strong{color:var(--ink)}
+.prose em{color:var(--red);font-style:normal;font-weight:500}
+
+/* footer */
+.sources{margin-top:2.5rem;padding-top:1.2rem;border-top:1px solid var(--line);font-size:.8rem;color:var(--ink-muted)}
+.sources a{color:var(--blue)}
+.honesty{margin-top:1.2rem;border:1px dashed var(--line);padding:.9rem 1.1rem;font-size:.82rem;color:var(--ink-muted)}
+.honesty .t{font-family:var(--mono);font-size:.7rem;letter-spacing:.18em;color:var(--ink);margin-bottom:.3rem}
+.honesty ul{margin:.3rem 0 .3rem 1.2rem}
+.honesty li{margin:.25rem 0}
+.honesty strong{color:var(--ink)}
+.honesty em{color:var(--red);font-style:normal;font-weight:500}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}

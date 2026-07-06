@@ -18,7 +18,7 @@ cargo run --bin hsm -- help     # cryptoki セットプログラム
 
 🌐 **Web 版（GitHub Pages）**: <https://capypara20.github.io/study_pkcs/>
 
-上流から下流へ、粒度がだんだん細かく深くなる順（**用語 → 基礎概念 → 認証/情報 → 関数 → 操作フロー → 鍵生成 → Rust 実装**）。
+上流から下流へ、粒度がだんだん細かく深くなる順（**用語 → 基礎概念 → 認証/情報 → 関数 → 操作フロー → 鍵生成 → Rust 実装**）。09 以降は実装時に横に置く**引き表リファレンス**。
 
 | ファイル | 内容 |
 |---|---|
@@ -30,6 +30,8 @@ cargo run --bin hsm -- help     # cryptoki セットプログラム
 | [docs/06.鍵生成の詳解.html](docs/06.鍵生成の詳解.html) | **鍵生成の深掘り**（属性の意味・RSA/EC/Ed25519/X25519/AES/HMAC の作り方・鍵→署名の対応） |
 | [docs/07.PKCS11-Rust生FFI実装.html](docs/07.PKCS11-Rust生FFI実装.html) | 生 FFI 実装・型マッピング |
 | [docs/08.cryptoki-セットプログラム解説.html](docs/08.cryptoki-セットプログラム解説.html) | cryptoki 版の設計・C API 対応・使い方 |
+| [docs/09.PKCS11-属性階層リファレンス.html](docs/09.PKCS11-属性階層リファレンス.html) | **属性の引き表**（定義の系譜ツリー・「誰が値を決めるか」マーカー 書/黙/生/読/粘） |
+| [docs/10.PKCS11-メカニズム層リファレンス.html](docs/10.PKCS11-メカニズム層リファレンス.html) | **鍵生成メカニズムの引き表**（強度指定 6 系統・09 の“生”属性との接続・SoftHSM2/cryptoki 可否） |
 
 ---
 
